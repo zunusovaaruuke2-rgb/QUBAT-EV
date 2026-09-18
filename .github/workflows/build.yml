@@ -25,7 +25,8 @@ jobs:
 
       - name: Unpack Android project
         run: unzip -o QUBAT_EV_GitHub_Upload.zip
-
+      - name: Fix Android 12 splash resources
+        run: rm -rf QUBAT_EV_Android/app/src/main/res/values-v31
       - name: Build APK
         working-directory: QUBAT_EV_Android
         run: gradle assembleDebug --stacktrace
@@ -35,4 +36,5 @@ jobs:
         with:
           name: QUBAT-EV-APK
           path: QUBAT_EV_Android/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: errorless 
+          if-no-files-found: error
+          
