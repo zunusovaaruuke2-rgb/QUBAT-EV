@@ -83,12 +83,12 @@ import androidx.compose.ui.unit.Dp
             val active=mutableSetOf<PressInteraction.Press>()
             source.interactions.collect {interaction->when(interaction) {
                 is PressInteraction.Press -> {release?.cancel();active.add(interaction);pressed=true}
-                is PressInteraction.Release -> {active.remove(interaction.press);if(active.isEmpty())release=launch {delay(70);pressed=false}}
+                is PressInteraction.Release -> {active.remove(interaction.press);if(active.isEmpty())release=launch {delay(180);pressed=false}}
                 is PressInteraction.Cancel -> {active.remove(interaction.press);release?.cancel();if(active.isEmpty())pressed=false}
             }}
         }
     }
-    val fraction=animateFloatAsState(if(pressed && enabled)1f else 0f,tween(if(pressed)75 else 150),label="press-compression")
+    val fraction=animateFloatAsState(if(pressed && enabled)1f else 0f,tween(if(pressed)60 else 180),label="press-compression")
     return graphicsLayer {
         val value=fraction.value
         scaleX=1f-(1f-pressedScale)*value
