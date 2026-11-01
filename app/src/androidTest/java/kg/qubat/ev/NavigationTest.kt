@@ -200,7 +200,8 @@ class NavigationTest {
             manager.setTestProviderEnabled(android.location.LocationManager.GPS_PROVIDER,true)
             try {
                 compose.onNodeWithText("Карта",useUnmergedTree=true).performClick()
-                compose.onNodeWithContentDescription("Моя позиция").performClick()
+                val positionButton=compose.onNodeWithContentDescription("Моя позиция")
+                if(!positionButton.fetchSemanticsNode().config.contains(SemanticsProperties.Disabled)) positionButton.performClick()
                 fun fix(lat:Double,lon:Double) {
                     manager.setTestProviderLocation(android.location.LocationManager.GPS_PROVIDER,android.location.Location(android.location.LocationManager.GPS_PROVIDER).apply {
                         latitude=lat;longitude=lon;accuracy=5f;time=System.currentTimeMillis();elapsedRealtimeNanos=android.os.SystemClock.elapsedRealtimeNanos()
