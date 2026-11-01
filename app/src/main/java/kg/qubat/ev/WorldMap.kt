@@ -8,13 +8,20 @@ import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.LinkAnnotation
+import kotlin.math.log2
+import kotlin.math.roundToInt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.ExperimentalComposeUiApi
-import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -40,20 +47,18 @@ import java.util.Locale
 private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
 
 @Suppress("DEPRECATION")
-@OptIn(ExperimentalComposeUiApi::class)
 @Composable fun WorldMap(stations:List<Station>,city:String?,location:GeoPoint?,selectedId:String,
     modifier:Modifier,focusRequest:Int,zoomRequest:Int,onSelect:(Station)->Unit) {
     val context=LocalContext.current
     val owner=LocalLifecycleOwner.current
+    val density=LocalDensity.current.density
     val select by rememberUpdatedState(onSelect)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var viewport by remember { mutableStateOf("Карта загружается") }
     var ready by remember { mutableStateOf(false) }
     var loadError by remember {mutableStateOf(false)}
-    val markerStations=remember { mutableMapOf<Long,Station>() }
     val icons=remember {mutableMapOf<String,org.maplibre.android.annotations.Icon>()}
     val mapView=remember {
-        fun px(dp:Int)=(dp*context.resources.displayMetrics.density).toInt()
         MapLibre.getInstance(context)
         MapView(context).also { view ->
             view.onCreate(null)
@@ -63,19 +68,13 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                 native.setMinZoomPreference(0.0)
                 native.setMaxZoomPreference(19.0)
                 native.uiSettings.apply {
-                    isScrollGesturesEnabled=true; isHorizontalScrollGesturesEnabled=true; isZoomGesturesEnabled=true
-                    isRotateGesturesEnabled=true; isTiltGesturesEnabled=false
-                    isAttributionEnabled=true; isLogoEnabled=false
-                    setAttributionMargins(px(12),px(110),px(12),px(12))
-                    attributionGravity=android.view.Gravity.TOP or android.view.Gravity.END
-                    logoGravity=android.view.Gravity.TOP or android.view.Gravity.START
-                    setLogoMargins(px(12),px(135),px(12),px(12))
+                    setAllGesturesEnabled(false)
+                    isCompassEnabled=false; isAttributionEnabled=false; isLogoEnabled=false
                 }
                 native.addOnCameraIdleListener {
                     val centre=native.projection.fromScreenLocation(PointF(view.width/2f,view.height/2f))
                     viewport=String.format(Locale.ROOT,"Масштаб %.1f; %.3f, %.3f",native.zoom,centre.latitude,centre.longitude)
                 }
-                native.setOnMarkerClickListener { marker -> markerStations[marker.id]?.let(select); true }
                 map=native
                 viewport="Масштаб 5.0; 41.500, 74.700"
                 native.setStyle(Style.Builder().fromUri(WORLD_STYLE)) { ready=true;loadError=false }
@@ -109,15 +108,14 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     LaunchedEffect(map,stations,selectedId,ready,location) {
         val native=map ?: return@LaunchedEffect
         if(!ready) return@LaunchedEffect
-        native.clear();markerStations.clear()
+        native.clear()
         stations.forEach { station ->
             val iconKey="${station.connectorCount}:${station.availableConnectors}:${station.status}:${station.id==selectedId}"
             val icon=icons.getOrPut(iconKey) {IconFactory.getInstance(context).fromBitmap(stationMarker(station,station.id==selectedId))}
-            val marker=native.addMarker(MarkerOptions().position(LatLng(station.point.lat,station.point.lon))
+            native.addMarker(MarkerOptions().position(LatLng(station.point.lat,station.point.lon))
                 .title("ДЕМО · ${station.city}")
                 .snippet("${station.availableConnectors} из ${station.connectorCount} свободно · GB/T DC")
                 .icon(icon))
-            markerStations[marker.id]=station
         }
         location?.let { native.addMarker(MarkerOptions().position(LatLng(it.lat,it.lon)).title("Ваша позиция")) }
     }
@@ -134,14 +132,39 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     }
     Box(modifier) {
         AndroidView(factory={mapView},modifier=Modifier.fillMaxSize().testTag("world-map").semantics {contentDescription="Карта мира";stateDescription=viewport+if(ready) " · карта загружена" else " · ожидание сети"})
-        // One MotionEvent stream goes directly to the native pan/pinch/tap recognizers.
-        // The Compose controls above this map retain their own touch targets.
-        Box(Modifier.matchParentSize().pointerInteropFilter { event ->
-            mapView.dispatchTouchEvent(event)
-            true
-        })
+        // Compose owns touch recognition; native projection/camera own the geographic transform.
+        Box(Modifier.matchParentSize()
+            .pointerInput(map) {
+                detectTransformGestures(panZoomLock=true) { centroid,pan,scale,_ ->
+                    val native=map ?: return@detectTransformGestures
+                    if(pan!=Offset.Zero) {
+                        val target=native.projection.fromScreenLocation(PointF(mapView.width/2f-pan.x,mapView.height/2f-pan.y))
+                        native.moveCamera(CameraUpdateFactory.newLatLng(target))
+                    }
+                    if(scale!=1f && scale>0f) native.moveCamera(CameraUpdateFactory.zoomBy(log2(scale.toDouble()),android.graphics.Point(centroid.x.roundToInt(),centroid.y.roundToInt())))
+                }
+            }
+            .pointerInput(map,stations) {
+                detectTapGestures(
+                    onDoubleTap={ point ->map?.animateCamera(CameraUpdateFactory.zoomBy(1.0,android.graphics.Point(point.x.roundToInt(),point.y.roundToInt())))},
+                    onTap={ point ->
+                        val native=map ?: return@detectTapGestures
+                        fun distance(station:Station):Float {
+                            val projected=native.projection.toScreenLocation(LatLng(station.point.lat,station.point.lon))
+                            return (Offset(projected.x,projected.y-20*density)-point).getDistance()
+                        }
+                        stations.minByOrNull(::distance)?.takeIf {distance(it)<44*density}?.let(select)
+                    }
+                )
+            })
         Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=76.dp,start=16.dp,end=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(8.dp),color=SurfaceGreen.copy(alpha=.92f)) {
-            Text("© OpenStreetMap · OpenMapTiles · OpenFreeMap",fontSize=10.sp,color=Muted,modifier=Modifier.clickable {context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse("https://openfreemap.org/")))}.padding(6.dp))
+            Text(buildAnnotatedString {
+                withLink(LinkAnnotation.Url("https://www.openstreetmap.org/copyright")) {append("© OpenStreetMap")}
+                append(" · ")
+                withLink(LinkAnnotation.Url("https://openmaptiles.org/")) {append("© OpenMapTiles")}
+                append(" · ")
+                withLink(LinkAnnotation.Url("https://openfreemap.org/")) {append("OpenFreeMap")}
+            },fontSize=10.sp,color=Muted,modifier=Modifier.padding(6.dp))
         }
         if(!ready) Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=140.dp,start=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(10.dp),color=SurfaceGreen) {
             Text(if(loadError) "Карта недоступна · проверьте интернет" else "Загрузка карты · нужен интернет",modifier=Modifier.padding(8.dp),fontSize=11.sp,color=Muted)

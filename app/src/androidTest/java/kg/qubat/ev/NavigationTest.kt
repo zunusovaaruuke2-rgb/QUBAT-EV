@@ -13,6 +13,7 @@ import org.maplibre.android.maps.MapLibreMap
 import android.view.View
 import android.view.ViewGroup
 import android.graphics.PointF
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import org.junit.Rule
 import org.junit.Test
@@ -55,6 +56,19 @@ class NavigationTest {
                 onView(isAssignableFrom(MapView::class.java)).perform(GeneralSwipeAction(Swipe.SLOW,GeneralLocation.CENTER,GeneralLocation.CENTER_LEFT,Press.FINGER))
                 try {compose.waitUntil(10000) {kotlin.math.abs(centre().longitude-initialLongitude)>0.001}}
                 catch(failure:Throwable) {throw AssertionError("Долгота до: $initialLongitude; центр экрана после: ${centre()}",failure)}
+            }
+            step("Масштабирование двумя пальцами") {
+                val beforePinch=zoom()
+                map.performTouchInput {
+                    down(0,Offset(width*.43f,height*.4f));down(1,Offset(width*.57f,height*.4f))
+                    for(index in 1..10) {
+                        updatePointerTo(0,Offset(width*(.43f-.015f*index),height*.4f))
+                        updatePointerTo(1,Offset(width*(.57f+.015f*index),height*.4f))
+                        move(32)
+                    }
+                    up(0);up(1)
+                }
+                compose.waitUntil(10000) {zoom()>beforePinch+0.4}
             }
             compose.onNodeWithContentDescription("Уменьшить карту").performClick()
         }
