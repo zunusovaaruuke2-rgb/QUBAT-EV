@@ -132,8 +132,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
         if(context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED) locate()
         else permission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION))
     }
-    val stations=remember(state.session?.connectorId,state.completedConnectorIds) {
-        DemoData.stations.map {it.withConnectorSession(state.session?.connectorId,state.completedConnectorIds)}
+    val stations=remember(state.session?.connectorId,state.completedConnectorIds,demoBatteryPercent(state.progress.energyKwh)) {
+        DemoData.stations.map {it.withConnectorSession(state.session?.connectorId,state.completedConnectorIds,demoBatteryPercent(state.progress.energyKwh))}
     }
     val filtered=filterStations(stations,query,city,minPower,statusName?.let { StationStatus.valueOf(it) })
     val visible=location?.let { p -> filtered.sortedBy { distanceKm(p,it.point) } } ?: filtered
@@ -174,6 +174,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                                 Text(station.city,color=Lime,fontSize=13.sp); Text(station.title,fontSize=22.sp,fontWeight=FontWeight.Bold)
                                 Text("GB/T DC  ·  80 кВт  ·  13,5 сом/кВт·ч",color=Muted,fontSize=13.sp)
                                 chosenPort?.let {Text("Аппарат ${station.chargerNumber(it.id)} · разъём ${it.number} · ${it.state.title}",color=Color(it.state.argb),fontSize=13.sp)}
+                                if(state.session!=null) Text("Заряд батареи: ${demoBatteryPercent(state.progress.energyKwh)}% · демо",color=Lime,fontWeight=FontWeight.Bold)
                                 Text(if(state.session!=null) "● Симуляция активна" else station.status.title,color=if(station.status==StationStatus.AVAILABLE)Lime else Amber)
                             }
                             Box(Modifier.fillMaxWidth().height(220.dp),contentAlignment=Alignment.Center) {

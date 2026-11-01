@@ -32,9 +32,11 @@ data class Station(val id:String,val city:String,val title:String,val point:GeoP
     fun freeConnector(id:String?=null):Connector?=connectors.firstOrNull {(id==null || it.id==id) && it.state==ConnectorState.FREE}
     fun chargerNumber(connectorId:String):Int?=chargers.firstOrNull {unit->unit.connectors.any {it.id==connectorId}}?.number
 }
-fun Station.withConnectorSession(activeId:String?,completed:Set<String>):Station=copy(chargers=chargers.map {unit->
+fun demoBatteryPercent(energyKwh:Double):Int = (20 + energyKwh.coerceAtLeast(0.0) / 60.0 * 100).toInt().coerceIn(20,100)
+
+fun Station.withConnectorSession(activeId:String?,completed:Set<String>,activePercent:Int=20):Station=copy(chargers=chargers.map {unit->
     unit.copy(connectors=unit.connectors.map {port->when {
-        port.id==activeId -> port.copy(state=ConnectorState.CHARGING,percent=null)
+        port.id==activeId -> port.copy(state=ConnectorState.CHARGING,percent=activePercent.coerceIn(0,100))
         port.id in completed -> port.copy(state=ConnectorState.COMPLETED,percent=null)
         else -> port
     }})

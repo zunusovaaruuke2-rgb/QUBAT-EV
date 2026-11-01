@@ -44,7 +44,7 @@ import androidx.compose.ui.unit.sp
         Box(Modifier.size(38.dp),contentAlignment=Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {drawCircle(color,style=Stroke(3.dp.toPx()))}
             when(port.state) {
-                ConnectorState.CHARGING -> if(port.percent!=null) Text("${port.percent}",color=color,fontSize=14.sp,fontWeight=FontWeight.Bold) else Icon(Icons.Default.PlayArrow,null,tint=color,modifier=Modifier.size(18.dp))
+                ConnectorState.CHARGING -> if(port.percent!=null) Text("${port.percent}%",color=color,fontSize=12.sp,fontWeight=FontWeight.Bold) else Icon(Icons.Default.PlayArrow,null,tint=color,modifier=Modifier.size(18.dp))
                 ConnectorState.COMPLETED -> Icon(Icons.Default.Check,null,tint=color,modifier=Modifier.size(19.dp))
                 ConnectorState.ERROR -> Icon(Icons.Default.Warning,null,tint=color,modifier=Modifier.size(19.dp))
                 ConnectorState.OFFLINE -> Icon(Icons.Default.Close,null,tint=color,modifier=Modifier.size(19.dp))

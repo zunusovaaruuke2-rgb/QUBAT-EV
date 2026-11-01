@@ -102,4 +102,12 @@ class DomainTest {
     }
     @Test(expected=IllegalArgumentException::class) fun `negative time rejected`() {calculateCharge(-1,80,1350,100)}
     @Test(expected=IllegalArgumentException::class) fun `invalid tariff rejected`() {calculateCharge(1,80,0,100)}
+    @Test fun `demo battery percentage increases with energy and is capped`() {
+        assertEquals(20,demoBatteryPercent(0.0))
+        assertEquals(30,demoBatteryPercent(6.0))
+        assertEquals(100,demoBatteryPercent(100.0))
+        val site=DemoData.stations.first()
+        val port=site.freeConnector()!!
+        assertEquals(57,site.withConnectorSession(port.id,emptySet(),57).connectors.first {it.id==port.id}.percent)
+    }
 }
