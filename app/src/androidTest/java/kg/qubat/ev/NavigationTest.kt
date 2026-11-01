@@ -177,6 +177,14 @@ class NavigationTest {
         step("Кошелёк") {
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()
             visible("Учебный баланс")
+            listOf("Visa","О!Деньги","Элкарт","ELQR","MBANK","Бакай","Демир").forEach {compose.onNodeWithTag("payment-$it").assertExists()}
+            val vm=compose.runOnIdle {androidx.lifecycle.ViewModelProvider(compose.activity)[ChargingViewModel::class.java]}
+            val before=compose.runOnIdle {vm.state.value.balanceMinor}
+            compose.onNodeWithTag("payment-Visa").performScrollTo().performClick()
+            compose.onNodeWithText("Демо-пополнение").assertIsDisplayed()
+            compose.onNodeWithTag("confirm-demo-topup").performClick()
+            compose.waitUntil(5000) {vm.state.value.balanceMinor==before+50000L}
+            compose.onNodeWithText("Демо-пополнение").assertDoesNotExist()
         }
         step("Старт и остановка симуляции") {
             compose.onNodeWithText("Зарядка",useUnmergedTree=true).performClick()
@@ -203,6 +211,13 @@ class NavigationTest {
             visible("Демо-зарядка · Бишкек")
             compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
             visible("Демо-пользователь")
+            compose.onNodeWithTag("edit-profile").performScrollTo().performClick()
+            compose.onNodeWithTag("profile-field-first").performTextInput("Тест QUBAT")
+            compose.onNodeWithTag("save-profile").performClick()
+            visible("Тест QUBAT")
+            compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()
+            compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
+            visible("Тест QUBAT")
         }
         step("Живая геопозиция и повторное приближение к своей точке") {
             val automation=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation

@@ -137,12 +137,14 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                         onQuery={query=it},onCity={},onPower={minPower=it},onStatus={statusName=it},
                         onDetail={detailId=it.id},onConnector=::openConnector)
                 } else {
+                if(tab==Tab.CHARGE) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
                     androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.qubat_logo),"QUBAT",Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)))
                     Column(Modifier.weight(1f).padding(start=12.dp)) { Text("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); Text("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp) }
                     ThemeToggle()
                 }
-                HorizontalDivider(color=Color(0xFF203C30))
+                HorizontalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.3f))
+                }
                 Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                     when(tab) {
                         Tab.HOME -> Unit
@@ -159,32 +161,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                                 onRelease={chosenPort?.let {vm.releaseConnector(it.id)}},
                                 onStations={tabName=Tab.STATIONS.name})
                         }
-                        Tab.WALLET -> {
-                            Eyebrow("ТОЛЬКО УЧЕБНЫЕ СРЕДСТВА"); Title("Кошелёк")
-                            Panel {
-                                Text("Учебный баланс",color=Muted)
-                                Text(money((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0)),fontSize=32.sp,fontWeight=FontWeight.Bold,color=Lime)
-                                Text("Деньги не списываются с банковских карт",color=Muted,fontSize=12.sp)
-                                Button(onClick={vm.topUp();message("Добавлено 500 учебных сомов")},enabled=state.session==null) {Text("Добавить 500 учебных сомов")}
-                                if(state.session!=null) Text("Пополнение доступно после завершения сеанса",color=Amber,fontSize=12.sp)
-                            }
-                            Title("История операций")
-                            if(state.history.isEmpty()) Panel {Text("Здесь появится ваша история");Text("Завершите демо-зарядку или пополните учебный баланс.",color=Muted)}
-                            state.history.forEach { item -> Panel {
-                                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(item.title,modifier=Modifier.weight(1f),fontWeight=FontWeight.Medium);Text(if(item.amountMinor>0) "+${money(item.amountMinor)}" else money(item.amountMinor),color=if(item.amountMinor>0)Lime else MaterialTheme.colorScheme.onSurface,fontSize=13.sp)}
-                                Text(item.detail,color=Muted,fontSize=12.sp)
-                                Text(SimpleDateFormat("dd.MM.yyyy · HH:mm",Ru).format(Date(item.timestamp)),color=Muted,fontSize=11.sp)
-                            } }
-                        }
-                        Tab.PROFILE -> {
-                            Eyebrow("ЛИЧНЫЙ КАБИНЕТ");Title("Профиль")
-                            Panel { Icon(Icons.Default.Person,null,tint=Lime,modifier=Modifier.size(40.dp)); Text("Демо-пользователь",fontSize=24.sp,fontWeight=FontWeight.Bold); Text("Без регистрации · данные на этом устройстве",color=Muted) }
-                            Panel {Text("Мой автомобиль",color=Muted);Text("Учебный электромобиль · GB/T DC",fontWeight=FontWeight.Medium);Text("Проверяйте разъём своего автомобиля перед реальной зарядкой.",color=Muted,fontSize=12.sp)}
-                            Panel {Row(verticalAlignment=Alignment.CenterVertically) {Text("Оформление",Modifier.weight(1f));ThemeToggle()};Text(if(LocalNight.current) "Ночная тема" else "Дневная тема",color=Muted)}
-                            Panel {Text("Язык интерфейса");Text("Русский",color=Lime);Text("Регион · Кыргызская Республика",color=Muted)}
-                            Panel {Text("О приложении",fontWeight=FontWeight.Bold);Text("QUBAT EV  ${BuildConfig.VERSION_NAME}",color=Lime);Text("Нативное приложение на Kotlin и Jetpack Compose. Все станции, их статусы и операции — демонстрационные. API EEJANN и платежи не подключены.",color=Muted,fontSize=13.sp)}
-                            Panel {Text("Конфиденциальность",fontWeight=FontWeight.Bold);Text("Геопозиция используется для вашей точки на карте и расстояний. Геопозиция обновляется только пока приложение открыто. Учебный баланс и последние 100 операций сохраняются локально. При использовании карты её провайдер получает сетевые запросы; внешний навигатор получает выбранную точку.",color=Muted,fontSize=13.sp)}
-                        }
+                        Tab.WALLET -> WalletContent(state) {amount,method->vm.topUp(amount,method)}
+                        Tab.PROFILE -> ProfileContent(state) {tabName=Tab.WALLET.name}
                     }
                     Spacer(Modifier.height(8.dp))
                 }

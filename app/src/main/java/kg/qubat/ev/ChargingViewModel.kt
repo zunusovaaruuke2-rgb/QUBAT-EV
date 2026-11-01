@@ -76,10 +76,10 @@ class ChargingViewModel(app: Application): AndroidViewModel(app) {
         _state.value=s.copy(balanceMinor=(s.balanceMinor-s.progress.costMinor).coerceAtLeast(0),session=null,history=(listOf(entry)+s.history).take(100),completedConnectorIds=s.completedConnectorIds+session.connectorId)
         persist()
     }
-    fun topUp() {
+    fun topUp(amountMinor:Long=50000,method:String="Демо"):Boolean {
         val s=_state.value
-        if(s.session!=null) return
-        _state.value=s.copy(balanceMinor=s.balanceMinor+50000,history=(listOf(HistoryEntry("Учебное пополнение",50000,System.currentTimeMillis(),"Без банковской операции"))+s.history).take(100))
-        persist()
+        if(s.session!=null || amountMinor !in 100..5_000_000L || s.balanceMinor>Long.MAX_VALUE-amountMinor) return false
+        _state.value=s.copy(balanceMinor=s.balanceMinor+amountMinor,history=(listOf(HistoryEntry("Учебное пополнение · $method",amountMinor,System.currentTimeMillis(),"Демо · без банковской операции"))+s.history).take(100))
+        persist();return true
     }
 }
