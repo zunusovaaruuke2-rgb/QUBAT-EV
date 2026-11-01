@@ -61,19 +61,10 @@ import androidx.compose.ui.unit.sp
 @Composable fun StationEquipment(station:Station,onConnector:(Connector)->Unit) {
     var openedId by remember(station.id) {mutableStateOf<String?>(null)}
     station.chargers.firstOrNull {it.id==openedId}?.let {unit->
-        AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={openedId=null},title={AppText("Аппарат ${unit.number}")},text={
-            Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                AppText("${station.title} · ${unit.powerKw} кВт",fontSize=13.sp)
-                unit.connectors.forEach {port->
-                    DepthSurface(onClick={openedId=null;onConnector(port)},shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant) {
-                        Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically) {
-                            Box(Modifier.width(56.dp)) {ConnectorBadge(unit,port) {openedId=null;onConnector(port)}}
-                            Column {AppText("GB/T · разъём ${port.number}",fontWeight=FontWeight.Bold,fontSize=14.sp);AppText(port.state.title+(port.percent?.let {" · $it%"} ?: ""),fontSize=12.sp,color=Muted)}
-                        }
-                    }
-                }
-            }
-        },confirmButton={PressTextButton(onClick={openedId=null}) {AppText("Закрыть")}})
+        ApparatusDialog(station,unit,onDismiss={openedId=null},onConnector={port->
+            openedId=null
+            onConnector(port)
+        })
     }
     val columns=if(LocalConfiguration.current.screenWidthDp>=348) 3 else 2
     val rows=remember(station.chargers,columns) {station.chargers.chunked(columns)}

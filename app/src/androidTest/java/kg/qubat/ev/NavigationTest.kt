@@ -99,7 +99,13 @@ class NavigationTest {
                 compose.onNodeWithText("Аппарат 1").assertIsDisplayed()
                 compose.onNodeWithText("GB/T · разъём 1").assertIsDisplayed()
                 compose.onNodeWithText("GB/T · разъём 2").assertIsDisplayed()
+                compose.onNodeWithTag("apparatus-dialog").assertIsDisplayed()
                 compose.onNodeWithText("Закрыть").performClick()
+                compose.onNodeWithTag("apparatus-dialog").assertDoesNotExist()
+                compose.onNodeWithTag("apparatus-demo-bishkek-unit-1").performSemanticsAction(SemanticsActions.OnClick) {it()}
+                compose.onNodeWithTag("apparatus-dialog").assertIsDisplayed()
+                androidx.test.espresso.Espresso.pressBack()
+                compose.onNodeWithTag("apparatus-dialog").assertDoesNotExist()
                 compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-2").assertIsDisplayed().performClick()
                 compose.onNodeWithTag("connector-dialog-state").assertTextEquals("Заряжается")
                 compose.onNodeWithText("Закрыть").performClick()
