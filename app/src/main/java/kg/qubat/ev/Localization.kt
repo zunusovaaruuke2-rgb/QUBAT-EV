@@ -1,5 +1,9 @@
 package kg.qubat.ev
 
+import androidx.compose.ui.unit.dp
+
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -45,7 +49,7 @@ val LocalTranslate=staticCompositionLocalOf<(String)->String> {{it}}
 @Composable fun LanguagePicker(onDismiss:()->Unit) {
     val selected=LocalAppLanguage.current
     val change=LocalSetLanguage.current
-    AlertDialog(onDismissRequest=onDismiss,title={AppText("Язык")},text={
+    AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest=onDismiss,title={AppText("Язык")},text={
         androidx.compose.foundation.layout.Column {
             AppLanguage.entries.forEach {language->TextButton(onClick={change(language);onDismiss()}) {
                 RadioButton(selected=selected==language,onClick=null)

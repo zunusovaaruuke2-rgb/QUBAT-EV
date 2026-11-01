@@ -6,19 +6,33 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.collectLatest
+import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
+@Immutable
 data class HistoryEntry(val title: String, val amountMinor: Long, val timestamp: Long, val detail: String)
+@Immutable
 data class ChargeSession(val stationId: String, val startedAt: Long, val budgetMinor: Long,val connectorId:String="")
+@Immutable
 data class AppState(val balanceMinor: Long = 150000, val session: ChargeSession? = null,
     val progress: ChargeResult = ChargeResult(0,0.0,0,false), val history: List<HistoryEntry> = emptyList(),val completedConnectorIds:Set<String> = emptySet())
 class ChargingViewModel(app: Application): AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences("qubat_demo_v1",0)
     private val _state = MutableStateFlow(restore())
     val state = _state.asStateFlow()
-    init { tick(); viewModelScope.launch { while(true) { delay(1000); tick() } } }
+    init {
+        tick()
+        viewModelScope.launch {
+            state.map {it.session?.startedAt}.distinctUntilChanged().collectLatest {startedAt->
+                if(startedAt!=null) while(true) {delay(1000);tick()}
+            }
+        }
+    }
     private fun restore(): AppState = runCatching {
         val json = JSONObject(prefs.getString("state", "{}")!!)
         val items = json.optJSONArray("history") ?: JSONArray()

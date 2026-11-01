@@ -26,16 +26,16 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun StationFilterSheet(count:Int,city:String?,minPower:Int,statusName:String?,onCity:(String?)->Unit,onPower:(Int)->Unit,onStatus:(String?)->Unit,onDismiss:()->Unit) {
-    ModalBottomSheet(onDismissRequest=onDismiss,containerColor=SurfaceGreen) {
+    ModalBottomSheet(modifier=Modifier.depthFrame(RoundedCornerShape(topStart=28.dp,topEnd=28.dp),SurfaceGreen,3.dp,fill=false),onDismissRequest=onDismiss,containerColor=SurfaceGreen) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             Title("Фильтры")
             AppText("Мощность аппарата",color=Muted)
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf(0,50,80,120).forEach {power->
-                FilterChip(selected=minPower==power,onClick={onPower(power)},label={AppText(if(power==0)"Любая" else "≥ $power кВт")})
+                DepthChip(selected=minPower==power,onClick={onPower(power)},label={AppText(if(power==0)"Любая" else "≥ $power кВт")})
             }}
             AppText("Доступность локации",color=Muted);FlowRowCompatStatus(statusName,onStatus)
             AppText("Разъёмы · GB/T DC",color=Muted,fontSize=13.sp)
-            Button(onClick=onDismiss,modifier=Modifier.fillMaxWidth()) {AppText("Показать станции · $count")}
+            DepthButton(onClick=onDismiss,modifier=Modifier.fillMaxWidth()) {AppText("Показать станции · $count")}
             TextButton(onClick={onCity(null);onPower(0);onStatus(null)}) {AppText("Сбросить фильтры")}
         }
     }
@@ -78,18 +78,18 @@ import androidx.compose.ui.unit.sp
     androidx.activity.compose.BackHandler(expanded) {expanded=false;onQuery("");keyboard?.hide()}
     Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         if(expanded) {
-            OutlinedTextField(query,onQuery,modifier=Modifier.weight(1f).then(Modifier.focusRequester(focus)).testTag("station-search-field"),singleLine=true,
+            OutlinedTextField(query,onQuery,modifier=Modifier.weight(1f).then(Modifier.focusRequester(focus)).testTag("station-search-field").depthFrame(RoundedCornerShape(16.dp),SurfaceGreen,1.dp,fill=false),singleLine=true,
                 placeholder={AppText("Название станции",fontSize=14.sp)},leadingIcon={AppIcon(Icons.Default.Search,null)},
                 trailingIcon={IconButton(onClick={onQuery("");expanded=false;keyboard?.hide()}) {AppIcon(Icons.Default.Close,"Закрыть поиск")}},
                 shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}))
             LaunchedEffect(Unit) {focus.requestFocus();keyboard?.show()}
         } else {
-            Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen,shadowElevation=3.dp) {
+            DepthSurface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen,shadowElevation=3.dp) {
                 IconButton(onClick={expanded=true}) {AppIcon(Icons.Default.Search,"Поиск станции",tint=Lime)}
             }
             if(query.isNotBlank()) AppText(query,modifier=Modifier.weight(1f),maxLines=1,fontSize=13.sp) else Spacer(Modifier.weight(1f))
-            Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {ThemeToggle()}
-            Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {IconButton(onClick=onFilters) {AppIcon(Icons.Default.Settings,filterDescription,tint=Lime)}}
+            DepthSurface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {ThemeToggle()}
+            DepthSurface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {IconButton(onClick=onFilters) {AppIcon(Icons.Default.Settings,filterDescription,tint=Lime)}}
         }
     }
 }

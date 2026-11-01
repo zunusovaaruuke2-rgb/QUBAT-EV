@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
     Box(Modifier.fillMaxWidth().height(56.dp).testTag("connector-${port.id}")
         .clickable(role=Role.Button,onClick=onClick)
         .semantics {contentDescription=description;stateDescription=status},contentAlignment=Alignment.Center) {
-        Box(Modifier.size(38.dp),contentAlignment=Alignment.Center) {
+        Box(Modifier.size(38.dp).depthFrame(CircleShape,SurfaceGreen,1.dp),contentAlignment=Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {drawCircle(color,style=Stroke(3.dp.toPx()))}
             when(port.state) {
                 ConnectorState.CHARGING -> if(port.percent!=null) AppText("${port.percent}%",color=color,fontSize=12.sp,fontWeight=FontWeight.Bold) else AppIcon(Icons.Default.PlayArrow,null,tint=color,modifier=Modifier.size(18.dp))
@@ -61,11 +61,11 @@ import androidx.compose.ui.unit.sp
 @Composable fun StationEquipment(station:Station,onConnector:(Connector)->Unit) {
     var openedId by remember(station.id) {mutableStateOf<String?>(null)}
     station.chargers.firstOrNull {it.id==openedId}?.let {unit->
-        AlertDialog(onDismissRequest={openedId=null},title={AppText("Аппарат ${unit.number}")},text={
+        AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={openedId=null},title={AppText("Аппарат ${unit.number}")},text={
             Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 AppText("${station.title} · ${unit.powerKw} кВт",fontSize=13.sp)
                 unit.connectors.forEach {port->
-                    Surface(onClick={openedId=null;onConnector(port)},shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant) {
+                    DepthSurface(onClick={openedId=null;onConnector(port)},shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant) {
                         Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically) {
                             Box(Modifier.width(56.dp)) {ConnectorBadge(unit,port) {openedId=null;onConnector(port)}}
                             Column {AppText("GB/T · разъём ${port.number}",fontWeight=FontWeight.Bold,fontSize=14.sp);AppText(port.state.title+(port.percent?.let {" · $it%"} ?: ""),fontSize=12.sp,color=Muted)}
@@ -82,7 +82,7 @@ import androidx.compose.ui.unit.sp
             rows.forEach {units->
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.fillMaxWidth()) {
                     units.forEach {charger->
-                        Box(Modifier.weight(1f).background(MaterialTheme.colorScheme.surfaceVariant,RoundedCornerShape(14.dp)).border(1.dp,MaterialTheme.colorScheme.outline,RoundedCornerShape(14.dp)).clickable(role=Role.Button) {openedId=charger.id}.testTag("apparatus-${charger.id}")) {
+                        Box(Modifier.weight(1f).depthFrame(RoundedCornerShape(14.dp),MaterialTheme.colorScheme.surfaceVariant,1.dp).clickable(role=Role.Button) {openedId=charger.id}.testTag("apparatus-${charger.id}")) {
                             Column(Modifier.padding(vertical=6.dp)) {
                                 Row(Modifier.fillMaxWidth().padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                                     AppText(charger.number.toString(),fontSize=13.sp,fontWeight=FontWeight.Bold)
@@ -104,7 +104,7 @@ import androidx.compose.ui.unit.sp
 @Composable fun LocationEquipmentCard(station:Station,location:GeoPoint?,onDetail:()->Unit,onConnector:(Connector)->Unit) {
     val summary=remember(station.availableConnectors,station.connectorCount) {"Свободно ${station.availableConnectors} из ${station.connectorCount} разъёмов · 13,5 сом/кВт·ч"}
     val distance=remember(station.point,location) {location?.let {"${String.format(Ru,"%.1f",distanceKm(it,station.point))} км по прямой"}}
-    Surface(onClick=onDetail,shape=RoundedCornerShape(22.dp),color=SurfaceGreen) {
+    DepthSurface(onClick=onDetail,shape=RoundedCornerShape(22.dp),color=SurfaceGreen) {
         Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

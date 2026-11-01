@@ -124,7 +124,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     }
     run {
         Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) {data->Snackbar {AppText(data.visuals.message)}} },bottomBar={
-            NavigationBar(containerColor=SurfaceGreen) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={AppIcon(item.icon,item.label)},label={AppText(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
+            NavigationBar(modifier=Modifier.depthFrame(RoundedCornerShape(topStart=18.dp,topEnd=18.dp),SurfaceGreen,0.dp,fill=false),containerColor=SurfaceGreen) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={AppIcon(item.icon,item.label)},label={AppText(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 if(tab==Tab.HOME) {
@@ -136,6 +136,10 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                     StationsList(visible,query,city,minPower,statusName,location,
                         onQuery={query=it},onCity={},onPower={minPower=it},onStatus={statusName=it},
                         onDetail={detailId=it.id},onConnector=::openConnector)
+                } else if(tab==Tab.WALLET) {
+                    WalletContent((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0),state.session!=null,state.history) {amount,method->vm.topUp(amount,method)}
+                } else if(tab==Tab.PROFILE) {
+                    ProfileContent((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0)) {tabName=Tab.WALLET.name}
                 } else {
                 if(tab==Tab.CHARGE) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -161,8 +165,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                                 onRelease={chosenPort?.let {vm.releaseConnector(it.id)}},
                                 onStations={tabName=Tab.STATIONS.name})
                         }
-                        Tab.WALLET -> WalletContent(state) {amount,method->vm.topUp(amount,method)}
-                        Tab.PROFILE -> ProfileContent(state) {tabName=Tab.WALLET.name}
+                        Tab.WALLET -> Unit
+                        Tab.PROFILE -> Unit
                     }
                     Spacer(Modifier.height(8.dp))
                 }
@@ -171,7 +175,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
             focusedConnectorId?.let {id->
                 val site=stations.firstOrNull {s->s.connectors.any {it.id==id}}
                 val port=site?.connectors?.firstOrNull {it.id==id}
-                if(site!=null && port!=null) AlertDialog(onDismissRequest={focusedConnectorId=null},
+                if(site!=null && port!=null) AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={focusedConnectorId=null},
                     title={AppText("Аппарат ${site.chargerNumber(id)} · разъём ${port.number}")},
                     text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         AppText(port.state.title,color=Color(port.state.argb),fontWeight=FontWeight.Bold,modifier=Modifier.testTag("connector-dialog-state"))
@@ -192,11 +196,11 @@ private enum class Tab(val label: String,val icon: ImageVector) {
             }
             detailId?.let { id ->
                 val s=stations.first {it.id==id}
-                AlertDialog(onDismissRequest={detailId=null},title={AppText("${s.city} · ДЕМО")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={detailId=null},title={AppText("${s.city} · ДЕМО")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     AppText(s.title,fontWeight=FontWeight.Bold);AppText("${s.status.title} · ${s.availableConnectors} из ${s.connectorCount} мест свободно\n80 кВт на место · GB/T DC · 13,5 сом/кВт·ч")
                     AppText("Вымышленная станция у центра города. По этим координатам зарядной станции может не быть. Маршрут — только для проверки интерфейса.",color=Amber)
                     AppText("${s.point.lat}, ${s.point.lon}",color=Muted)
-                    OutlinedButton(onClick={openRoute(context,s,::message)},modifier=Modifier.fillMaxWidth()) {AppText("Учебный маршрут · 2ГИС")}
+                    DepthOutlinedButton(onClick={openRoute(context,s,::message)},modifier=Modifier.fillMaxWidth()) {AppText("Учебный маршрут · 2ГИС")}
                     TextButton(onClick={openGoogleRoute(context,s,::message)}) {AppText("Открыть маршрут в Google Maps")}
                 }},confirmButton={TextButton(onClick={selectedId=s.id;detailId=null;tabName=Tab.CHARGE.name}) {AppText("К зарядке")}},dismissButton={TextButton(onClick={detailId=null}){AppText("Закрыть")}})
             }
@@ -205,14 +209,14 @@ private enum class Tab(val label: String,val icon: ImageVector) {
 }
 @Composable fun Eyebrow(text:String) {AppText(text,color=Lime,fontSize=10.sp,letterSpacing=2.sp,fontWeight=FontWeight.Bold)}
 @Composable fun Title(text:String) {AppText(text,fontSize=25.sp,fontWeight=FontWeight.Bold)}
-@Composable fun Panel(content:@Composable ColumnScope.()->Unit) { Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(SurfaceGreen).padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp),content=content) }
+@Composable fun Panel(content:@Composable ColumnScope.()->Unit) { Column(Modifier.fillMaxWidth().depthFrame(RoundedCornerShape(22.dp),SurfaceGreen).padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp),content=content) }
 @Composable fun DemoNotice() {Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFF2B3624)).padding(12.dp),verticalAlignment=Alignment.CenterVertically) {AppIcon(Icons.Default.Info,null,tint=Amber,modifier=Modifier.size(18.dp));AppText(" Демо-данные. Станции вымышленные. Платежей нет.",color=Amber,fontSize=11.sp)}}
-@Composable fun Metric(label:String,value:String,modifier:Modifier) {Column(modifier.clip(RoundedCornerShape(18.dp)).background(SurfaceGreen).padding(16.dp)) {AppText(label,color=Muted,fontSize=12.sp);Spacer(Modifier.height(8.dp));AppText(value,fontSize=17.sp,fontWeight=FontWeight.Bold)}}
+@Composable fun Metric(label:String,value:String,modifier:Modifier) {Column(modifier.depthFrame(RoundedCornerShape(18.dp),SurfaceGreen).padding(16.dp)) {AppText(label,color=Muted,fontSize=12.sp);Spacer(Modifier.height(8.dp));AppText(value,fontSize=17.sp,fontWeight=FontWeight.Bold)}}
 @Composable fun FlowRowCompatStatus(selected:String?,onSelect:(String?)->Unit) {
     Column {Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-        FilterChip(selected=selected==null,onClick={onSelect(null)},label={AppText("Все")})
-        FilterChip(selected=selected==StationStatus.AVAILABLE.name,onClick={onSelect(StationStatus.AVAILABLE.name)},label={AppText("Свободны")})
-    };Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {StationStatus.entries.filter {it!=StationStatus.AVAILABLE}.forEach {s -> FilterChip(selected=selected==s.name,onClick={onSelect(s.name)},label={AppText(s.title)})}} }
+        DepthChip(selected=selected==null,onClick={onSelect(null)},label={AppText("Все")})
+        DepthChip(selected=selected==StationStatus.AVAILABLE.name,onClick={onSelect(StationStatus.AVAILABLE.name)},label={AppText("Свободны")})
+    };Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {StationStatus.entries.filter {it!=StationStatus.AVAILABLE}.forEach {s -> DepthChip(selected=selected==s.name,onClick={onSelect(s.name)},label={AppText(s.title)})}} }
 }
 fun openRoute(context:android.content.Context,s:Station,message:(String)->Unit) {
     // Official 2GIS deep link, longitude first; navigator determines the source.

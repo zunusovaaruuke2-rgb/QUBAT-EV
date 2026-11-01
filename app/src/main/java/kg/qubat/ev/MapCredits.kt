@@ -1,5 +1,7 @@
 package kg.qubat.ev
 
+import androidx.compose.foundation.shape.RoundedCornerShape
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,10 +18,10 @@ import androidx.compose.ui.unit.sp
 
 @Composable fun MapCredits() {
     var expanded by remember {mutableStateOf(false)}
-    Surface(shape=CircleShape,color=SurfaceGreen.copy(alpha=.9f),shadowElevation=2.dp) {
+    DepthSurface(shape=CircleShape,color=SurfaceGreen.copy(alpha=.9f),shadowElevation=2.dp) {
         TextButton(onClick={expanded=true},modifier=Modifier.size(36.dp).testTag("map-credits").appDescription("Источники карты"),contentPadding=PaddingValues(0.dp)) {AppText("©",fontSize=18.sp,color=Muted)}
     }
-    if(expanded) AlertDialog(onDismissRequest={expanded=false},title={AppText("Источники карты")},text={
+    if(expanded) AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={expanded=false},title={AppText("Источники карты")},text={
         Text(buildAnnotatedString {
             withLink(LinkAnnotation.Url("https://www.openstreetmap.org/copyright")) {append("© OpenStreetMap contributors")}
             append("\n\n")

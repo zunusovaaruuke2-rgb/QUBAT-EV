@@ -39,6 +39,6 @@ import com.google.maps.android.compose.*
             stations.forEach { s -> Marker(state=remember(s.id) {MarkerState(position=LatLng(s.point.lat,s.point.lon))},icon=remember(s,selectedId) {BitmapDescriptorFactory.fromBitmap(stationMarker(s,s.id==selectedId))},title="ДЕМО · ${s.city}",snippet="${s.availableConnectors} из ${s.connectorCount} свободно",onClick={onSelect(s);true})}
             location?.let {Marker(state=remember(it) {MarkerState(position=LatLng(it.lat,it.lon))},title="Вы здесь",anchor=androidx.compose.ui.geometry.Offset(.5f,.5f),icon=remember {BitmapDescriptorFactory.fromBitmap(userLocationMarker())})}
         }
-        if(!loaded) Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=90.dp,start=16.dp),color=SurfaceGreen) {AppText("Загрузка карты… Проверьте сеть и ключ",modifier=Modifier.padding(10.dp),fontSize=11.sp)}
+        if(!loaded) DepthSurface(modifier=Modifier.align(Alignment.TopStart).padding(top=90.dp,start=16.dp),color=SurfaceGreen) {AppText("Загрузка карты… Проверьте сеть и ключ",modifier=Modifier.padding(10.dp),fontSize=11.sp)}
     }
 }

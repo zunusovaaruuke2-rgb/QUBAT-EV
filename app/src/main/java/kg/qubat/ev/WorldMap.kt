@@ -59,7 +59,12 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     var viewport by remember { mutableStateOf("Карта загружается") }
     var ready by remember { mutableStateOf(false) }
     var loadError by remember {mutableStateOf(false)}
-    val icons=remember {mutableMapOf<String,org.maplibre.android.annotations.Icon>()}
+    val icons=remember {object:LinkedHashMap<String,org.maplibre.android.annotations.Icon>(32,.75f,true) {
+        override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,org.maplibre.android.annotations.Icon>?)=size>64
+    }}
+    val markers=remember {mutableMapOf<String,org.maplibre.android.annotations.Marker>()}
+    val markerKeys=remember {mutableMapOf<String,String>()}
+    var renderedStyle by remember {mutableStateOf<Style?>(null)}
     val mapView=remember {
         MapLibre.getInstance(context)
         MapView(context).also { view ->
@@ -112,19 +117,26 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
             mapView.onDestroy()
         }
     }
-    LaunchedEffect(map,stations,selectedId,ready,location) {
+    LaunchedEffect(map,stations,selectedId,ready,language) {
         val native=map ?: return@LaunchedEffect
         if(!ready) return@LaunchedEffect
-        native.clear()
-        stations.forEach { station ->
-            val iconKey="${station.chargerCount}:${station.connectors.joinToString {it.state.name}}:${station.id==selectedId}"
-            val icon=icons.getOrPut(iconKey) {IconFactory.getInstance(context).fromBitmap(stationMarker(station,station.id==selectedId))}
-            native.addMarker(MarkerOptions().position(LatLng(station.point.lat,station.point.lon))
-                .title("ДЕМО · ${station.city}")
-                .snippet("${station.availableConnectors} из ${station.connectorCount} свободно · GB/T DC")
-                .icon(icon))
+        if(renderedStyle!==native.style) {
+            markers.values.forEach {native.removeMarker(it)}
+            markers.clear();markerKeys.clear();renderedStyle=native.style
         }
-
+        val ids=stations.mapTo(hashSetOf()) {it.id}
+        markers.keys.filter {it !in ids}.forEach {id->markers.remove(id)?.let {native.removeMarker(it)};markerKeys.remove(id)}
+        stations.forEach {station->
+            val iconKey="${station.chargerCount}:${station.connectors.joinToString {it.state.name}}:${station.id==selectedId}"
+            val key="$iconKey:${station.point}:${station.availableConnectors}:${language.code}"
+            if(markerKeys[station.id]!=key) {
+                val icon=icons.getOrPut(iconKey) {IconFactory.getInstance(context).fromBitmap(stationMarker(station,station.id==selectedId))}
+                val existing=markers[station.id]
+                if(existing==null) markers[station.id]=native.addMarker(MarkerOptions().position(LatLng(station.point.lat,station.point.lon)).title(localize("ДЕМО · ${station.city}")).icon(icon))
+                else {existing.icon=icon;if(existing.position.latitude!=station.point.lat || existing.position.longitude!=station.point.lon)existing.position=LatLng(station.point.lat,station.point.lon);existing.title=localize("ДЕМО · ${station.city}")}
+                markerKeys[station.id]=key
+            }
+        }
     }
     LaunchedEffect(map,ready,location) {
         val style=map?.style ?: return@LaunchedEffect
@@ -180,7 +192,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
             Spacer(Modifier.size(1.dp).testTag("user-location").semantics {contentDescription=localize("Вы здесь");stateDescription="${location.lat},${location.lon}"})
         }
         Box(Modifier.align(Alignment.TopStart).padding(top=86.dp,start=16.dp)) {MapCredits()}
-        if(!ready) Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=140.dp,start=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(10.dp),color=SurfaceGreen) {
+        if(!ready) DepthSurface(modifier=Modifier.align(Alignment.TopStart).padding(top=140.dp,start=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(10.dp),color=SurfaceGreen) {
             AppText(if(loadError) "Карта недоступна · проверьте интернет" else "Загрузка карты · нужен интернет",modifier=Modifier.padding(8.dp),fontSize=11.sp,color=Muted)
         }
     }

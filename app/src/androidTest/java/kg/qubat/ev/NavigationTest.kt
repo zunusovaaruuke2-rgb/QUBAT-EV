@@ -26,7 +26,13 @@ class NavigationTest {
             throw AssertionError("QUBAT UI step: $name — ${failure.message}",failure)
         }
     }
+    private fun lazyContainer()=compose.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex))
+    private fun scrollTag(tag:String):SemanticsNodeInteraction {
+        if(compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()) lazyContainer().performScrollToNode(hasTestTag(tag))
+        return compose.onNodeWithTag(tag).performScrollTo()
+    }
     private fun visible(text:String) {
+        if(compose.onAllNodesWithText(text,substring=true).fetchSemanticsNodes().isEmpty()) lazyContainer().performScrollToNode(hasText(text,substring=true))
         val node=compose.onNodeWithText(text,substring=true)
         try {node.assertIsDisplayed()} catch(_:AssertionError) {node.performScrollTo().assertIsDisplayed()}
     }
@@ -72,10 +78,13 @@ class NavigationTest {
             fun zoom()=compose.runOnIdle {nativeMap!!.zoom}
             fun centre()=compose.runOnIdle {nativeMap!!.projection.fromScreenLocation(PointF(nativeView.width/2f,nativeView.height/2f))}
             step("Карта показывает аппараты и разъёмы") {
+                compose.waitUntil(10000) {compose.runOnIdle {nativeMap!!.annotations.size==DemoData.stations.size}}
+                val markerIds=compose.runOnIdle {nativeMap!!.annotations.map {it.id}.sorted()}
                 val pixel=compose.runOnIdle {val p=DemoData.stations.first().point;nativeMap!!.projection.toScreenLocation(org.maplibre.android.geometry.LatLng(p.lat,p.lon))}
                 val markerOffset=20*compose.activity.resources.displayMetrics.density
                 map.performTouchInput {click(Offset(pixel.x,pixel.y-markerOffset))}
                 compose.waitUntil(10000) {compose.onAllNodesWithTag("map-station-card").fetchSemanticsNodes().isNotEmpty()}
+                compose.runOnIdle {check(markerIds==nativeMap!!.annotations.map {it.id}.sorted()) {"Selecting a station recreated map markers"}}
                 compose.onNodeWithTag("port-number-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("1").assertIsDisplayed()
                 compose.onNodeWithTag("port-number-demo-bishkek-unit-1-port-2",useUnmergedTree=true).assertTextEquals("2").assertIsDisplayed()
                 compose.onNodeWithTag("apparatus-demo-bishkek-unit-1").performSemanticsAction(SemanticsActions.OnClick) {it()}
@@ -189,10 +198,11 @@ class NavigationTest {
         step("Кошелёк") {
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()
             visible("Учебный баланс")
-            listOf("Visa","О!Деньги","Элкарт","ELQR","MBANK","Бакай","Демир").forEach {compose.onNodeWithTag("payment-$it").assertExists()}
+            listOf("Visa","О!Деньги","Элкарт","ELQR","MBANK","Бакай","Демир").forEach {scrollTag("payment-$it").assertIsDisplayed()}
+            compose.onNodeWithTag("wallet-scroll").performScrollToIndex(0)
             val vm=compose.runOnIdle {androidx.lifecycle.ViewModelProvider(compose.activity)[ChargingViewModel::class.java]}
             val before=compose.runOnIdle {vm.state.value.balanceMinor}
-            compose.onNodeWithTag("payment-Visa").performScrollTo().performClick()
+            scrollTag("payment-Visa").performClick()
             compose.onNodeWithText("Демо-пополнение").assertIsDisplayed()
             compose.onNodeWithTag("confirm-demo-topup").performClick()
             compose.waitUntil(5000) {vm.state.value.balanceMinor==before+50000L}
@@ -223,7 +233,7 @@ class NavigationTest {
             visible("Демо-зарядка · Бишкек")
             compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
             visible("Демо-пользователь")
-            compose.onNodeWithTag("edit-profile").performScrollTo().performClick()
+            scrollTag("edit-profile").performClick()
             compose.onNodeWithTag("profile-field-first").performTextInput("Тест QUBAT")
             compose.onNodeWithTag("save-profile").performClick()
             visible("Тест QUBAT")
@@ -232,13 +242,13 @@ class NavigationTest {
             visible("Тест QUBAT")
         }
         step("Три языка интерфейса") {
-            compose.onNodeWithTag("profile-language").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) {it()}
+            scrollTag("profile-language").performSemanticsAction(SemanticsActions.OnClick) {it()}
             try {compose.waitUntil(5000) {compose.onAllNodesWithText("English").fetchSemanticsNodes().isNotEmpty()}} catch(failure:Throwable) {throw AssertionError(compose.onRoot().printToString(),failure)}
             compose.onNodeWithText("English").performClick()
             compose.onNodeWithText("Wallet",useUnmergedTree=true).assertIsDisplayed().performClick()
             visible("Demo balance")
             compose.onNodeWithText("Profile",useUnmergedTree=true).performClick()
-            compose.onNodeWithTag("profile-language").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) {it()}
+            scrollTag("profile-language").performSemanticsAction(SemanticsActions.OnClick) {it()}
             compose.onNodeWithText("Кыргызча").performClick()
             compose.onNodeWithText("Капчык",useUnmergedTree=true).performClick()
             visible("Демо-баланс")
@@ -246,7 +256,7 @@ class NavigationTest {
             compose.waitUntil(5000) {compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
             visible("Демо-баланс")
             compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
-            compose.onNodeWithTag("profile-language").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) {it()}
+            scrollTag("profile-language").performSemanticsAction(SemanticsActions.OnClick) {it()}
             compose.onNodeWithText("Русский").performClick()
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).assertIsDisplayed()
         }

@@ -98,6 +98,7 @@ fun distanceKm(a: GeoPoint, b: GeoPoint): Double {
     return 6371 * 2 * asin(sqrt(h.coerceIn(0.0,1.0)))
 }
 fun nearestStation(stations: List<Station>, point: GeoPoint) = stations.minByOrNull { distanceKm(point,it.point) }
+@Immutable
 data class ChargeResult(val seconds: Long, val energyKwh: Double, val costMinor: Long, val depleted: Boolean)
 fun calculateCharge(seconds: Long, powerKw: Int, tariffMinor: Long, balanceMinor: Long): ChargeResult {
     require(seconds >= 0 && powerKw > 0 && tariffMinor > 0 && balanceMinor >= 0)
