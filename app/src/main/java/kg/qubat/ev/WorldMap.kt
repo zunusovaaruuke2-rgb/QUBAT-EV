@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.ExperimentalComposeUiApi
+import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
@@ -37,6 +39,7 @@ import java.util.Locale
 private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
 
 @Suppress("DEPRECATION")
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable fun WorldMap(stations:List<Station>,city:String?,location:GeoPoint?,selectedId:String,
     modifier:Modifier,focusRequest:Int,zoomRequest:Int,onSelect:(Station)->Unit) {
     val context=LocalContext.current
@@ -59,7 +62,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                 native.setMinZoomPreference(0.0)
                 native.setMaxZoomPreference(19.0)
                 native.uiSettings.apply {
-                    isScrollGesturesEnabled=true; isZoomGesturesEnabled=true
+                    isScrollGesturesEnabled=true; isHorizontalScrollGesturesEnabled=true; isZoomGesturesEnabled=true
                     isRotateGesturesEnabled=true; isTiltGesturesEnabled=false
                     isAttributionEnabled=true; isLogoEnabled=false
                     setAttributionMargins(px(12),px(110),px(12),px(12))
@@ -130,6 +133,12 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     }
     Box(modifier) {
         AndroidView(factory={mapView},modifier=Modifier.fillMaxSize().testTag("world-map").semantics {contentDescription="Карта мира";stateDescription=viewport+if(ready) " · карта загружена" else " · ожидание сети"})
+        // One MotionEvent stream goes directly to the native pan/pinch/tap recognizers.
+        // The Compose controls above this map retain their own touch targets.
+        Box(Modifier.matchParentSize().pointerInteropFilter { event ->
+            mapView.dispatchTouchEvent(event)
+            true
+        })
         Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=76.dp,start=16.dp,end=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(8.dp),color=SurfaceGreen.copy(alpha=.92f)) {
             Text("© OpenStreetMap · OpenMapTiles · OpenFreeMap",fontSize=10.sp,color=Muted,modifier=Modifier.clickable {context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse("https://openfreemap.org/")))}.padding(6.dp))
         }
