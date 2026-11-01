@@ -42,7 +42,15 @@ class PartnerCabinetTest {
         catch(failure:Throwable) {throw AssertionError("Partner scroll target $tag: ${compose.onNodeWithTag(tag).printToString()}",failure)}
     }
     private fun ready() {
-        compose.waitUntil(10000) {compose.onNodeWithTag("partner-screen").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="Отчёт загружен"}
+        try {
+            compose.waitUntil(10000) {
+                val state=compose.onNodeWithTag("partner-screen").fetchSemanticsNode().config[SemanticsProperties.StateDescription]
+                if(state=="Ошибка отчёта") throw AssertionError("Report failed: ${compose.onRoot().printToString()}")
+                state=="Отчёт загружен"
+            }
+        } catch(failure:Throwable) {
+            throw AssertionError("Report state: ${compose.onNodeWithTag("partner-screen").printToString()} — ${failure.message}",failure)
+        }
         compose.waitForIdle()
     }
     private fun preview(name:String) {

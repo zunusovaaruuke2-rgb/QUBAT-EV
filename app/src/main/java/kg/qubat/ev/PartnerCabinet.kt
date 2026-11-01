@@ -81,8 +81,9 @@ private fun partnerTime(value:Instant?)=value?.let(cabinetTime::format) ?: "Не
         try {
             val loaded=withContext(Dispatchers.Default) {repo.stations(account) to repo.report(account,filter)}
             stations=loaded.first;report=loaded.second
+            if(BuildConfig.DEBUG) android.util.Log.d("QUBAT_PARTNER","Report loaded: ${loaded.second.sessions.size} sessions, matching filter=${loaded.second.filter==filter}")
         } catch(cancel:CancellationException) {throw cancel}
-        catch(_:Exception) {error=true}
+        catch(failure:Exception) {android.util.Log.e("QUBAT_PARTNER","Demo report loading failed",failure);error=true}
         finally {loading=false}
     }
     val export=rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")) {uri->
