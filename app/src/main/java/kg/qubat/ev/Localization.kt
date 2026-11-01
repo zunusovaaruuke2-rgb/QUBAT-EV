@@ -60,6 +60,11 @@ internal fun translate(text:String,language:AppLanguage):String {
     val key=text.trim()
     val exact=translationByKey[key]
     if(exact!=null) return text.replace(key,if(language==AppLanguage.EN) exact.en else exact.ky)
+    val summary=Regex("^(\\d+) (?:аппарата|аппаратов) · свободно (\\d+) из (\\d+) разъёмов$").matchEntire(text)
+    if(summary!=null) {
+        val (count,free,total)=summary.destructured
+        return if(language==AppLanguage.EN) "$count chargers · $free of $total connectors available" else "$count түзмөк · $total туташтыргыч · $free бош"
+    }
     val available=Regex("^Свободно (\\d+) из (\\d+) разъёмов · (.+)$").matchEntire(text)
     if(available!=null) {
         val (free,total,tail)=available.destructured

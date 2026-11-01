@@ -54,7 +54,7 @@ import kotlinx.coroutines.delay
                     val glow=Brush.radialGradient(listOf(Color(0xFF9FEA5C).copy(alpha=.25f),Color.Transparent))
                     drawCircle(glow)
                     val green=Brush.linearGradient(listOf(Color(0xFFD1F759),Color(0xFF41ECA0)),Offset.Zero,Offset(size.width,size.height))
-                    drawArc(green,-42f,310f,false,Offset(size.width*.17f,size.height*.12f),androidx.compose.ui.geometry.Size(size.width*.65f,size.height*.65f),style=Stroke(size.width*.11f,cap=StrokeCap.Round))
+                    drawArc(green,40f,310f,false,Offset(size.width*.17f,size.height*.12f),androidx.compose.ui.geometry.Size(size.width*.65f,size.height*.65f),style=Stroke(size.width*.11f,cap=StrokeCap.Round))
                     val bolt=Path().apply {moveTo(size.width*.48f,size.height*.48f);lineTo(size.width*.68f,size.height*.48f);lineTo(size.width*.62f,size.height*.56f);lineTo(size.width*.89f,size.height*.9f);lineTo(size.width*.57f,size.height*.7f);lineTo(size.width*.65f,size.height*.68f);close()}
                     drawPath(bolt,green)
                 }

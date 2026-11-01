@@ -120,6 +120,7 @@ class DomainTest {
         assertEquals("Туташкан",translate("Подключён",AppLanguage.KY))
         assertEquals("Charger 2 · connector 1 · Charging",translate("Аппарат 2 · разъём 1 · Заряжается",AppLanguage.EN))
         assertEquals("3 of 8 connectors available · 13,5 KGS/kWh",translate("Свободно 3 из 8 разъёмов · 13,5 сом/кВт·ч",AppLanguage.EN))
+        assertEquals("4 түзмөк · 8 туташтыргыч · 3 бош",translate("4 аппарата · свободно 3 из 8 разъёмов",AppLanguage.KY))
         assertEquals("Visa",translate("Visa",AppLanguage.KY))
         assertEquals("Карта",translate("Карта",AppLanguage.RU))
     }
