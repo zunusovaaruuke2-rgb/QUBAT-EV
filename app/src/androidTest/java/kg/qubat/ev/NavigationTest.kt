@@ -79,8 +79,8 @@ class NavigationTest {
                 compose.onNodeWithText("GB/T · разъём 1").assertIsDisplayed()
                 compose.onNodeWithText("GB/T · разъём 2").assertIsDisplayed()
                 compose.onNodeWithText("Закрыть").performClick()
-                compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-1").assertIsDisplayed().performClick()
-                compose.onNodeWithTag("connector-dialog-state").assertTextEquals("Свободен")
+                compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-2").assertIsDisplayed().performClick()
+                compose.onNodeWithTag("connector-dialog-state").assertTextEquals("Заряжается")
                 compose.onNodeWithText("Закрыть").performClick()
                 compose.onNodeWithContentDescription("Закрыть карточку").performClick()
             }
@@ -148,8 +148,10 @@ class NavigationTest {
             compose.onNodeWithTag("station-search-field").performImeAction()
             compose.onNodeWithText("Север · DEMO 01").assertIsDisplayed().performClick()
             compose.waitUntil(10000) {compose.onAllNodesWithTag("map-station-card").fetchSemanticsNodes().isNotEmpty()}
-            compose.onNodeWithContentDescription("Закрыть карточку").performClick()
-            compose.onNodeWithContentDescription("Закрыть поиск").performClick()
+            compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-1").performClick()
+            compose.onNodeWithTag("start-charge").assertExists()
+            compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
+            visible("Аппарат 1 · разъём 1 · Свободен")
         }
         step("Поиск только по названию станции и пустое состояние") {
             compose.onNodeWithText("Список",useUnmergedTree=true).performClick()

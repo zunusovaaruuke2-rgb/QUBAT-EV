@@ -115,6 +115,13 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     val visible=location?.let { p -> filtered.sortedBy { distanceKm(p,it.point) } } ?: filtered
     val selected=stations.first { it.id==selectedId }
     val sessionStation=state.session?.let { s -> stations.first { it.id==s.stationId } }
+    fun openConnector(site:Station,port:Connector) {
+        if(port.state==ConnectorState.FREE) {
+            if(state.session==null) {selectedId=site.id;selectedConnectorId=port.id}
+            focusedConnectorId=null
+            tabName=Tab.CHARGE.name
+        } else focusedConnectorId=port.id
+    }
     run {
         Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) },bottomBar={
             NavigationBar(containerColor=SurfaceGreen) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={Icon(item.icon,item.label)},label={Text(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
@@ -124,11 +131,11 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                     MapHome(visible,query,location,locationFocus,locating,locationMessage,minPower,statusName,
                         onQuery={query=it},
                         onCity={},onPower={minPower=it},onStatus={statusName=it},onLocate={askLocation()},
-                        onDetail={detailId=it.id;selectedId=it.id},onConnector={_,port->focusedConnectorId=port.id})
+                        onDetail={detailId=it.id;selectedId=it.id},onConnector=::openConnector)
                 } else if(tab==Tab.STATIONS) {
                     StationsList(visible,query,city,minPower,statusName,location,
                         onQuery={query=it},onCity={},onPower={minPower=it},onStatus={statusName=it},
-                        onDetail={detailId=it.id},onConnector={_,port->focusedConnectorId=port.id})
+                        onDetail={detailId=it.id},onConnector=::openConnector)
                 } else {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
                     androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.qubat_logo),"QUBAT",Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)))
@@ -202,8 +209,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                             ConnectorState.OFFLINE -> "Разъём недоступен."
                         },color=Muted,fontSize=13.sp)
                     }},confirmButton={
-                        if(port.state==ConnectorState.FREE) TextButton(onClick={selectedId=site.id;selectedConnectorId=id;focusedConnectorId=null;tabName=Tab.CHARGE.name}) {Text("Выбрать разъём")}
-                        else if(id in state.completedConnectorIds) TextButton(onClick={vm.releaseConnector(id);focusedConnectorId=null}) {Text("Освободить разъём")}
+                        if(id in state.completedConnectorIds) TextButton(onClick={vm.releaseConnector(id);focusedConnectorId=null}) {Text("Освободить разъём")}
                     },dismissButton={TextButton(onClick={focusedConnectorId=null}) {Text("Закрыть")}})
             }
             detailId?.let { id ->
