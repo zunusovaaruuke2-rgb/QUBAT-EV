@@ -14,6 +14,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -26,11 +28,12 @@ import androidx.compose.ui.unit.sp
 ) {
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var filters by rememberSaveable { mutableStateOf(false) }
+    var zoomRequest by remember {mutableIntStateOf(0)}
     var focusRequest by remember { mutableIntStateOf(0) }
     LaunchedEffect(location) { location?.let { selectedId=nearestStation(stations,it)?.id } }
     val selected=stations.firstOrNull {it.id==selectedId}
     Box(Modifier.fillMaxSize()) {
-        CountryMap(stations,city,location,selectedId ?: "",Modifier.fillMaxSize(),focusRequest) { selectedId=it.id }
+        CountryMap(stations,city,location,selectedId ?: "",Modifier.fillMaxSize(),focusRequest,zoomRequest) { selectedId=it.id }
         Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically) {
             Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen,shadowElevation=4.dp,modifier=Modifier.weight(1f)) {
                 TextButton(onClick={filters=true},modifier=Modifier.fillMaxWidth()) {Icon(Icons.Default.Place,null,modifier=Modifier.size(18.dp));Text(city ?: "Кыргызстан",modifier=Modifier.weight(1f),fontWeight=FontWeight.SemiBold);Icon(Icons.Default.ArrowDropDown,null)}
@@ -38,12 +41,14 @@ import androidx.compose.ui.unit.sp
             FilledIconButton(onClick={filters=true},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Icon(Icons.Default.Settings,"Фильтры карты")}
         }
         Column(Modifier.align(Alignment.CenterEnd).padding(end=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            FilledIconButton(onClick={zoomRequest++},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).semantics {contentDescription="Увеличить карту"},colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Text("+",fontSize=28.sp)}
+            FilledIconButton(onClick={zoomRequest--},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).semantics {contentDescription="Уменьшить карту"},colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Text("−",fontSize=28.sp)}
             FilledIconButton(onClick={focusRequest++},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Icon(Icons.Default.Refresh,"Обзор Кыргызстана")}
             FilledIconButton(onClick={onLocate},enabled=!locating,shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {if(locating) CircularProgressIndicator(modifier=Modifier.size(20.dp),strokeWidth=2.dp) else Icon(Icons.Default.LocationOn,"Моя позиция")}
         }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             if(locating || locationMessage!="Местоположение не определено") Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen) {Text(locationMessage,modifier=Modifier.padding(10.dp),fontSize=11.sp,color=Muted)}
-            Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen.copy(alpha=.94f)) {Text(if(BuildConfig.MAPS_CONFIGURED) "Демо · 4 вымышленные станции" else "Демо-схема · карта без ключа не подключена",modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp),fontSize=11.sp,color=Muted)}
+            Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen.copy(alpha=.94f)) {Text("Демо · ${DemoData.stations.size} вымышленных локаций",modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp),fontSize=11.sp,color=Muted)}
             if(selected!=null) Surface(shape=RoundedCornerShape(24.dp),color=SurfaceGreen,shadowElevation=8.dp) {
                 Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
@@ -51,7 +56,8 @@ import androidx.compose.ui.unit.sp
                         Text(selected.status.title,color=if(selected.status==StationStatus.AVAILABLE)Lime else Amber,fontSize=12.sp)
                         IconButton(onClick={selectedId=null}) {Icon(Icons.Default.Close,"Закрыть карточку")}
                     }
-                    Text("80 кВт   ·   GB/T DC   ·   13,5 сом/кВт·ч",color=Lime,fontSize=13.sp)
+                    Text("${selected.availableConnectors} из ${selected.connectorCount} мест свободно · GB/T DC",color=Lime,fontSize=13.sp)
+                    Text("80 кВт на место · 13,5 сом/кВт·ч",color=Muted,fontSize=12.sp)
                     Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(onClick={onDetail(selected)},modifier=Modifier.weight(1f)) {Text("Подробнее")}
                         Button(onClick={onCharge(selected)},modifier=Modifier.weight(1f)) {Text("Зарядка")}

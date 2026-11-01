@@ -4,9 +4,12 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class DomainTest {
-    @Test fun `four explicit demo points use requested power and tariff`() {
-        assertEquals(4,DemoData.stations.size)
-        assertEquals(4,DemoData.stations.map {it.id}.distinct().size)
+    @Test fun `sixteen demo locations provide four or eight charging places`() {
+        assertEquals(16,DemoData.stations.size)
+        assertEquals(16,DemoData.stations.map {it.id}.distinct().size)
+        assertEquals(96,DemoData.stations.sumOf {it.connectorCount})
+        assertTrue(DemoData.stations.all {it.connectorCount in listOf(4,8) && it.availableConnectors in 0..it.connectorCount})
+        assertTrue(DemoData.stations.all {(it.status==StationStatus.AVAILABLE)==(it.availableConnectors>0)})
         assertTrue(DemoData.stations.all {it.id.startsWith("demo-") && it.powerKw==80 && it.tariffMinor==1350L && it.connector=="GB/T DC"})
     }
     @Test fun `all requested cities and more are selectable`() {
@@ -21,10 +24,10 @@ class DomainTest {
         assertEquals(1,filterStations(DemoData.stations,"demo","Ош",80,StationStatus.AVAILABLE).size)
         assertTrue(filterStations(DemoData.stations,"","Ош",80,StationStatus.BUSY).isEmpty())
         assertTrue(filterStations(DemoData.stations,"",null,120,null).isEmpty())
-        assertEquals(2,filterStations(DemoData.stations,"",null,50,StationStatus.AVAILABLE).size)
+        assertEquals(12,filterStations(DemoData.stations,"",null,50,StationStatus.AVAILABLE).size)
     }
     @Test fun `unrepresented city has no invented stations`() {
-        assertTrue(filterStations(DemoData.stations,"","Нарын",0,null).isEmpty())
+        assertTrue(filterStations(DemoData.stations,"","Неизвестный город",0,null).isEmpty())
     }
     @Test fun `nearest uses countrywide coordinates`() {
         assertEquals("demo-osh",nearestStation(DemoData.stations,GeoPoint(40.53,72.80))!!.id)

@@ -221,7 +221,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
             detailId?.let { id ->
                 val s=DemoData.stations.first {it.id==id}
                 AlertDialog(onDismissRequest={detailId=null},title={Text("${s.city} · ДЕМО")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Text(s.title,fontWeight=FontWeight.Bold);Text("${s.status.title} · 80 кВт\nGB/T DC · 13,5 сом/кВт·ч")
+                    Text(s.title,fontWeight=FontWeight.Bold);Text("${s.status.title} · ${s.availableConnectors} из ${s.connectorCount} мест свободно\n80 кВт на место · GB/T DC · 13,5 сом/кВт·ч")
                     Text("Вымышленная станция у центра города. По этим координатам зарядной станции может не быть. Маршрут — только для проверки интерфейса.",color=Amber)
                     Text("${s.point.lat}, ${s.point.lon}",color=Muted)
                     OutlinedButton(onClick={openRoute(context,s,::message)},modifier=Modifier.fillMaxWidth()) {Text("Учебный маршрут · 2ГИС")}
@@ -254,7 +254,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
 @Composable fun StationCard(s:Station,location:GeoPoint?,activeId:String?,onDetail:()->Unit,onCharge:()->Unit) {Panel {
     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(s.city,color=Muted);Text(if(activeId==s.id) "Ваш демо-сеанс" else s.status.title,color=if(s.status==StationStatus.AVAILABLE)Lime else Amber,fontSize=12.sp)}
     Text(s.title,fontSize=20.sp,fontWeight=FontWeight.Bold)
-    Text("80 кВт  /  GB/T DC",color=Lime,fontWeight=FontWeight.Medium)
+    Text("${s.availableConnectors} из ${s.connectorCount} свободно · 80 кВт / GB/T DC",color=Lime,fontWeight=FontWeight.Medium)
     Text("13,5 сом/кВт·ч · вымышленная точка",color=Muted,fontSize=12.sp)
     location?.let {Text("${String.format(Ru,"%.1f",distanceKm(it,s.point))} км по прямой",color=Muted,fontSize=12.sp)}
     Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {OutlinedButton(onClick=onDetail,modifier=Modifier.weight(1f)) {Text("Подробнее")};Button(onClick=onCharge,modifier=Modifier.weight(1f)) {Text("Зарядка")}}

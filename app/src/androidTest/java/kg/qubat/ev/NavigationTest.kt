@@ -1,6 +1,8 @@
 package kg.qubat.ev
 
 import androidx.compose.ui.test.*
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import org.junit.Rule
 import org.junit.Test
@@ -17,16 +19,26 @@ class NavigationTest {
         step("Главная и раскрытие демо-данных") {
             compose.onNodeWithContentDescription("Фильтры карты").assertIsDisplayed().performClick()
             compose.onNodeWithText("Фильтры").assertIsDisplayed()
-            compose.onNodeWithText("Показать станции · 4").performScrollTo().performClick()
+            compose.onNodeWithText("Показать станции · 16").performScrollTo().performClick()
             compose.onNodeWithContentDescription("Моя позиция").assertIsDisplayed()
-            compose.onNodeWithContentDescription("Демо-станция Бишкек").performClick()
-            compose.onNodeWithText("Север · DEMO 01").assertIsDisplayed()
-            compose.onNodeWithContentDescription("Закрыть карточку").performClick()
+            val map=compose.onNodeWithTag("world-map")
+            compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+            val initial=map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].substringBefore(";")
+            compose.onNodeWithContentDescription("Увеличить карту").performClick()
+            compose.waitUntil(10000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].substringBefore(";")!=initial}
+            val zoomed=map.fetchSemanticsNode().config[SemanticsProperties.StateDescription]
+            map.performTouchInput {swipe(start=Offset(width*.55f,height*.4f),end=Offset(width*.15f,height*.4f),durationMillis=500)}
+            compose.waitUntil(10000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription]!=zoomed}
+            compose.onNodeWithContentDescription("Уменьшить карту").performClick()
         }
         step("Поиск по Кыргызстану и пустое состояние") {
             compose.onNodeWithText("Станции",useUnmergedTree=true).performClick()
             visible("Станции Кыргызстана")
             compose.onNodeWithText("Город или название станции").performTextInput("Нарын")
+            compose.onNodeWithText("Город или название станции").performImeAction()
+            visible("Тянь-Шань · DEMO 05")
+            compose.onNodeWithText("Город или название станции").performScrollTo().performTextClearance()
+            compose.onNodeWithText("Город или название станции").performTextInput("Несуществующий город")
             compose.onNodeWithText("Город или название станции").performImeAction()
             visible("Демо-станций пока нет")
         }
