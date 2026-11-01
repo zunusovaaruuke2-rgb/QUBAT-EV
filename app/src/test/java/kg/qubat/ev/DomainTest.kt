@@ -113,4 +113,14 @@ class DomainTest {
         val port=site.freeConnector()!!
         assertEquals(57,site.withConnectorSession(port.id,emptySet(),57).connectors.first {it.id==port.id}.percent)
     }
+    @Test fun `three languages translate navigation and live connector labels`() {
+        assertEquals("Map",translate("Карта",AppLanguage.EN))
+        assertEquals("Капчык",translate("Кошелёк",AppLanguage.KY))
+        assertEquals("Available",translate("Свободен",AppLanguage.EN))
+        assertEquals("Туташкан",translate("Подключён",AppLanguage.KY))
+        assertEquals("Charger 2 · connector 1 · Charging",translate("Аппарат 2 · разъём 1 · Заряжается",AppLanguage.EN))
+        assertEquals("3 of 8 connectors available · 13,5 KGS/kWh",translate("Свободно 3 из 8 разъёмов · 13,5 сом/кВт·ч",AppLanguage.EN))
+        assertEquals("Visa",translate("Visa",AppLanguage.KY))
+        assertEquals("Карта",translate("Карта",AppLanguage.RU))
+    }
 }

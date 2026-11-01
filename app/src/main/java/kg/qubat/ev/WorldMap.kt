@@ -48,6 +48,8 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
 @Suppress("DEPRECATION")
 @Composable fun WorldMap(stations:List<Station>,city:String?,location:GeoPoint?,selectedId:String,
     modifier:Modifier,focusRequest:Int,zoomRequest:Int,locationFocus:Int,stationFocus:Int,onSelect:(Station)->Unit) {
+    val localize=LocalTranslate.current
+    val language=LocalAppLanguage.current
     val night=LocalNight.current
     val context=LocalContext.current
     val owner=LocalLifecycleOwner.current
@@ -82,10 +84,10 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
             }
         }
     }
-    LaunchedEffect(map,night) {
+    LaunchedEffect(map,night,language) {
         val native=map ?: return@LaunchedEffect
         ready=false;loadError=false
-        native.setStyle(Style.Builder().fromUri(if(night) "https://tiles.openfreemap.org/styles/dark" else WORLD_STYLE)) {style->if(night) improveNightMap(style);ready=true;loadError=false}
+        native.setStyle(Style.Builder().fromUri(if(night) "https://tiles.openfreemap.org/styles/dark" else WORLD_STYLE)) {style->if(night) improveNightMap(style);localizeMapLabels(style,language);ready=true;loadError=false}
     }
     DisposableEffect(mapView,owner) {
         var started=false;var resumed=false
@@ -144,7 +146,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
         previousZoom=zoomRequest
     }
     Box(modifier) {
-        AndroidView(factory={mapView},modifier=Modifier.fillMaxSize().testTag("world-map").semantics {contentDescription="Карта мира";stateDescription=viewport+if(ready) " · карта загружена" else " · ожидание сети"})
+        AndroidView(factory={mapView},modifier=Modifier.fillMaxSize().testTag("world-map").semantics {contentDescription=localize("Карта мира");stateDescription=localize(viewport+if(ready) " · карта загружена" else " · ожидание сети")})
         // Compose owns touch recognition; native projection/camera own the geographic transform.
         Box(Modifier.matchParentSize()
             .pointerInput(map) {
@@ -175,19 +177,11 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                 )
             })
         if(location!=null && ready) {
-            Spacer(Modifier.size(1.dp).testTag("user-location").semantics {contentDescription="Вы здесь";stateDescription="${location.lat},${location.lon}"})
+            Spacer(Modifier.size(1.dp).testTag("user-location").semantics {contentDescription=localize("Вы здесь");stateDescription="${location.lat},${location.lon}"})
         }
-        Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=86.dp,start=16.dp,end=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(8.dp),color=SurfaceGreen.copy(alpha=.92f)) {
-            Text(buildAnnotatedString {
-                withLink(LinkAnnotation.Url("https://www.openstreetmap.org/copyright")) {append("© OpenStreetMap")}
-                append(" · ")
-                withLink(LinkAnnotation.Url("https://openmaptiles.org/")) {append("© OpenMapTiles")}
-                append(" · ")
-                withLink(LinkAnnotation.Url("https://openfreemap.org/")) {append("OpenFreeMap")}
-            },fontSize=10.sp,color=Muted,modifier=Modifier.padding(6.dp))
-        }
+        Box(Modifier.align(Alignment.TopStart).padding(top=86.dp,start=16.dp)) {MapCredits()}
         if(!ready) Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=140.dp,start=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(10.dp),color=SurfaceGreen) {
-            Text(if(loadError) "Карта недоступна · проверьте интернет" else "Загрузка карты · нужен интернет",modifier=Modifier.padding(8.dp),fontSize=11.sp,color=Muted)
+            AppText(if(loadError) "Карта недоступна · проверьте интернет" else "Загрузка карты · нужен интернет",modifier=Modifier.padding(8.dp),fontSize=11.sp,color=Muted)
         }
     }
 }
@@ -257,4 +251,13 @@ internal fun updateUserLocation(style:Style,point:GeoPoint?) {
             org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor("#FFFFFF"),
             org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth(3f)))
     } else source.setGeoJson(geometry)
+}
+
+internal fun localizeMapLabels(style:Style,language:AppLanguage) {
+    style.layers.filterIsInstance<org.maplibre.android.style.layers.SymbolLayer>().filter {it.id.contains("label",true) && !it.id.contains("ref",true)}.forEach {layer->
+        layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.textField(org.maplibre.android.style.expressions.Expression.coalesce(
+            org.maplibre.android.style.expressions.Expression.get("name:${language.code}"),
+            org.maplibre.android.style.expressions.Expression.get(if(language==AppLanguage.EN) "name:latin" else "name"),
+            org.maplibre.android.style.expressions.Expression.get("name"))))
+    }
 }

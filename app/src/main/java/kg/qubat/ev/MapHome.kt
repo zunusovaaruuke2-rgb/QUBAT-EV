@@ -43,42 +43,42 @@ import androidx.compose.ui.unit.sp
             StationSearchControls(query,onQuery,{filters=true},"Фильтры карты")
             if(query.isNotBlank()) Surface(Modifier.padding(horizontal=12.dp),shape=RoundedCornerShape(16.dp),color=SurfaceGreen,shadowElevation=4.dp) {
                 androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max=220.dp)) {
-                    if(stations.isEmpty()) item {Text("Станция не найдена",Modifier.padding(16.dp),fontSize=13.sp)}
+                    if(stations.isEmpty()) item {AppText("Станция не найдена",Modifier.padding(16.dp),fontSize=13.sp)}
                     items(stations.size) {index->val station=stations[index]
-                        TextButton(onClick={selectedId=station.id;stationFocus++;onQuery("");keyboard?.hide()},modifier=Modifier.fillMaxWidth()) {Column(Modifier.fillMaxWidth().padding(6.dp)) {Text(station.title,fontWeight=FontWeight.SemiBold);Text(station.city,fontSize=11.sp,color=Muted)}}
+                        TextButton(onClick={selectedId=station.id;stationFocus++;onQuery("");keyboard?.hide()},modifier=Modifier.fillMaxWidth()) {Column(Modifier.fillMaxWidth().padding(6.dp)) {AppText(station.title,fontWeight=FontWeight.SemiBold);AppText(station.city,fontSize=11.sp,color=Muted)}}
                     }
                 }
             }
         }
         Column(Modifier.align(Alignment.CenterEnd).padding(end=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            FilledIconButton(onClick={zoomRequest++},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).semantics {contentDescription="Увеличить карту"},colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Text("+",fontSize=28.sp)}
-            FilledIconButton(onClick={zoomRequest--},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).semantics {contentDescription="Уменьшить карту"},colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Text("−",fontSize=28.sp)}
-            FilledIconButton(onClick={focusRequest++},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Icon(Icons.Default.Refresh,"Обзор Кыргызстана")}
-            FilledIconButton(onClick={selectedId=null;onLocate()},enabled=!locating,shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).semantics {contentDescription="Моя позиция"},colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {if(locating) CircularProgressIndicator(modifier=Modifier.size(20.dp),strokeWidth=2.dp) else Icon(Icons.Default.LocationOn,null)}
+            FilledIconButton(onClick={zoomRequest++},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).appDescription("Увеличить карту"),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {AppText("+",fontSize=28.sp)}
+            FilledIconButton(onClick={zoomRequest--},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).appDescription("Уменьшить карту"),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {AppText("−",fontSize=28.sp)}
+            FilledIconButton(onClick={focusRequest++},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {AppIcon(Icons.Default.Refresh,"Обзор Кыргызстана")}
+            FilledIconButton(onClick={selectedId=null;onLocate()},enabled=!locating,shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).appDescription("Моя позиция"),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {if(locating) CircularProgressIndicator(modifier=Modifier.size(20.dp),strokeWidth=2.dp) else AppIcon(Icons.Default.LocationOn,null)}
         }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             if(locating || locationMessage!="Местоположение не определено") Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen) {
                 Column(Modifier.padding(10.dp)) {
-                    Text(locationMessage,fontSize=11.sp,color=Muted)
+                    AppText(locationMessage,fontSize=11.sp,color=Muted)
                     if(locationMessage.contains("настройках") || locationMessage.contains("точную геопозицию")) TextButton(onClick={
                         val intent=if(locationMessage.contains("Разрешите") || locationMessage.contains("точную геопозицию")) android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:${context.packageName}")) else android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)
                         runCatching {context.startActivity(intent)}
-                    }) {Text("Настройки геопозиции",fontSize=12.sp)}
+                    }) {AppText("Настройки геопозиции",fontSize=12.sp)}
                 }
             }
-            Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen.copy(alpha=.94f)) {Text("ДЕМО",modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp),fontSize=11.sp,color=Muted)}
+            Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen.copy(alpha=.94f)) {AppText("ДЕМО",modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp),fontSize=11.sp,color=Muted)}
             if(selected!=null) Surface(onClick={onDetail(selected)},modifier=Modifier.testTag("map-station-card"),shape=RoundedCornerShape(24.dp),color=SurfaceGreen,shadowElevation=8.dp) {
                 Column(Modifier.heightIn(max=450.dp).verticalScroll(rememberScrollState()).padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
-                        Column(Modifier.weight(1f)) {Text(selected.title,fontSize=18.sp,fontWeight=FontWeight.Bold);Text("${selected.city} · ДЕМО",color=Muted,fontSize=12.sp)}
-                        IconButton(onClick={onDetail(selected)}) {Icon(Icons.Default.Place,"Маршрут и детали",tint=Lime)}
-                        IconButton(onClick={selectedId=null}) {Icon(Icons.Default.Close,"Закрыть карточку")}
+                        Column(Modifier.weight(1f)) {AppText(selected.title,fontSize=18.sp,fontWeight=FontWeight.Bold);AppText("${selected.city} · ДЕМО",color=Muted,fontSize=12.sp)}
+                        IconButton(onClick={onDetail(selected)}) {AppIcon(Icons.Default.Place,"Маршрут и детали",tint=Lime)}
+                        IconButton(onClick={selectedId=null}) {AppIcon(Icons.Default.Close,"Закрыть карточку")}
                     }
-                    Text("${selected.chargerCount} ${if(selected.chargerCount==4) "аппарата" else "аппаратов"} · свободно ${selected.availableConnectors} из ${selected.connectorCount} разъёмов",color=Muted,fontSize=11.sp)
+                    AppText("${selected.chargerCount} ${if(selected.chargerCount==4) "аппарата" else "аппаратов"} · свободно ${selected.availableConnectors} из ${selected.connectorCount} разъёмов",color=Muted,fontSize=11.sp)
                     StationEquipment(selected) {onConnector(selected,it)}
                 }
             }
-            if(stations.isEmpty()) Surface(shape=RoundedCornerShape(18.dp),color=SurfaceGreen) {Text("Нет демо-станций по выбранным фильтрам",modifier=Modifier.padding(16.dp),color=Muted)}
+            if(stations.isEmpty()) Surface(shape=RoundedCornerShape(18.dp),color=SurfaceGreen) {AppText("Нет демо-станций по выбранным фильтрам",modifier=Modifier.padding(16.dp),color=Muted)}
         }
     }
     if(filters) StationFilterSheet(stations.size,null,minPower,statusName,onCity,onPower,onStatus) {filters=false}

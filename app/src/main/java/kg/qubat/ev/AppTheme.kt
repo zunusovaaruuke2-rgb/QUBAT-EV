@@ -44,13 +44,24 @@ val Amber:Color @Composable get()=if(LocalNight.current) Color(0xFFFFCF80) else 
 }
 @Composable fun ThemeToggle() {
     val night=LocalNight.current
-    val tint=Lime
-    IconButton(onClick=LocalToggleTheme.current,modifier=Modifier.semantics {contentDescription=if(night) "Дневная тема" else "Ночная тема"}) {
+    val color=Lime
+    val label=LocalTranslate.current(if(night) "Дневная тема" else "Ночная тема")
+    TextButton(onClick=LocalToggleTheme.current,modifier=Modifier.semantics {contentDescription=label},contentPadding=androidx.compose.foundation.layout.PaddingValues(8.dp)) {
         Canvas(Modifier.size(24.dp)) {
             if(night) {
-                drawCircle(tint,5.dp.toPx(),center,style=Stroke(2.dp.toPx()))
-                repeat(8) {i->val angle=i*Math.PI/4;val a=Offset(center.x+cos(angle).toFloat()*8.dp.toPx(),center.y+sin(angle).toFloat()*8.dp.toPx());val b=Offset(center.x+cos(angle).toFloat()*11.dp.toPx(),center.y+sin(angle).toFloat()*11.dp.toPx());drawLine(tint,a,b,2.dp.toPx())}
-            } else drawArc(tint,45f,270f,false,topLeft=Offset(3.dp.toPx(),2.dp.toPx()),size=androidx.compose.ui.geometry.Size(18.dp.toPx(),18.dp.toPx()),style=Stroke(2.dp.toPx()))
+                drawCircle(color,5.dp.toPx(),center,style=Stroke(2.dp.toPx()))
+                repeat(8) {i->val angle=i*Math.PI/4;drawLine(color,Offset(center.x+cos(angle).toFloat()*8.dp.toPx(),center.y+sin(angle).toFloat()*8.dp.toPx()),Offset(center.x+cos(angle).toFloat()*11.dp.toPx(),center.y+sin(angle).toFloat()*11.dp.toPx()),2.dp.toPx())}
+            } else {
+                val moon=androidx.compose.ui.graphics.Path().apply {
+                    moveTo(size.width*.8f,size.height*.78f)
+                    cubicTo(size.width*.12f,size.height*1.04f,-size.width*.05f,size.height*.1f,size.width*.57f,size.height*.08f)
+                    cubicTo(size.width*.25f,size.height*.5f,size.width*.57f,size.height*.86f,size.width*.8f,size.height*.78f)
+                    close()
+                }
+                drawPath(moon,color)
+            }
         }
+        androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
+        AppText(if(night) "Светлая" else "Тёмная",fontSize=androidx.compose.ui.unit.TextUnit.Unspecified)
     }
 }

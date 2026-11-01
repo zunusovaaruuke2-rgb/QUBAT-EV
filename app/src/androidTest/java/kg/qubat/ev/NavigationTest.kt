@@ -37,10 +37,14 @@ class NavigationTest {
     }
     @Test fun mainNavigationAndDemoDisclosure() {
         step("Главная и раскрытие демо-данных") {
+            compose.waitUntil(5000) {compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
             compose.onNodeWithContentDescription("Фильтры карты").assertIsDisplayed().performClick()
             compose.onNodeWithText("Фильтры").assertIsDisplayed()
             compose.onNodeWithText("Показать станции · 16").performScrollTo().performClick()
             compose.onNodeWithContentDescription("Моя позиция").assertIsDisplayed()
+            compose.onNodeWithTag("map-credits").performClick()
+            compose.onNodeWithText("Источники карты").assertIsDisplayed()
+            compose.onNodeWithText("Закрыть").performClick()
             val map=compose.onNodeWithTag("world-map")
             compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
             var nativeMap:MapLibreMap?=null
@@ -218,6 +222,24 @@ class NavigationTest {
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()
             compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
             visible("Тест QUBAT")
+        }
+        step("Три языка интерфейса") {
+            compose.onNodeWithTag("profile-language").performScrollTo().performClick()
+            compose.onNodeWithText("English").performClick()
+            compose.onNodeWithText("Wallet",useUnmergedTree=true).assertIsDisplayed().performClick()
+            visible("Demo balance")
+            compose.onNodeWithText("Profile",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("profile-language").performScrollTo().performClick()
+            compose.onNodeWithText("Кыргызча").performClick()
+            compose.onNodeWithText("Капчык",useUnmergedTree=true).performClick()
+            visible("Демо-баланс")
+            compose.activityRule.scenario.recreate()
+            compose.waitUntil(5000) {compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
+            visible("Демо-баланс")
+            compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("profile-language").performScrollTo().performClick()
+            compose.onNodeWithText("Русский").performClick()
+            compose.onNodeWithText("Кошелёк",useUnmergedTree=true).assertIsDisplayed()
         }
         step("Живая геопозиция и повторное приближение к своей точке") {
             val automation=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation

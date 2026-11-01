@@ -27,18 +27,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable fun ConnectorBadge(charger:Charger,port:Connector,onClick:()->Unit) {
+    val localize=LocalTranslate.current
     val color=Color(port.state.argb)
     val description="Аппарат ${charger.number}, разъём ${port.number}, GB/T DC, ${port.state.title}"+(port.percent?.let {", $it процентов, демо"} ?: "")
     Box(Modifier.fillMaxWidth().height(56.dp).testTag("connector-${port.id}")
         .clickable(role=Role.Button,onClick=onClick)
-        .semantics {contentDescription=description;stateDescription=port.state.title},contentAlignment=Alignment.Center) {
+        .semantics {contentDescription=localize(description);stateDescription=localize(port.state.title)},contentAlignment=Alignment.Center) {
         Box(Modifier.size(38.dp),contentAlignment=Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {drawCircle(color,style=Stroke(3.dp.toPx()))}
             when(port.state) {
-                ConnectorState.CHARGING -> if(port.percent!=null) Text("${port.percent}%",color=color,fontSize=12.sp,fontWeight=FontWeight.Bold) else Icon(Icons.Default.PlayArrow,null,tint=color,modifier=Modifier.size(18.dp))
-                ConnectorState.COMPLETED -> Icon(Icons.Default.Check,null,tint=color,modifier=Modifier.size(19.dp))
-                ConnectorState.ERROR -> Icon(Icons.Default.Warning,null,tint=color,modifier=Modifier.size(19.dp))
-                ConnectorState.OFFLINE -> Icon(Icons.Default.Close,null,tint=color,modifier=Modifier.size(19.dp))
+                ConnectorState.CHARGING -> if(port.percent!=null) AppText("${port.percent}%",color=color,fontSize=12.sp,fontWeight=FontWeight.Bold) else AppIcon(Icons.Default.PlayArrow,null,tint=color,modifier=Modifier.size(18.dp))
+                ConnectorState.COMPLETED -> AppIcon(Icons.Default.Check,null,tint=color,modifier=Modifier.size(19.dp))
+                ConnectorState.ERROR -> AppIcon(Icons.Default.Warning,null,tint=color,modifier=Modifier.size(19.dp))
+                ConnectorState.OFFLINE -> AppIcon(Icons.Default.Close,null,tint=color,modifier=Modifier.size(19.dp))
                 else -> Canvas(Modifier.size(18.dp)) {
                     drawCircle(color,style=Stroke(1.5.dp.toPx()))
                     listOf(Offset(.35f,.35f),Offset(.65f,.35f),Offset(.5f,.64f)).forEach {p->drawCircle(color,1.8.dp.toPx(),Offset(size.width*p.x,size.height*p.y))}
@@ -47,7 +48,7 @@ import androidx.compose.ui.unit.sp
             Box(Modifier.align(Alignment.TopEnd).offset(x=3.dp,y=(-3).dp).size(19.dp)
                 .background(if(LocalNight.current) Color(0xFFECF6FA) else Color(0xFF102638),CircleShape)
                 .border(1.5.dp,color,CircleShape),contentAlignment=Alignment.Center) {
-                Text(port.number.toString(),fontSize=11.sp,lineHeight=12.sp,color=if(LocalNight.current) Color(0xFF102638) else Color.White,fontWeight=FontWeight.Black,modifier=Modifier.testTag("port-number-${port.id}"))
+                AppText(port.number.toString(),fontSize=11.sp,lineHeight=12.sp,color=if(LocalNight.current) Color(0xFF102638) else Color.White,fontWeight=FontWeight.Black,modifier=Modifier.testTag("port-number-${port.id}"))
             }
         }
     }
@@ -55,19 +56,19 @@ import androidx.compose.ui.unit.sp
 @Composable fun StationEquipment(station:Station,onConnector:(Connector)->Unit) {
     var openedId by remember(station.id) {mutableStateOf<String?>(null)}
     station.chargers.firstOrNull {it.id==openedId}?.let {unit->
-        AlertDialog(onDismissRequest={openedId=null},title={Text("Аппарат ${unit.number}")},text={
+        AlertDialog(onDismissRequest={openedId=null},title={AppText("Аппарат ${unit.number}")},text={
             Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                Text("${station.title} · ${unit.powerKw} кВт",fontSize=13.sp)
+                AppText("${station.title} · ${unit.powerKw} кВт",fontSize=13.sp)
                 unit.connectors.forEach {port->
                     Surface(onClick={openedId=null;onConnector(port)},shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant) {
                         Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically) {
                             Box(Modifier.width(56.dp)) {ConnectorBadge(unit,port) {openedId=null;onConnector(port)}}
-                            Column {Text("GB/T · разъём ${port.number}",fontWeight=FontWeight.Bold,fontSize=14.sp);Text(port.state.title+(port.percent?.let {" · $it%"} ?: ""),fontSize=12.sp,color=Muted)}
+                            Column {AppText("GB/T · разъём ${port.number}",fontWeight=FontWeight.Bold,fontSize=14.sp);AppText(port.state.title+(port.percent?.let {" · $it%"} ?: ""),fontSize=12.sp,color=Muted)}
                         }
                     }
                 }
             }
-        },confirmButton={TextButton(onClick={openedId=null}) {Text("Закрыть")}})
+        },confirmButton={TextButton(onClick={openedId=null}) {AppText("Закрыть")}})
     }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val columns=if(maxWidth>=300.dp) 3 else 2
@@ -78,8 +79,8 @@ import androidx.compose.ui.unit.sp
                         Surface(onClick={openedId=charger.id},modifier=Modifier.weight(1f).testTag("apparatus-${charger.id}"),shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline)) {
                             Column(Modifier.padding(vertical=6.dp)) {
                                 Row(Modifier.fillMaxWidth().padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
-                                    Text(charger.number.toString(),fontSize=13.sp,fontWeight=FontWeight.Bold)
-                                    Text("${charger.powerKw} кВт",color=Lime,fontSize=10.sp,fontWeight=FontWeight.SemiBold)
+                                    AppText(charger.number.toString(),fontSize=13.sp,fontWeight=FontWeight.Bold)
+                                    AppText("${charger.powerKw} кВт",color=Lime,fontSize=10.sp,fontWeight=FontWeight.SemiBold)
                                     Canvas(Modifier.size(6.dp)) {drawCircle(Color(charger.state.argb))}
                                 }
                                 Row(Modifier.fillMaxWidth()) {charger.connectors.forEach {port->
@@ -99,13 +100,13 @@ import androidx.compose.ui.unit.sp
         Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(station.title,fontWeight=FontWeight.Bold,fontSize=18.sp)
-                    Text("${station.city} · ДЕМО",color=Muted,fontSize=12.sp)
+                    AppText(station.title,fontWeight=FontWeight.Bold,fontSize=18.sp)
+                    AppText("${station.city} · ДЕМО",color=Muted,fontSize=12.sp)
                 }
-                IconButton(onClick=onDetail) {Icon(Icons.Default.Place,"Маршрут и детали ${station.city}",tint=Lime)}
+                IconButton(onClick=onDetail) {AppIcon(Icons.Default.Place,"Маршрут и детали ${station.city}",tint=Lime)}
             }
-            Text("Свободно ${station.availableConnectors} из ${station.connectorCount} разъёмов · 13,5 сом/кВт·ч",color=Muted,fontSize=11.sp)
-            location?.let {Text("${String.format(Ru,"%.1f",distanceKm(it,station.point))} км по прямой",color=Muted,fontSize=11.sp)}
+            AppText("Свободно ${station.availableConnectors} из ${station.connectorCount} разъёмов · 13,5 сом/кВт·ч",color=Muted,fontSize=11.sp)
+            location?.let {AppText("${String.format(Ru,"%.1f",distanceKm(it,station.point))} км по прямой",color=Muted,fontSize=11.sp)}
             StationEquipment(station,onConnector)
         }
     }

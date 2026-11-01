@@ -55,7 +55,7 @@ val Ru=Locale("ru","KG")
 fun money(minor: Long) = String.format(Ru,"%,.2f сом",minor/100.0)
 fun energy(kwh: Double) = String.format(Ru,"%.3f",kwh)
 class MainActivity: ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); enableEdgeToEdge(); setContent { QubatTheme { QubatApp() } } }
+    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); enableEdgeToEdge(); setContent { QubatTheme { AppLanguageProvider { QubatLaunch() } } } }
 }
 private enum class Tab(val label: String,val icon: ImageVector) {
     HOME("Карта",Icons.Default.Home), STATIONS("Список",Icons.Default.Place), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
@@ -123,8 +123,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
         } else focusedConnectorId=port.id
     }
     run {
-        Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) },bottomBar={
-            NavigationBar(containerColor=SurfaceGreen) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={Icon(item.icon,item.label)},label={Text(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
+        Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) {data->Snackbar {AppText(data.visuals.message)}} },bottomBar={
+            NavigationBar(containerColor=SurfaceGreen) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={AppIcon(item.icon,item.label)},label={AppText(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 if(tab==Tab.HOME) {
@@ -140,7 +140,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 if(tab==Tab.CHARGE) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
                     androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.qubat_logo),"QUBAT",Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)))
-                    Column(Modifier.weight(1f).padding(start=12.dp)) { Text("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); Text("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp) }
+                    Column(Modifier.weight(1f).padding(start=12.dp)) { AppText("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); AppText("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp) }
                     ThemeToggle()
                 }
                 HorizontalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.3f))
@@ -172,13 +172,13 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 val site=stations.firstOrNull {s->s.connectors.any {it.id==id}}
                 val port=site?.connectors?.firstOrNull {it.id==id}
                 if(site!=null && port!=null) AlertDialog(onDismissRequest={focusedConnectorId=null},
-                    title={Text("Аппарат ${site.chargerNumber(id)} · разъём ${port.number}")},
+                    title={AppText("Аппарат ${site.chargerNumber(id)} · разъём ${port.number}")},
                     text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                        Text(port.state.title,color=Color(port.state.argb),fontWeight=FontWeight.Bold,modifier=Modifier.testTag("connector-dialog-state"))
-                        Text("${site.city} · ${site.title}")
-                        Text("GB/T DC · 80 кВт · 13,5 сом/кВт·ч",color=Muted,fontSize=13.sp)
-                        port.percent?.let {Text("Демо-уровень заряда: $it%",color=Color(port.state.argb))}
-                        Text(when(port.state) {
+                        AppText(port.state.title,color=Color(port.state.argb),fontWeight=FontWeight.Bold,modifier=Modifier.testTag("connector-dialog-state"))
+                        AppText("${site.city} · ${site.title}")
+                        AppText("GB/T DC · 80 кВт · 13,5 сом/кВт·ч",color=Muted,fontSize=13.sp)
+                        port.percent?.let {AppText("Демо-уровень заряда: $it%",color=Color(port.state.argb))}
+                        AppText(when(port.state) {
                             ConnectorState.FREE -> "Разъём свободен. Можно выбрать для учебной зарядки."
                             ConnectorState.CONNECTED -> "Автомобиль уже подключён и ожидает старта. Разъём занят."
                             ConnectorState.CHARGING -> "Идёт демонстрационная зарядка. Разъём занят."
@@ -187,32 +187,32 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                             ConnectorState.OFFLINE -> "Разъём недоступен."
                         },color=Muted,fontSize=13.sp)
                     }},confirmButton={
-                        if(id in state.completedConnectorIds) TextButton(onClick={vm.releaseConnector(id);focusedConnectorId=null}) {Text("Освободить разъём")}
-                    },dismissButton={TextButton(onClick={focusedConnectorId=null}) {Text("Закрыть")}})
+                        if(id in state.completedConnectorIds) TextButton(onClick={vm.releaseConnector(id);focusedConnectorId=null}) {AppText("Освободить разъём")}
+                    },dismissButton={TextButton(onClick={focusedConnectorId=null}) {AppText("Закрыть")}})
             }
             detailId?.let { id ->
                 val s=stations.first {it.id==id}
-                AlertDialog(onDismissRequest={detailId=null},title={Text("${s.city} · ДЕМО")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    Text(s.title,fontWeight=FontWeight.Bold);Text("${s.status.title} · ${s.availableConnectors} из ${s.connectorCount} мест свободно\n80 кВт на место · GB/T DC · 13,5 сом/кВт·ч")
-                    Text("Вымышленная станция у центра города. По этим координатам зарядной станции может не быть. Маршрут — только для проверки интерфейса.",color=Amber)
-                    Text("${s.point.lat}, ${s.point.lon}",color=Muted)
-                    OutlinedButton(onClick={openRoute(context,s,::message)},modifier=Modifier.fillMaxWidth()) {Text("Учебный маршрут · 2ГИС")}
-                    TextButton(onClick={openGoogleRoute(context,s,::message)}) {Text("Открыть маршрут в Google Maps")}
-                }},confirmButton={TextButton(onClick={selectedId=s.id;detailId=null;tabName=Tab.CHARGE.name}) {Text("К зарядке")}},dismissButton={TextButton(onClick={detailId=null}){Text("Закрыть")}})
+                AlertDialog(onDismissRequest={detailId=null},title={AppText("${s.city} · ДЕМО")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    AppText(s.title,fontWeight=FontWeight.Bold);AppText("${s.status.title} · ${s.availableConnectors} из ${s.connectorCount} мест свободно\n80 кВт на место · GB/T DC · 13,5 сом/кВт·ч")
+                    AppText("Вымышленная станция у центра города. По этим координатам зарядной станции может не быть. Маршрут — только для проверки интерфейса.",color=Amber)
+                    AppText("${s.point.lat}, ${s.point.lon}",color=Muted)
+                    OutlinedButton(onClick={openRoute(context,s,::message)},modifier=Modifier.fillMaxWidth()) {AppText("Учебный маршрут · 2ГИС")}
+                    TextButton(onClick={openGoogleRoute(context,s,::message)}) {AppText("Открыть маршрут в Google Maps")}
+                }},confirmButton={TextButton(onClick={selectedId=s.id;detailId=null;tabName=Tab.CHARGE.name}) {AppText("К зарядке")}},dismissButton={TextButton(onClick={detailId=null}){AppText("Закрыть")}})
             }
         }
     }
 }
-@Composable fun Eyebrow(text:String) {Text(text,color=Lime,fontSize=10.sp,letterSpacing=2.sp,fontWeight=FontWeight.Bold)}
-@Composable fun Title(text:String) {Text(text,fontSize=25.sp,fontWeight=FontWeight.Bold)}
+@Composable fun Eyebrow(text:String) {AppText(text,color=Lime,fontSize=10.sp,letterSpacing=2.sp,fontWeight=FontWeight.Bold)}
+@Composable fun Title(text:String) {AppText(text,fontSize=25.sp,fontWeight=FontWeight.Bold)}
 @Composable fun Panel(content:@Composable ColumnScope.()->Unit) { Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(SurfaceGreen).padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp),content=content) }
-@Composable fun DemoNotice() {Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFF2B3624)).padding(12.dp),verticalAlignment=Alignment.CenterVertically) {Icon(Icons.Default.Info,null,tint=Amber,modifier=Modifier.size(18.dp));Text(" Демо-данные. Станции вымышленные. Платежей нет.",color=Amber,fontSize=11.sp)}}
-@Composable fun Metric(label:String,value:String,modifier:Modifier) {Column(modifier.clip(RoundedCornerShape(18.dp)).background(SurfaceGreen).padding(16.dp)) {Text(label,color=Muted,fontSize=12.sp);Spacer(Modifier.height(8.dp));Text(value,fontSize=17.sp,fontWeight=FontWeight.Bold)}}
+@Composable fun DemoNotice() {Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFF2B3624)).padding(12.dp),verticalAlignment=Alignment.CenterVertically) {AppIcon(Icons.Default.Info,null,tint=Amber,modifier=Modifier.size(18.dp));AppText(" Демо-данные. Станции вымышленные. Платежей нет.",color=Amber,fontSize=11.sp)}}
+@Composable fun Metric(label:String,value:String,modifier:Modifier) {Column(modifier.clip(RoundedCornerShape(18.dp)).background(SurfaceGreen).padding(16.dp)) {AppText(label,color=Muted,fontSize=12.sp);Spacer(Modifier.height(8.dp));AppText(value,fontSize=17.sp,fontWeight=FontWeight.Bold)}}
 @Composable fun FlowRowCompatStatus(selected:String?,onSelect:(String?)->Unit) {
     Column {Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-        FilterChip(selected=selected==null,onClick={onSelect(null)},label={Text("Все")})
-        FilterChip(selected=selected==StationStatus.AVAILABLE.name,onClick={onSelect(StationStatus.AVAILABLE.name)},label={Text("Свободны")})
-    };Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {StationStatus.entries.filter {it!=StationStatus.AVAILABLE}.forEach {s -> FilterChip(selected=selected==s.name,onClick={onSelect(s.name)},label={Text(s.title)})}} }
+        FilterChip(selected=selected==null,onClick={onSelect(null)},label={AppText("Все")})
+        FilterChip(selected=selected==StationStatus.AVAILABLE.name,onClick={onSelect(StationStatus.AVAILABLE.name)},label={AppText("Свободны")})
+    };Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {StationStatus.entries.filter {it!=StationStatus.AVAILABLE}.forEach {s -> FilterChip(selected=selected==s.name,onClick={onSelect(s.name)},label={AppText(s.title)})}} }
 }
 fun openRoute(context:android.content.Context,s:Station,message:(String)->Unit) {
     // Official 2GIS deep link, longitude first; navigator determines the source.
