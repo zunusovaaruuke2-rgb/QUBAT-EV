@@ -51,12 +51,12 @@ val LocalTranslate=staticCompositionLocalOf<(String)->String> {{it}}
     val change=LocalSetLanguage.current
     AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest=onDismiss,title={AppText("Язык")},text={
         androidx.compose.foundation.layout.Column {
-            AppLanguage.entries.forEach {language->TextButton(onClick={change(language);onDismiss()}) {
+            AppLanguage.entries.forEach {language->PressTextButton(onClick={change(language);onDismiss()}) {
                 RadioButton(selected=selected==language,onClick=null)
                 Text(language.nativeName)
             }}
         }
-    },confirmButton={TextButton(onClick=onDismiss) {AppText("Закрыть")}})
+    },confirmButton={PressTextButton(onClick=onDismiss) {AppText("Закрыть")}})
 }
 
 private data class Translation(val ru:String,val en:String,val ky:String) {

@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.sp
                     AppText("${station.city} · демонстрационная станция",fontSize=11.sp,color=Muted)
                     port?.let {AppText("Аппарат ${station.chargerNumber(it.id)} · разъём ${it.number} · ${it.state.title}",fontSize=11.sp,color=if(it.state==ConnectorState.FREE)Lime else androidx.compose.ui.graphics.Color(it.state.argb))}
                 }
-                IconButton(onClick=onStations,enabled=!active) {AppIcon(Icons.Default.ArrowForward,"Выбрать станцию")}
+                PressIconButton(onClick=onStations,enabled=!active) {AppIcon(Icons.Default.ArrowForward,"Выбрать станцию")}
             }
         }
         if(!active) {
@@ -58,7 +58,7 @@ import androidx.compose.ui.unit.sp
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             unit.connectors.forEach {item->
                 val selected=item.id==port?.id
-                DepthSurface(Modifier.weight(1f).testTag("charge-choice-${item.id}").clickable(enabled=!active) {onChoose(item)},shape=RoundedCornerShape(16.dp),color=if(selected) Lime.copy(alpha=.12f) else SurfaceGreen,border=BorderStroke(if(selected)2.dp else 1.dp,if(selected)Lime else MaterialTheme.colorScheme.outline)) {
+                DepthSurface(Modifier.weight(1f).testTag("charge-choice-${item.id}").pressClickable(enabled=!active) {onChoose(item)},shape=RoundedCornerShape(16.dp),color=if(selected) Lime.copy(alpha=.12f) else SurfaceGreen,border=BorderStroke(if(selected)2.dp else 1.dp,if(selected)Lime else MaterialTheme.colorScheme.outline)) {
                     Row(Modifier.padding(horizontal=8.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically) {
                         Box(Modifier.width(48.dp)) {ConnectorBadge(unit,item) {if(!active)onChoose(item)}}
                         Column(Modifier.weight(1f)) {AppText("GB/T ${item.number}",fontSize=14.sp,fontWeight=FontWeight.Bold);AppText(item.state.title,fontSize=10.sp,color=Muted)}
@@ -101,7 +101,7 @@ import androidx.compose.ui.unit.sp
         else {
             DepthButton(onClick=onStart,enabled=port?.state==ConnectorState.FREE && state.balanceMinor>0,modifier=Modifier.fillMaxWidth().height(54.dp).testTag("start-charge"),shape=RoundedCornerShape(17.dp)) {AppIcon(Icons.Default.PlayArrow,null);AppText("Начать зарядку",fontWeight=FontWeight.Bold)}
             AppText("Учебный режим · начать симуляцию без реального подключения",fontSize=10.sp,color=Muted)
-            if(port?.id in state.completedConnectorIds) TextButton(onClick=onRelease) {AppText("Освободить разъём после сеанса")}
+            if(port?.id in state.completedConnectorIds) PressTextButton(onClick=onRelease) {AppText("Освободить разъём после сеанса")}
         }
         ChargePowerChart(state.progress)
         AppText("ДЕМО · батарея 60 кВт·ч, начальный заряд 20%. Мощность модели — 80 кВт. График показывает прошедший сеанс; данные автомобиля и станции не подключены.",fontSize=10.sp,lineHeight=14.sp,color=Muted)

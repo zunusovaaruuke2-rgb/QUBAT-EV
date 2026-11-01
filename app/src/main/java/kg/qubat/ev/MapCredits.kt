@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.sp
 @Composable fun MapCredits() {
     var expanded by remember {mutableStateOf(false)}
     DepthSurface(shape=CircleShape,color=SurfaceGreen.copy(alpha=.9f),shadowElevation=2.dp) {
-        TextButton(onClick={expanded=true},modifier=Modifier.size(36.dp).testTag("map-credits").appDescription("Источники карты"),contentPadding=PaddingValues(0.dp)) {AppText("©",fontSize=18.sp,color=Muted)}
+        PressTextButton(onClick={expanded=true},modifier=Modifier.size(36.dp).testTag("map-credits").appDescription("Источники карты"),contentPadding=PaddingValues(0.dp)) {AppText("©",fontSize=18.sp,color=Muted)}
     }
     if(expanded) AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={expanded=false},title={AppText("Источники карты")},text={
         Text(buildAnnotatedString {
@@ -29,5 +29,5 @@ import androidx.compose.ui.unit.sp
             append("\n\n")
             withLink(LinkAnnotation.Url("https://openfreemap.org/")) {append("OpenFreeMap")}
         },modifier=Modifier.verticalScroll(rememberScrollState()))
-    },confirmButton={TextButton(onClick={expanded=false}) {AppText("Закрыть")}})
+    },confirmButton={PressTextButton(onClick={expanded=false}) {AppText("Закрыть")}})
 }

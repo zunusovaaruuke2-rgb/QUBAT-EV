@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.sp
     val description=remember(charger.number,port,localize) {localize("Аппарат ${charger.number}, разъём ${port.number}, GB/T DC, ${port.state.title}"+(port.percent?.let {", $it процентов, демо"} ?: ""))}
     val status=remember(port.state,localize) {localize(port.state.title)}
     Box(Modifier.fillMaxWidth().height(56.dp).testTag("connector-${port.id}")
-        .clickable(role=Role.Button,onClick=onClick)
+        .pressClickable(role=Role.Button,onClick=onClick)
         .semantics {contentDescription=description;stateDescription=status},contentAlignment=Alignment.Center) {
         Box(Modifier.size(38.dp).depthFrame(CircleShape,SurfaceGreen,0.dp),contentAlignment=Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {drawCircle(color,style=Stroke(3.dp.toPx()))}
@@ -73,7 +73,7 @@ import androidx.compose.ui.unit.sp
                     }
                 }
             }
-        },confirmButton={TextButton(onClick={openedId=null}) {AppText("Закрыть")}})
+        },confirmButton={PressTextButton(onClick={openedId=null}) {AppText("Закрыть")}})
     }
     val columns=if(LocalConfiguration.current.screenWidthDp>=348) 3 else 2
     val rows=remember(station.chargers,columns) {station.chargers.chunked(columns)}
@@ -82,7 +82,7 @@ import androidx.compose.ui.unit.sp
             rows.forEach {units->
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.fillMaxWidth()) {
                     units.forEach {charger->
-                        Box(Modifier.weight(1f).depthFrame(RoundedCornerShape(14.dp),MaterialTheme.colorScheme.surfaceVariant,0.dp).clickable(role=Role.Button) {openedId=charger.id}.testTag("apparatus-${charger.id}")) {
+                        Box(Modifier.weight(1f).depthFrame(RoundedCornerShape(14.dp),MaterialTheme.colorScheme.surfaceVariant,0.dp).pressClickable(role=Role.Button) {openedId=charger.id}.testTag("apparatus-${charger.id}")) {
                             Column(Modifier.padding(vertical=6.dp)) {
                                 Row(Modifier.fillMaxWidth().padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                                     AppText(charger.number.toString(),fontSize=13.sp,fontWeight=FontWeight.Bold)
@@ -111,7 +111,7 @@ import androidx.compose.ui.unit.sp
                     AppText(station.title,fontWeight=FontWeight.Bold,fontSize=18.sp)
                     AppText("${station.city} · ДЕМО",color=Muted,fontSize=12.sp)
                 }
-                IconButton(onClick=onDetail) {AppIcon(Icons.Default.Place,"Маршрут и детали ${station.city}",tint=Lime)}
+                PressIconButton(onClick=onDetail) {AppIcon(Icons.Default.Place,"Маршрут и детали ${station.city}",tint=Lime)}
             }
             AppText(summary,color=Muted,fontSize=11.sp)
             distance?.let {AppText(it,color=Muted,fontSize=11.sp)}

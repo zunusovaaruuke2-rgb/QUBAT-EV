@@ -56,7 +56,7 @@ private val paymentOptions=listOf(
     var notice by rememberSaveable {mutableStateOf<String?>(null)}
     LazyColumn(Modifier.fillMaxSize().testTag("wallet-scroll"),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         item(key="header",contentType="header") {Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {AppText(if(historyOnly) "История баланса" else "Кошелёк",Modifier.weight(1f),fontSize=27.sp,fontWeight=FontWeight.Bold);ThemeToggle()}}
-        if(historyOnly) item(key="back") {TextButton(onClick={historyOnly=false}) {AppText("Назад к кошельку")}}
+        if(historyOnly) item(key="back") {PressTextButton(onClick={historyOnly=false}) {AppText("Назад к кошельку")}}
         else {
             item(key="balance",contentType="balance") {DepthSurface(shape=RoundedCornerShape(23.dp),color=SurfaceGreen,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline.copy(alpha=.35f))) {
                 Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -67,7 +67,7 @@ private val paymentOptions=listOf(
                     AppText(money(available),fontSize=34.sp,fontWeight=FontWeight.Bold,color=Lime)
                     AppText("Кыргызский сом · KGS",fontSize=11.sp,color=Muted)
                     HorizontalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.3f))
-                    TextButton(onClick={historyOnly=true},contentPadding=PaddingValues(0.dp)) {AppIcon(Icons.Default.DateRange,null,Modifier.size(18.dp));AppText("  История баланса",Modifier.weight(1f));AppIcon(Icons.Default.ArrowForward,null,Modifier.size(18.dp))}
+                    PressTextButton(onClick={historyOnly=true},contentPadding=PaddingValues(0.dp)) {AppIcon(Icons.Default.DateRange,null,Modifier.size(18.dp));AppText("  История баланса",Modifier.weight(1f));AppIcon(Icons.Default.ArrowForward,null,Modifier.size(18.dp))}
                 }
             }}
             item(key="methods-title") {Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {AppText("Способы пополнения",fontSize=18.sp,fontWeight=FontWeight.Bold);AppText("Демо-режим · банковские списания отключены",fontSize=11.sp,color=Muted)}}
@@ -92,7 +92,7 @@ private val paymentOptions=listOf(
                 AppText(method,fontSize=24.sp,fontWeight=FontWeight.Bold)
                 AppText("Демо-пополнение",fontSize=16.sp,fontWeight=FontWeight.SemiBold)
                 AppText("Это проверка интерфейса. Карта и приложение банка не используются; средства будут учебными.",fontSize=12.sp,lineHeight=17.sp,color=Muted)
-                OutlinedTextField(amount,{value->if(value.length<=5 && value.all {it.isDigit()})amount=value},modifier=Modifier.fillMaxWidth().testTag("topup-amount").depthFrame(RoundedCornerShape(16.dp),SurfaceGreen,1.dp,fill=false),shape=RoundedCornerShape(16.dp),label={AppText("Сумма в сомах")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),suffix={AppText("KGS")})
+                PressOutlinedTextField(amount,{value->if(value.length<=5 && value.all {it.isDigit()})amount=value},modifier=Modifier.fillMaxWidth().testTag("topup-amount").depthFrame(RoundedCornerShape(16.dp),SurfaceGreen,1.dp,fill=false),shape=RoundedCornerShape(16.dp),label={AppText("Сумма в сомах")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),suffix={AppText("KGS")})
                 Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf(100,500,1000).forEach {value->DepthChip(selected=amount==value.toString(),onClick={amount=value.toString()},label={AppText("$value")})}}
                 if(sessionActive) AppText("Пополнение доступно после завершения сеанса",color=Amber,fontSize=12.sp)
                 error?.let {AppText(it,color=Amber,fontSize=12.sp)}
@@ -100,7 +100,7 @@ private val paymentOptions=listOf(
             }
         }
     }
-    notice?.let {text->AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={notice=null},title={AppText("QUBAT EV")},text={AppText(text)},confirmButton={TextButton(onClick={notice=null}) {AppText("Понятно")}})}
+    notice?.let {text->AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={notice=null},title={AppText("QUBAT EV")},text={AppText(text)},confirmButton={PressTextButton(onClick={notice=null}) {AppText("Понятно")}})}
 }
 
 @Composable fun ProfileContent(available:Long,onWallet:()->Unit) {
@@ -125,7 +125,7 @@ private val paymentOptions=listOf(
                 Text(if(name.isBlank()) LocalTranslate.current("Демо-пользователь") else name,fontSize=22.sp,fontWeight=FontWeight.Bold,textAlign=androidx.compose.ui.text.style.TextAlign.Center)
                 Text(if(phone.isBlank()) LocalTranslate.current("Номер телефона не указан") else phone,fontSize=13.sp,color=Muted)
                 AppText("Профиль создан: $createdLabel",fontSize=10.sp,color=Muted)
-                TextButton(onClick={editor="profile"},modifier=Modifier.testTag("edit-profile")) {AppText("Изменить профиль")}
+                PressTextButton(onClick={editor="profile"},modifier=Modifier.testTag("edit-profile")) {AppText("Изменить профиль")}
             }
         }}
         item(key="balance") {DepthSurface(shape=RoundedCornerShape(20.dp),color=SurfaceGreen) {
@@ -149,16 +149,16 @@ private val paymentOptions=listOf(
         var second by rememberSaveable(kind) {mutableStateOf(if(kind=="profile")phone else plate)}
         AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={editor=null},title={AppText(if(kind=="profile") "Личные данные" else "Мой автомобиль")},text={
             Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(first,{if(it.length<=80)first=it},label={AppText(if(kind=="profile") "Имя" else "Марка и модель")},modifier=Modifier.testTag("profile-field-first").depthFrame(RoundedCornerShape(16.dp),SurfaceGreen,1.dp,fill=false),shape=RoundedCornerShape(16.dp),singleLine=true)
-                OutlinedTextField(second,{if(it.length<=30)second=it},modifier=Modifier.depthFrame(RoundedCornerShape(16.dp),SurfaceGreen,1.dp,fill=false),shape=RoundedCornerShape(16.dp),label={AppText(if(kind=="profile") "Телефон" else "Госномер")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=if(kind=="profile")KeyboardType.Phone else KeyboardType.Text))
+                PressOutlinedTextField(first,{if(it.length<=80)first=it},label={AppText(if(kind=="profile") "Имя" else "Марка и модель")},modifier=Modifier.testTag("profile-field-first").depthFrame(RoundedCornerShape(16.dp),SurfaceGreen,1.dp,fill=false),shape=RoundedCornerShape(16.dp),singleLine=true)
+                PressOutlinedTextField(second,{if(it.length<=30)second=it},modifier=Modifier.depthFrame(RoundedCornerShape(16.dp),SurfaceGreen,1.dp,fill=false),shape=RoundedCornerShape(16.dp),label={AppText(if(kind=="profile") "Телефон" else "Госномер")},singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=if(kind=="profile")KeyboardType.Phone else KeyboardType.Text))
             }
-        },confirmButton={TextButton(onClick={
+        },confirmButton={PressTextButton(onClick={
             if(kind=="profile") {name=first.trim();phone=second.trim();prefs.edit().putString("name",name).putString("phone",phone).apply()}
             else {car=first.trim();plate=second.trim();prefs.edit().putString("car",car).putString("plate",plate).apply()}
             editor=null
-        },modifier=Modifier.testTag("save-profile")) {AppText("Сохранить")}},dismissButton={TextButton(onClick={editor=null}) {AppText("Отмена")}})
+        },modifier=Modifier.testTag("save-profile")) {AppText("Сохранить")}},dismissButton={PressTextButton(onClick={editor=null}) {AppText("Отмена")}})
     }
-    info?.let {text->AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={info=null},title={AppText("QUBAT EV")},text={AppText(text)},confirmButton={TextButton(onClick={info=null}) {AppText("Понятно")}})}
+    info?.let {text->AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={info=null},title={AppText("QUBAT EV")},text={AppText(text)},confirmButton={PressTextButton(onClick={info=null}) {AppText("Понятно")}})}
 }
 
 @Composable private fun HistoryCard(entry:HistoryEntry) {

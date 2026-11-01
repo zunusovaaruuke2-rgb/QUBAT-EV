@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.sp
             AppText("Доступность локации",color=Muted);FlowRowCompatStatus(statusName,onStatus)
             AppText("Разъёмы · GB/T DC",color=Muted,fontSize=13.sp)
             DepthButton(onClick=onDismiss,modifier=Modifier.fillMaxWidth()) {AppText("Показать станции · $count")}
-            TextButton(onClick={onCity(null);onPower(0);onStatus(null)}) {AppText("Сбросить фильтры")}
+            PressTextButton(onClick={onCity(null);onPower(0);onStatus(null)}) {AppText("Сбросить фильтры")}
         }
     }
 }
@@ -57,7 +57,7 @@ import androidx.compose.ui.unit.sp
         LazyColumn(Modifier.weight(1f).testTag("stations-list"),state=listState,contentPadding=PaddingValues(horizontal=12.dp,vertical=4.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             if(stations.isEmpty()) item {
                 Panel {AppText("Демо-станций пока нет");AppText("С такими фильтрами учебных точек нет.",color=Muted)
-                    TextButton(onClick={onQuery("");onCity(null);onPower(0);onStatus(null)}) {AppText("Сбросить фильтры")}}
+                    PressTextButton(onClick={onQuery("");onCity(null);onPower(0);onStatus(null)}) {AppText("Сбросить фильтры")}}
             }
             items(ordered,key={it.id},contentType={it.chargerCount}) {station->
                 val latestStation=rememberUpdatedState(station)
@@ -78,18 +78,18 @@ import androidx.compose.ui.unit.sp
     androidx.activity.compose.BackHandler(expanded) {expanded=false;onQuery("");keyboard?.hide()}
     Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         if(expanded) {
-            OutlinedTextField(query,onQuery,modifier=Modifier.weight(1f).then(Modifier.focusRequester(focus)).testTag("station-search-field").depthFrame(RoundedCornerShape(16.dp),SurfaceGreen,1.dp,fill=false),singleLine=true,
+            PressOutlinedTextField(query,onQuery,modifier=Modifier.weight(1f).then(Modifier.focusRequester(focus)).testTag("station-search-field").depthFrame(RoundedCornerShape(16.dp),SurfaceGreen,1.dp,fill=false),singleLine=true,
                 placeholder={AppText("Название станции",fontSize=14.sp)},leadingIcon={AppIcon(Icons.Default.Search,null)},
-                trailingIcon={IconButton(onClick={onQuery("");expanded=false;keyboard?.hide()}) {AppIcon(Icons.Default.Close,"Закрыть поиск")}},
+                trailingIcon={PressIconButton(onClick={onQuery("");expanded=false;keyboard?.hide()}) {AppIcon(Icons.Default.Close,"Закрыть поиск")}},
                 shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}))
             LaunchedEffect(Unit) {focus.requestFocus();keyboard?.show()}
         } else {
             DepthSurface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen,shadowElevation=3.dp) {
-                IconButton(onClick={expanded=true}) {AppIcon(Icons.Default.Search,"Поиск станции",tint=Lime)}
+                PressIconButton(onClick={expanded=true}) {AppIcon(Icons.Default.Search,"Поиск станции",tint=Lime)}
             }
             if(query.isNotBlank()) AppText(query,modifier=Modifier.weight(1f),maxLines=1,fontSize=13.sp) else Spacer(Modifier.weight(1f))
             DepthSurface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {ThemeToggle()}
-            DepthSurface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {IconButton(onClick=onFilters) {AppIcon(Icons.Default.Settings,filterDescription,tint=Lime)}}
+            DepthSurface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {PressIconButton(onClick=onFilters) {AppIcon(Icons.Default.Settings,filterDescription,tint=Lime)}}
         }
     }
 }

@@ -124,7 +124,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     }
     run {
         Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) {data->Snackbar {AppText(data.visuals.message)}} },bottomBar={
-            NavigationBar(modifier=Modifier.depthFrame(RoundedCornerShape(topStart=18.dp,topEnd=18.dp),SurfaceGreen,0.dp,fill=false),containerColor=SurfaceGreen) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={AppIcon(item.icon,item.label)},label={AppText(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
+            NavigationBar(modifier=Modifier.depthFrame(RoundedCornerShape(topStart=18.dp,topEnd=18.dp),SurfaceGreen,0.dp,fill=false),containerColor=SurfaceGreen) { Tab.entries.forEach { item -> PressNavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={AppIcon(item.icon,item.label)},label={AppText(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 if(tab==Tab.HOME) {
@@ -191,8 +191,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                             ConnectorState.OFFLINE -> "Разъём недоступен."
                         },color=Muted,fontSize=13.sp)
                     }},confirmButton={
-                        if(id in state.completedConnectorIds) TextButton(onClick={vm.releaseConnector(id);focusedConnectorId=null}) {AppText("Освободить разъём")}
-                    },dismissButton={TextButton(onClick={focusedConnectorId=null}) {AppText("Закрыть")}})
+                        if(id in state.completedConnectorIds) PressTextButton(onClick={vm.releaseConnector(id);focusedConnectorId=null}) {AppText("Освободить разъём")}
+                    },dismissButton={PressTextButton(onClick={focusedConnectorId=null}) {AppText("Закрыть")}})
             }
             detailId?.let { id ->
                 val s=stations.first {it.id==id}
@@ -201,8 +201,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                     AppText("Вымышленная станция у центра города. По этим координатам зарядной станции может не быть. Маршрут — только для проверки интерфейса.",color=Amber)
                     AppText("${s.point.lat}, ${s.point.lon}",color=Muted)
                     DepthOutlinedButton(onClick={openRoute(context,s,::message)},modifier=Modifier.fillMaxWidth()) {AppText("Учебный маршрут · 2ГИС")}
-                    TextButton(onClick={openGoogleRoute(context,s,::message)}) {AppText("Открыть маршрут в Google Maps")}
-                }},confirmButton={TextButton(onClick={selectedId=s.id;detailId=null;tabName=Tab.CHARGE.name}) {AppText("К зарядке")}},dismissButton={TextButton(onClick={detailId=null}){AppText("Закрыть")}})
+                    PressTextButton(onClick={openGoogleRoute(context,s,::message)}) {AppText("Открыть маршрут в Google Maps")}
+                }},confirmButton={PressTextButton(onClick={selectedId=s.id;detailId=null;tabName=Tab.CHARGE.name}) {AppText("К зарядке")}},dismissButton={PressTextButton(onClick={detailId=null}){AppText("Закрыть")}})
             }
         }
     }

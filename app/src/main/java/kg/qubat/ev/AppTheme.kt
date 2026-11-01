@@ -46,7 +46,7 @@ val Amber:Color @Composable get()=if(LocalNight.current) Color(0xFFFFCF80) else 
     val night=LocalNight.current
     val color=Lime
     val label=LocalTranslate.current(if(night) "Дневная тема" else "Ночная тема")
-    TextButton(onClick=LocalToggleTheme.current,modifier=Modifier.semantics {contentDescription=label},contentPadding=androidx.compose.foundation.layout.PaddingValues(8.dp)) {
+    PressTextButton(onClick=LocalToggleTheme.current,modifier=Modifier.semantics {contentDescription=label},contentPadding=androidx.compose.foundation.layout.PaddingValues(8.dp)) {
         Canvas(Modifier.size(24.dp)) {
             if(night) {
                 drawCircle(color,5.dp.toPx(),center,style=Stroke(2.dp.toPx()))

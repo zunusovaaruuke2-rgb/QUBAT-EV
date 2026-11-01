@@ -105,6 +105,15 @@ class NavigationTest {
                 compose.onNodeWithText("Закрыть").performClick()
                 compose.onNodeWithContentDescription("Закрыть карточку").performClick()
             }
+            step("Сдавливание при удержании и восстановление после отпускания") {
+                val button=compose.onNodeWithContentDescription("Обзор Кыргызстана")
+                val width=button.fetchSemanticsNode().boundsInRoot.width
+                button.performTouchInput {down(center)}
+                try {
+                    compose.waitUntil(3000) {button.fetchSemanticsNode().boundsInRoot.width<width*.99f}
+                } finally {button.performTouchInput {up()}}
+                compose.waitUntil(3000) {kotlin.math.abs(button.fetchSemanticsNode().boundsInRoot.width-width)<1f}
+            }
             val initial=zoom()
             step("Увеличение масштаба карты") {
                 compose.onNodeWithContentDescription("Увеличить карту").performClick()
