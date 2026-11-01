@@ -26,17 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-@Composable fun ConnectorLegend() {
-    val items=listOf(ConnectorState.FREE to "Свободен",ConnectorState.CHARGING to "Заряжается",ConnectorState.CONNECTED to "Подключён",ConnectorState.COMPLETED to "Завершён / ошибка",ConnectorState.OFFLINE to "Недоступен")
-    Column(verticalArrangement=Arrangement.spacedBy(5.dp)) {
-        items.chunked(3).forEach {row->Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {row.forEach {(state,title)->
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(4.dp)) {
-                Canvas(Modifier.size(7.dp)) {drawCircle(Color(state.argb))}
-                Text(title,color=Muted,fontSize=10.sp)
-            }
-        }}}
-    }
-}
 @Composable fun ConnectorBadge(charger:Charger,port:Connector,onClick:()->Unit) {
     val color=Color(port.state.argb)
     val description="Аппарат ${charger.number}, разъём ${port.number}, GB/T DC, ${port.state.title}"+(port.percent?.let {", $it процентов, демо"} ?: "")

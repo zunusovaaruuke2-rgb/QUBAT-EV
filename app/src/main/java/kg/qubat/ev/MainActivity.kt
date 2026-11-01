@@ -3,10 +3,8 @@ package kg.qubat.ev
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
-import android.os.CancellationSignal
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -74,13 +72,15 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
-    var city by rememberSaveable { mutableStateOf<String?>(null) }
+    val city:String?=null
     var minPower by rememberSaveable { mutableIntStateOf(0) }
     var statusName by rememberSaveable { mutableStateOf<String?>(null) }
     var location by remember { mutableStateOf<GeoPoint?>(null) }
     var locating by remember { mutableStateOf(false) }
     var locationMessage by remember { mutableStateOf("Местоположение не определено") }
-    var cancelLocation by remember { mutableStateOf<CancellationSignal?>(null) }
+    var locationFocus by remember {mutableIntStateOf(0)}
+    var waitingForLocationFocus by remember {mutableStateOf(false)}
+    var refiningLocation by remember {mutableStateOf(false)}
     val context=LocalContext.current
     val keyboard=LocalSoftwareKeyboardController.current
     val contentScroll=key(tab) { rememberScrollState() }
@@ -88,44 +88,25 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     val scope=rememberCoroutineScope()
     val snackbar=remember { SnackbarHostState() }
     fun message(text:String) { scope.launch { snackbar.showSnackbar(text) } }
-    DisposableEffect(Unit) { onDispose { cancelLocation?.cancel() } }
-    fun locate() {
-        cancelLocation?.cancel(); locating=true; locationMessage="Определяем местоположение…"
-        val manager=context.getSystemService(LocationManager::class.java)
-        val provider=listOf(LocationManager.NETWORK_PROVIDER,LocationManager.GPS_PROVIDER).firstOrNull { manager.isProviderEnabled(it) }
-        if(provider==null) { locating=false; locationMessage="Включите геолокацию в настройках устройства"; return }
-        val cancellation=CancellationSignal(); cancelLocation=cancellation
-        try {
-            if(android.os.Build.VERSION.SDK_INT >= 30) {
-                manager.getCurrentLocation(provider,cancellation,context.mainExecutor) { result ->
-                    locating=false
-                    if(result==null) locationMessage="Не удалось определить положение. Выберите город вручную."
-                    else { location=GeoPoint(result.latitude,result.longitude); locationMessage="Расстояние по прямой от вашей позиции" }
-                }
-                scope.launch { kotlinx.coroutines.delay(15000); if(locating && cancelLocation===cancellation) { cancellation.cancel(); locating=false; locationMessage="Нет сигнала. Выберите город вручную." } }
-            } else {
-                // One foreground update for Android 8–10; no background tracking.
-                val listener=object: android.location.LocationListener {
-                    override fun onLocationChanged(result: android.location.Location) {
-                        manager.removeUpdates(this); locating=false
-                        location=GeoPoint(result.latitude,result.longitude); locationMessage="Расстояние по прямой от вашей позиции"
-                    }
-                    override fun onStatusChanged(provider:String?,status:Int,extras:Bundle?) {}
-                    override fun onProviderEnabled(provider:String) {}
-                    override fun onProviderDisabled(provider:String) {}
-                }
-                manager.requestLocationUpdates(provider,0L,0f,listener,android.os.Looper.getMainLooper())
-                cancellation.setOnCancelListener { manager.removeUpdates(listener) }
-                scope.launch { kotlinx.coroutines.delay(15000); if(locating && cancelLocation===cancellation) { cancellation.cancel(); locating=false; locationMessage="Нет сигнала. Выберите город вручную." } }
-            }
-        } catch (_: SecurityException) { locating=false; locationMessage="Нет доступа к геопозиции. Выберите город." }
+    val lifecycle=androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    val tracker=remember(context,lifecycle) {
+        ForegroundLocation(context,lifecycle,onFix={fix->
+            location=GeoPoint(fix.latitude,fix.longitude)
+            if(waitingForLocationFocus || (refiningLocation && fix.accuracy<=100f)) {locationFocus++;waitingForLocationFocus=false}
+            if(fix.accuracy<=100f) refiningLocation=false
+        },onState={busy,text->locating=busy;locationMessage=text})
     }
+    DisposableEffect(tracker) {onDispose {tracker.close()}}
+    fun locate() {waitingForLocationFocus=true;refiningLocation=true;tracker.request()}
     val permission=rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        if(result.values.any { it }) locate() else { locationMessage="Доступ не предоставлен. Доступен выбор города."; locating=false }
+        if(result.values.any { it }) locate() else { locationMessage="Разрешите доступ к геопозиции в настройках приложения."; locating=false }
     }
     fun askLocation() {
         if(context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED) locate()
         else permission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION))
+    }
+    LaunchedEffect(tracker) {
+        if(context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED) locate()
     }
     val stations=remember(state.session?.connectorId,state.completedConnectorIds,demoBatteryPercent(state.progress.energyKwh)) {
         DemoData.stations.map {it.withConnectorSession(state.session?.connectorId,state.completedConnectorIds,demoBatteryPercent(state.progress.energyKwh))}
@@ -140,12 +121,13 @@ private enum class Tab(val label: String,val icon: ImageVector) {
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 if(tab==Tab.HOME) {
-                    MapHome(filterStations(stations,"",city,minPower,statusName?.let { StationStatus.valueOf(it) }),city,location,locating,locationMessage,minPower,statusName,
-                        onCity={city=it},onPower={minPower=it},onStatus={statusName=it},onLocate={askLocation()},
+                    MapHome(visible,query,location,locationFocus,locating,locationMessage,minPower,statusName,
+                        onQuery={query=it},
+                        onCity={},onPower={minPower=it},onStatus={statusName=it},onLocate={askLocation()},
                         onDetail={detailId=it.id;selectedId=it.id},onConnector={_,port->focusedConnectorId=port.id})
                 } else if(tab==Tab.STATIONS) {
                     StationsList(visible,query,city,minPower,statusName,location,
-                        onQuery={query=it},onCity={city=it},onPower={minPower=it},onStatus={statusName=it},
+                        onQuery={query=it},onCity={},onPower={minPower=it},onStatus={statusName=it},
                         onDetail={detailId=it.id},onConnector={_,port->focusedConnectorId=port.id})
                 } else {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
@@ -194,7 +176,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                             Panel {Row(verticalAlignment=Alignment.CenterVertically) {Text("Оформление",Modifier.weight(1f));ThemeToggle()};Text(if(LocalNight.current) "Ночная тема" else "Дневная тема",color=Muted)}
                             Panel {Text("Язык интерфейса");Text("Русский",color=Lime);Text("Регион · Кыргызская Республика",color=Muted)}
                             Panel {Text("О приложении",fontWeight=FontWeight.Bold);Text("QUBAT EV  ${BuildConfig.VERSION_NAME}",color=Lime);Text("Нативное приложение на Kotlin и Jetpack Compose. Все станции, их статусы и операции — демонстрационные. API EEJANN и платежи не подключены.",color=Muted,fontSize=13.sp)}
-                            Panel {Text("Конфиденциальность",fontWeight=FontWeight.Bold);Text("Геопозиция запрашивается только по кнопке и используется для расстояний. Фоновое отслеживание отключено. Учебный баланс и последние 100 операций сохраняются локально. При использовании карты её провайдер получает сетевые запросы; внешний навигатор получает выбранную точку.",color=Muted,fontSize=13.sp)}
+                            Panel {Text("Конфиденциальность",fontWeight=FontWeight.Bold);Text("Геопозиция используется для вашей точки на карте и расстояний. Геопозиция обновляется только пока приложение открыто. Учебный баланс и последние 100 операций сохраняются локально. При использовании карты её провайдер получает сетевые запросы; внешний навигатор получает выбранную точку.",color=Muted,fontSize=13.sp)}
                         }
                     }
                     Spacer(Modifier.height(8.dp))
@@ -242,15 +224,6 @@ private enum class Tab(val label: String,val icon: ImageVector) {
 @Composable fun Panel(content:@Composable ColumnScope.()->Unit) { Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(SurfaceGreen).padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp),content=content) }
 @Composable fun DemoNotice() {Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFF2B3624)).padding(12.dp),verticalAlignment=Alignment.CenterVertically) {Icon(Icons.Default.Info,null,tint=Amber,modifier=Modifier.size(18.dp));Text(" Демо-данные. Станции вымышленные. Платежей нет.",color=Amber,fontSize=11.sp)}}
 @Composable fun Metric(label:String,value:String,modifier:Modifier) {Column(modifier.clip(RoundedCornerShape(18.dp)).background(SurfaceGreen).padding(16.dp)) {Text(label,color=Muted,fontSize=12.sp);Spacer(Modifier.height(8.dp));Text(value,fontSize=17.sp,fontWeight=FontWeight.Bold)}}
-@Composable fun CityPicker(city:String?,onSelect:(String?)->Unit) {
-    var expanded by remember {mutableStateOf(false)}
-    Box {OutlinedButton(onClick={expanded=true},modifier=Modifier.fillMaxWidth()) {Icon(Icons.Default.Place,null);Text(" ${city ?: "Весь Кыргызстан"}",modifier=Modifier.weight(1f));Icon(Icons.Default.ArrowDropDown,null)}
-        DropdownMenu(expanded=expanded,onDismissRequest={expanded=false},modifier=Modifier.heightIn(max=380.dp)) {
-            DropdownMenuItem(text={Text("Весь Кыргызстан")},onClick={onSelect(null);expanded=false})
-            DemoData.cities.forEach { c -> DropdownMenuItem(text={Text(c.name)},onClick={onSelect(c.name);expanded=false}) }
-        }
-    }
-}
 @Composable fun FlowRowCompatStatus(selected:String?,onSelect:(String?)->Unit) {
     Column {Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         FilterChip(selected=selected==null,onClick={onSelect(null)},label={Text("Все")})

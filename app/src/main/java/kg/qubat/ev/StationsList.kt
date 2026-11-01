@@ -16,6 +16,8 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -25,7 +27,7 @@ import androidx.compose.ui.unit.sp
 @Composable fun StationFilterSheet(count:Int,city:String?,minPower:Int,statusName:String?,onCity:(String?)->Unit,onPower:(Int)->Unit,onStatus:(String?)->Unit,onDismiss:()->Unit) {
     ModalBottomSheet(onDismissRequest=onDismiss,containerColor=SurfaceGreen) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=24.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
-            Title("Фильтры");CityPicker(city,onCity)
+            Title("Фильтры")
             Text("Мощность аппарата",color=Muted)
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf(0,50,80,120).forEach {power->
                 FilterChip(selected=minPower==power,onClick={onPower(power)},label={Text(if(power==0)"Любая" else "≥ $power кВт")})
@@ -42,17 +44,7 @@ import androidx.compose.ui.unit.sp
     var filters by rememberSaveable {mutableStateOf(false)}
     val keyboard=LocalSoftwareKeyboardController.current
     Column(Modifier.fillMaxSize()) {
-        Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(query,onQuery,modifier=Modifier.weight(1f),singleLine=true,label={Text("Город или название станции",fontSize=12.sp)},
-                leadingIcon={Icon(Icons.Default.Search,null)},shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}))
-            ThemeToggle()
-            FilledIconButton(onClick={keyboard?.hide();filters=true}) {Icon(Icons.Default.Settings,"Фильтры списка")}
-        }
-        Column(Modifier.padding(horizontal=16.dp).padding(bottom=10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {
-            Text("Станции Кыргызстана",fontSize=19.sp)
-            Text("Демо · найдено ${stations.size} локаций",color=Muted,fontSize=11.sp)
-            ConnectorLegend()
-        }
+        StationSearchControls(query,onQuery,{keyboard?.hide();filters=true},"Фильтры списка")
         LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(horizontal=12.dp,vertical=4.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             if(stations.isEmpty()) item {
                 Panel {Text("Демо-станций пока нет");Text("С такими фильтрами учебных точек нет.",color=Muted)
@@ -63,4 +55,27 @@ import androidx.compose.ui.unit.sp
         }
     }
     if(filters) StationFilterSheet(stations.size,city,minPower,statusName,onCity,onPower,onStatus) {filters=false}
+}
+
+@Composable fun StationSearchControls(query:String,onQuery:(String)->Unit,onFilters:()->Unit,filterDescription:String) {
+    var expanded by rememberSaveable {mutableStateOf(false)}
+    val keyboard=LocalSoftwareKeyboardController.current
+    val focus=remember {androidx.compose.ui.focus.FocusRequester()}
+    androidx.activity.compose.BackHandler(expanded) {expanded=false;onQuery("");keyboard?.hide()}
+    Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        if(expanded) {
+            OutlinedTextField(query,onQuery,modifier=Modifier.weight(1f).then(Modifier.focusRequester(focus)).testTag("station-search-field"),singleLine=true,
+                placeholder={Text("Название станции",fontSize=14.sp)},leadingIcon={Icon(Icons.Default.Search,null)},
+                trailingIcon={IconButton(onClick={onQuery("");expanded=false;keyboard?.hide()}) {Icon(Icons.Default.Close,"Закрыть поиск")}},
+                shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}))
+            LaunchedEffect(Unit) {focus.requestFocus();keyboard?.show()}
+        } else {
+            Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen,shadowElevation=3.dp) {
+                IconButton(onClick={expanded=true}) {Icon(Icons.Default.Search,"Поиск станции",tint=Lime)}
+            }
+            if(query.isNotBlank()) Text(query,modifier=Modifier.weight(1f),maxLines=1,fontSize=13.sp) else Spacer(Modifier.weight(1f))
+            Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {ThemeToggle()}
+            Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {IconButton(onClick=onFilters) {Icon(Icons.Default.Settings,filterDescription,tint=Lime)}}
+        }
+    }
 }

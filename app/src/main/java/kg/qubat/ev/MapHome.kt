@@ -23,36 +23,50 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun MapHome(
-    stations: List<Station>, city: String?, location: GeoPoint?, locating: Boolean,
+    stations: List<Station>, query:String, location: GeoPoint?, locationFocus:Int, locating: Boolean,
     locationMessage: String, minPower: Int, statusName: String?,
-    onCity: (String?)->Unit, onPower: (Int)->Unit, onStatus: (String?)->Unit,
+    onQuery:(String)->Unit,onCity: (String?)->Unit, onPower: (Int)->Unit, onStatus: (String?)->Unit,
     onLocate: ()->Unit, onDetail: (Station)->Unit, onConnector: (Station,Connector)->Unit
 ) {
+    val context=androidx.compose.ui.platform.LocalContext.current
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
     var filters by rememberSaveable { mutableStateOf(false) }
     var zoomRequest by remember {mutableIntStateOf(0)}
     var focusRequest by remember { mutableIntStateOf(0) }
-    LaunchedEffect(location) { location?.let { selectedId=nearestStation(stations,it)?.id } }
+    var stationFocus by remember {mutableIntStateOf(0)}
+    val keyboard=androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val selected=stations.firstOrNull {it.id==selectedId}
     BackHandler(enabled=selected!=null) {selectedId=null}
     Box(Modifier.fillMaxSize()) {
-        CountryMap(stations,city,location,selectedId ?: "",Modifier.fillMaxSize(),focusRequest,zoomRequest) { selectedId=it.id }
-        Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().padding(16.dp),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically) {
-            Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen,shadowElevation=4.dp,modifier=Modifier.weight(1f)) {
-                TextButton(onClick={filters=true},modifier=Modifier.fillMaxWidth()) {Icon(Icons.Default.Place,null,modifier=Modifier.size(18.dp));Text(city ?: "Кыргызстан",modifier=Modifier.weight(1f),fontWeight=FontWeight.SemiBold);Icon(Icons.Default.ArrowDropDown,null)}
+        CountryMap(stations,null,location,selectedId ?: "",Modifier.fillMaxSize(),focusRequest,zoomRequest,locationFocus,stationFocus) { selectedId=it.id }
+        Column(Modifier.align(Alignment.TopCenter)) {
+            StationSearchControls(query,onQuery,{filters=true},"Фильтры карты")
+            if(query.isNotBlank()) Surface(Modifier.padding(horizontal=12.dp),shape=RoundedCornerShape(16.dp),color=SurfaceGreen,shadowElevation=4.dp) {
+                androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max=220.dp)) {
+                    if(stations.isEmpty()) item {Text("Станция не найдена",Modifier.padding(16.dp),fontSize=13.sp)}
+                    items(stations.size) {index->val station=stations[index]
+                        TextButton(onClick={selectedId=station.id;stationFocus++;onQuery("");keyboard?.hide()},modifier=Modifier.fillMaxWidth()) {Column(Modifier.fillMaxWidth().padding(6.dp)) {Text(station.title,fontWeight=FontWeight.SemiBold);Text(station.city,fontSize=11.sp,color=Muted)}}
+                    }
+                }
             }
-            Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {ThemeToggle()}
-            FilledIconButton(onClick={filters=true},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Icon(Icons.Default.Settings,"Фильтры карты")}
         }
         Column(Modifier.align(Alignment.CenterEnd).padding(end=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             FilledIconButton(onClick={zoomRequest++},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).semantics {contentDescription="Увеличить карту"},colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Text("+",fontSize=28.sp)}
             FilledIconButton(onClick={zoomRequest--},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp).semantics {contentDescription="Уменьшить карту"},colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Text("−",fontSize=28.sp)}
             FilledIconButton(onClick={focusRequest++},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Icon(Icons.Default.Refresh,"Обзор Кыргызстана")}
-            FilledIconButton(onClick={onLocate},enabled=!locating,shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {if(locating) CircularProgressIndicator(modifier=Modifier.size(20.dp),strokeWidth=2.dp) else Icon(Icons.Default.LocationOn,"Моя позиция")}
+            FilledIconButton(onClick={selectedId=null;onLocate()},enabled=!locating,shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {if(locating) CircularProgressIndicator(modifier=Modifier.size(20.dp),strokeWidth=2.dp) else Icon(Icons.Default.LocationOn,"Моя позиция")}
         }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            if(locating || locationMessage!="Местоположение не определено") Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen) {Text(locationMessage,modifier=Modifier.padding(10.dp),fontSize=11.sp,color=Muted)}
-            Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen.copy(alpha=.94f)) {Text("Демо · ${DemoData.stations.size} вымышленных локаций",modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp),fontSize=11.sp,color=Muted)}
+            if(locating || locationMessage!="Местоположение не определено") Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen) {
+                Column(Modifier.padding(10.dp)) {
+                    Text(locationMessage,fontSize=11.sp,color=Muted)
+                    if(locationMessage.contains("настройках") || locationMessage.contains("точную геопозицию")) TextButton(onClick={
+                        val intent=if(locationMessage.contains("Разрешите") || locationMessage.contains("точную геопозицию")) android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,android.net.Uri.parse("package:${context.packageName}")) else android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                        runCatching {context.startActivity(intent)}
+                    }) {Text("Настройки геопозиции",fontSize=12.sp)}
+                }
+            }
+            Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen.copy(alpha=.94f)) {Text("ДЕМО",modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp),fontSize=11.sp,color=Muted)}
             if(selected!=null) Surface(modifier=Modifier.testTag("map-station-card"),shape=RoundedCornerShape(24.dp),color=SurfaceGreen,shadowElevation=8.dp) {
                 Column(Modifier.heightIn(max=450.dp).verticalScroll(rememberScrollState()).padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
@@ -61,12 +75,11 @@ import androidx.compose.ui.unit.sp
                         IconButton(onClick={selectedId=null}) {Icon(Icons.Default.Close,"Закрыть карточку")}
                     }
                     Text("${selected.chargerCount} ${if(selected.chargerCount==4) "аппарата" else "аппаратов"} · свободно ${selected.availableConnectors} из ${selected.connectorCount} разъёмов",color=Muted,fontSize=11.sp)
-                    ConnectorLegend()
                     StationEquipment(selected) {onConnector(selected,it)}
                 }
             }
             if(stations.isEmpty()) Surface(shape=RoundedCornerShape(18.dp),color=SurfaceGreen) {Text("Нет демо-станций по выбранным фильтрам",modifier=Modifier.padding(16.dp),color=Muted)}
         }
     }
-    if(filters) StationFilterSheet(stations.size,city,minPower,statusName,onCity,onPower,onStatus) {filters=false}
+    if(filters) StationFilterSheet(stations.size,null,minPower,statusName,onCity,onPower,onStatus) {filters=false}
 }

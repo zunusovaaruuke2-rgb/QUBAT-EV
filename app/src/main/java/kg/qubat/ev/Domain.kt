@@ -80,7 +80,7 @@ object DemoData {
 fun normalized(value: String) = value.lowercase(java.util.Locale.ROOT).replace('ё','е').replace('–','-').replace("джалал", "жалал").trim()
 fun filterStations(stations: List<Station>, query: String, city: String?, minPower: Int, status: StationStatus?): List<Station> =
     stations.filter { (city == null || it.city == city) && it.powerKw >= minPower && (status == null || it.status == status) &&
-        normalized("${it.city} ${it.title} ${it.connector}").contains(normalized(query)) }
+        normalized(it.title).contains(normalized(query)) }
 fun distanceKm(a: GeoPoint, b: GeoPoint): Double {
     val dLat = Math.toRadians(b.lat-a.lat); val dLon = Math.toRadians(b.lon-a.lon)
     val h = sin(dLat/2).pow(2) + cos(Math.toRadians(a.lat))*cos(Math.toRadians(b.lat))*sin(dLon/2).pow(2)

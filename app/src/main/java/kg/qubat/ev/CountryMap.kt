@@ -15,15 +15,16 @@ import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.maps.android.compose.*
 
 @Composable fun CountryMap(stations:List<Station>,city:String?,location:GeoPoint?,selectedId:String,
-    modifier:Modifier=Modifier,focusRequest:Int=0,zoomRequest:Int=0,onSelect:(Station)->Unit) {
+    modifier:Modifier=Modifier,focusRequest:Int=0,zoomRequest:Int=0,locationFocus:Int=0,stationFocus:Int=0,onSelect:(Station)->Unit) {
     if(!BuildConfig.MAPS_CONFIGURED) {
-        WorldMap(stations,city,location,selectedId,modifier,focusRequest,zoomRequest,onSelect)
+        WorldMap(stations,city,location,selectedId,modifier,focusRequest,zoomRequest,locationFocus,stationFocus,onSelect)
         return
     }
     val centre=DemoData.cities.firstOrNull {it.name==city}?.point
     val camera=rememberCameraPositionState {position=CameraPosition.fromLatLngZoom(LatLng(41.5,74.7),5f)}
     LaunchedEffect(city) {camera.position=CameraPosition.fromLatLngZoom(centre?.let {LatLng(it.lat,it.lon)} ?: LatLng(41.5,74.7),if(centre!=null)11f else 5f)}
-    LaunchedEffect(location) {location?.let {camera.position=CameraPosition.fromLatLngZoom(LatLng(it.lat,it.lon),11f)}}
+    LaunchedEffect(locationFocus) {if(locationFocus>0) location?.let {camera.animate(CameraUpdateFactory.newLatLngZoom(LatLng(it.lat,it.lon),15.5f))}}
+    LaunchedEffect(stationFocus) {if(stationFocus>0) stations.firstOrNull {it.id==selectedId}?.let {camera.animate(CameraUpdateFactory.newLatLngZoom(LatLng(it.point.lat,it.point.lon),15f))}}
     LaunchedEffect(focusRequest) {if(focusRequest>0)camera.position=CameraPosition.fromLatLngZoom(LatLng(41.5,74.7),5f)}
     var previousZoom by remember {mutableIntStateOf(zoomRequest)}
     LaunchedEffect(zoomRequest) {
@@ -36,7 +37,7 @@ import com.google.maps.android.compose.*
             properties=MapProperties(minZoomPreference=0f,maxZoomPreference=21f,mapStyleOptions=if(!LocalNight.current) null else MapStyleOptions("""[{"elementType":"geometry","stylers":[{"color":"#16372b"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#b9cfbd"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#173428"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0c2229"}]}]""")),
             uiSettings=MapUiSettings(mapToolbarEnabled=false,zoomControlsEnabled=false,scrollGesturesEnabled=true,zoomGesturesEnabled=true),onMapLoaded={loaded=true}) {
             stations.forEach { s -> Marker(state=remember(s.id) {MarkerState(position=LatLng(s.point.lat,s.point.lon))},icon=remember(s,selectedId) {BitmapDescriptorFactory.fromBitmap(stationMarker(s,s.id==selectedId))},title="ДЕМО · ${s.city}",snippet="${s.availableConnectors} из ${s.connectorCount} свободно",onClick={onSelect(s);true})}
-            location?.let {Marker(state=remember(it) {MarkerState(position=LatLng(it.lat,it.lon))},title="Ваша позиция")}
+            location?.let {Marker(state=remember(it) {MarkerState(position=LatLng(it.lat,it.lon))},title="Вы здесь",anchor=androidx.compose.ui.geometry.Offset(.5f,.5f),icon=remember {BitmapDescriptorFactory.fromBitmap(userLocationMarker())})}
         }
         if(!loaded) Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=90.dp,start=16.dp),color=SurfaceGreen) {Text("Загрузка карты… Проверьте сеть и ключ",modifier=Modifier.padding(10.dp),fontSize=11.sp)}
     }

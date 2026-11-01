@@ -128,11 +128,22 @@ class NavigationTest {
             compose.onNodeWithContentDescription("Уменьшить карту").performClick()
 
         }
-        step("Поиск по Кыргызстану и пустое состояние") {
+        step("Поиск станции на карте") {
+            compose.onNodeWithContentDescription("Поиск станции").performClick()
+            compose.onNodeWithTag("station-search-field").performTextInput("Север")
+            compose.onNodeWithTag("station-search-field").performImeAction()
+            compose.onNodeWithText("Север · DEMO 01").assertIsDisplayed().performClick()
+            compose.waitUntil(10000) {compose.onAllNodesWithTag("map-station-card").fetchSemanticsNodes().isNotEmpty()}
+            compose.onNodeWithContentDescription("Закрыть карточку").performClick()
+            compose.onNodeWithContentDescription("Закрыть поиск").performClick()
+        }
+        step("Поиск только по названию станции и пустое состояние") {
             compose.onNodeWithText("Список",useUnmergedTree=true).performClick()
-            visible("Станции Кыргызстана")
-            compose.onNodeWithText("Город или название станции").performTextInput("Нарын")
-            compose.onNodeWithText("Город или название станции").performImeAction()
+            compose.onNodeWithText("Станции Кыргызстана").assertDoesNotExist()
+            compose.onNodeWithText("Свободен").assertDoesNotExist()
+            compose.onNodeWithContentDescription("Поиск станции").performClick()
+            compose.onNodeWithTag("station-search-field").performTextInput("Тянь-Шань")
+            compose.onNodeWithTag("station-search-field").performImeAction()
             visible("Тянь-Шань · DEMO 05")
             step("Список показывает состояния отдельных разъёмов") {
                 listOf("1-port-2" to "Заряжается","2-port-1" to "Подключён","3-port-1" to "Завершён","3-port-2" to "Ошибка").forEach {(suffix,title)->
@@ -142,9 +153,9 @@ class NavigationTest {
                     compose.onNodeWithText("Закрыть").performClick()
                 }
             }
-            compose.onNodeWithText("Город или название станции").performTextClearance()
-            compose.onNodeWithText("Город или название станции").performTextInput("Несуществующий город")
-            compose.onNodeWithText("Город или название станции").performImeAction()
+            compose.onNodeWithTag("station-search-field").performTextClearance()
+            compose.onNodeWithTag("station-search-field").performTextInput("Бишкек")
+            compose.onNodeWithTag("station-search-field").performImeAction()
             visible("Демо-станций пока нет")
         }
         step("Кошелёк") {
@@ -176,6 +187,41 @@ class NavigationTest {
             visible("Демо-зарядка · Бишкек")
             compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
             visible("Демо-пользователь")
+        }
+        step("Живая геопозиция и повторное приближение к своей точке") {
+            val automation=androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().uiAutomation
+            fun shell(command:String) {android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command)).use {it.readBytes()}}
+            shell("pm grant kg.qubat.ev android.permission.ACCESS_COARSE_LOCATION")
+            shell("pm grant kg.qubat.ev android.permission.ACCESS_FINE_LOCATION")
+            shell("appops set kg.qubat.ev android:mock_location allow")
+            val manager=compose.activity.getSystemService(android.location.LocationManager::class.java)
+            @Suppress("DEPRECATION")
+            manager.addTestProvider(android.location.LocationManager.GPS_PROVIDER,false,false,false,false,true,true,true,android.location.Criteria.POWER_LOW,android.location.Criteria.ACCURACY_FINE)
+            manager.setTestProviderEnabled(android.location.LocationManager.GPS_PROVIDER,true)
+            try {
+                compose.onNodeWithText("Карта",useUnmergedTree=true).performClick()
+                compose.onNodeWithContentDescription("Моя позиция").performClick()
+                fun fix(lat:Double,lon:Double) {
+                    manager.setTestProviderLocation(android.location.LocationManager.GPS_PROVIDER,android.location.Location(android.location.LocationManager.GPS_PROVIDER).apply {
+                        latitude=lat;longitude=lon;accuracy=5f;time=System.currentTimeMillis();elapsedRealtimeNanos=android.os.SystemClock.elapsedRealtimeNanos()
+                    })
+                }
+                fix(42.875,74.57)
+                compose.waitUntil(15000) {compose.onAllNodesWithTag("user-location").fetchSemanticsNodes().isNotEmpty()}
+                var native:MapLibreMap?=null
+                lateinit var view:MapView
+                compose.runOnIdle {view=findMapView(compose.activity.window.decorView)!!;view.getMapAsync {native=it}}
+                compose.waitUntil(10000) {native!=null && native!!.zoom>=15.4}
+                fun nearMe()=compose.runOnIdle {val p=native!!.projection.fromScreenLocation(PointF(view.width/2f,view.height/2f));distanceKm(GeoPoint(p.latitude,p.longitude),GeoPoint(42.875,74.57))<.15}
+                compose.waitUntil(10000) {nearMe()}
+                val world=compose.onNodeWithTag("world-map")
+                world.performTouchInput {swipeLeft()}
+                compose.onNodeWithContentDescription("Моя позиция").performClick()
+                compose.waitUntil(10000) {nearMe()}
+                android.os.SystemClock.sleep(2100)
+                fix(42.876,74.571)
+                compose.waitUntil(10000) {compose.onNodeWithTag("user-location").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="42.876,74.571"}
+            } finally {manager.removeTestProvider(android.location.LocationManager.GPS_PROVIDER)}
         }
     }
 }

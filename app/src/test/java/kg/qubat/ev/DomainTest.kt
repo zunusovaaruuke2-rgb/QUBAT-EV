@@ -44,13 +44,16 @@ class DomainTest {
         assertEquals(site,site.withConnectorSession(null,emptySet()))
         assertEquals(ConnectorState.FREE,port.state)
     }
-    @Test fun `all requested cities and more are selectable`() {
+    @Test fun `demo locations cover the requested cities`() {
         assertTrue(DemoData.cities.map {it.name}.containsAll(listOf("Бишкек","Ош","Джалал-Абад","Каракол","Нарын","Талас","Баткен")))
         assertTrue(DemoData.cities.size>7)
     }
-    @Test fun `search normalizes city spelling and case`() {
-        assertEquals("demo-jalal",filterStations(DemoData.stations,"ЖАЛАЛ-АБАД",null,0,null).single().id)
-        assertEquals("demo-osh",filterStations(DemoData.stations,"  ош ",null,0,null).single().id)
+    @Test fun `search uses station names and ignores city and connector metadata`() {
+        assertEquals("demo-bishkek",filterStations(DemoData.stations,"  СЕВЕР  ",null,0,null).single().id)
+        assertEquals("demo-naryn",filterStations(DemoData.stations,"тянь–шань",null,0,null).single().id)
+        assertTrue(filterStations(DemoData.stations,"Бишкек",null,0,null).isEmpty())
+        assertTrue(filterStations(DemoData.stations,"Ош",null,0,null).isEmpty())
+        assertTrue(filterStations(DemoData.stations,"GB/T",null,0,null).isEmpty())
     }
     @Test fun `filters combine city power status and query`() {
         assertEquals(1,filterStations(DemoData.stations,"demo","Ош",80,StationStatus.AVAILABLE).size)

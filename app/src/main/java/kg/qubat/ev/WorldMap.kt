@@ -47,13 +47,14 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
 
 @Suppress("DEPRECATION")
 @Composable fun WorldMap(stations:List<Station>,city:String?,location:GeoPoint?,selectedId:String,
-    modifier:Modifier,focusRequest:Int,zoomRequest:Int,onSelect:(Station)->Unit) {
+    modifier:Modifier,focusRequest:Int,zoomRequest:Int,locationFocus:Int,stationFocus:Int,onSelect:(Station)->Unit) {
     val night=LocalNight.current
     val context=LocalContext.current
     val owner=LocalLifecycleOwner.current
     val density=LocalDensity.current.density
     val select by rememberUpdatedState(onSelect)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
+    var cameraTick by remember {mutableIntStateOf(0)}
     var viewport by remember { mutableStateOf("Карта загружается") }
     var ready by remember { mutableStateOf(false) }
     var loadError by remember {mutableStateOf(false)}
@@ -71,6 +72,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                     setAllGesturesEnabled(false)
                     isCompassEnabled=false; isAttributionEnabled=false; isLogoEnabled=false
                 }
+                native.addOnCameraMoveListener {cameraTick++}
                 native.addOnCameraIdleListener {
                     val centre=native.projection.fromScreenLocation(PointF(view.width/2f,view.height/2f))
                     viewport=String.format(Locale.ROOT,"Масштаб %.1f; %.3f, %.3f",native.zoom,centre.latitude,centre.longitude)
@@ -122,13 +124,14 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                 .snippet("${station.availableConnectors} из ${station.connectorCount} свободно · GB/T DC")
                 .icon(icon))
         }
-        location?.let { native.addMarker(MarkerOptions().position(LatLng(it.lat,it.lon)).title("Ваша позиция")) }
+
     }
     LaunchedEffect(map,city) {
         val target=DemoData.cities.firstOrNull {it.name==city}?.point
         map?.moveCamera(CameraUpdateFactory.newLatLngZoom(target?.let {LatLng(it.lat,it.lon)} ?: LatLng(41.5,74.7),if(target==null)5.0 else 11.0))
     }
-    LaunchedEffect(map,location) {location?.let {map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.lat,it.lon),11.0))}}
+    LaunchedEffect(map,locationFocus) {if(locationFocus>0) location?.let {map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.lat,it.lon),15.5))}}
+    LaunchedEffect(map,stationFocus) {if(stationFocus>0) stations.firstOrNull {it.id==selectedId}?.let {map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(it.point.lat,it.point.lon),15.0))}}
     LaunchedEffect(focusRequest) {if(focusRequest>0) map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(41.5,74.7),5.0))}
     var previousZoom by remember {mutableIntStateOf(zoomRequest)}
     LaunchedEffect(zoomRequest) {
@@ -169,7 +172,18 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                     }
                 )
             })
-        Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=76.dp,start=16.dp,end=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(8.dp),color=SurfaceGreen.copy(alpha=.92f)) {
+        if(location!=null && ready) {
+            val pixel=remember(map,location,cameraTick) {map?.projection?.toScreenLocation(LatLng(location.lat,location.lon))}
+            androidx.compose.foundation.Canvas(Modifier.matchParentSize().testTag("user-location").semantics {contentDescription="Вы здесь";stateDescription="${location.lat},${location.lon}"}) {
+                pixel?.let {point->
+                    val centre=Offset(point.x,point.y)
+                    drawCircle(androidx.compose.ui.graphics.Color(0xFF3287FF).copy(alpha=.2f),20.dp.toPx(),centre)
+                    drawCircle(androidx.compose.ui.graphics.Color.White,9.dp.toPx(),centre)
+                    drawCircle(androidx.compose.ui.graphics.Color(0xFF287DFA),6.dp.toPx(),centre)
+                }
+            }
+        }
+        Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=86.dp,start=16.dp,end=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(8.dp),color=SurfaceGreen.copy(alpha=.92f)) {
             Text(buildAnnotatedString {
                 withLink(LinkAnnotation.Url("https://www.openstreetmap.org/copyright")) {append("© OpenStreetMap")}
                 append(" · ")
@@ -200,4 +214,14 @@ internal fun stationMarker(station:Station,selected:Boolean):Bitmap {
     paint.textSize=40f;paint.textAlign=Paint.Align.CENTER;paint.typeface=android.graphics.Typeface.DEFAULT_BOLD
     canvas.drawText(station.chargerCount.toString(),56f,70f,paint)
     return bitmap
+}
+
+internal fun userLocationMarker():Bitmap {
+    val image=Bitmap.createBitmap(80,80,Bitmap.Config.ARGB_8888)
+    val canvas=Canvas(image)
+    val paint=Paint(Paint.ANTI_ALIAS_FLAG)
+    paint.color=0x443287FF;canvas.drawCircle(40f,40f,38f,paint)
+    paint.color=android.graphics.Color.WHITE;canvas.drawCircle(40f,40f,18f,paint)
+    paint.color=0xFF287DFA.toInt();canvas.drawCircle(40f,40f,12f,paint)
+    return image
 }
