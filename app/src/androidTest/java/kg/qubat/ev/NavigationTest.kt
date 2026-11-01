@@ -65,11 +65,19 @@ class NavigationTest {
             lateinit var nativeView:MapView
             compose.runOnIdle {nativeView=findMapView(compose.activity.window.decorView)!!;nativeView.getMapAsync {nativeMap=it}}
             compose.waitUntil(10000) {nativeMap!=null}
-            fun verifyNightBuildings() {
-                if(compose.onAllNodesWithContentDescription("Дневная тема").fetchSemanticsNodes().isNotEmpty()) compose.runOnIdle {
-                    val layers=nativeMap!!.style!!.layers.filterIsInstance<org.maplibre.android.style.layers.FillLayer>().filter {it.id.contains("building",ignoreCase=true)}
-                    check(layers.isNotEmpty()) {"Night style has no building layers"}
-                    check(layers.any {it.fillColor.colorInt==android.graphics.Color.parseColor("#456175") && it.minZoom<=13f}) {"Building contrast was not applied"}
+            fun verifyMapContrast() {
+                val night=compose.onAllNodesWithContentDescription("Дневная тема").fetchSemanticsNodes().isNotEmpty()
+                compose.runOnIdle {
+                    if(night) {
+                        val layers=nativeMap!!.style!!.layers.filterIsInstance<org.maplibre.android.style.layers.FillLayer>().filter {it.id.contains("building",ignoreCase=true)}
+                        check(layers.isNotEmpty()) {"Night style has no building layers"}
+                        check(layers.any {it.fillColor.colorInt==android.graphics.Color.parseColor("#2A4353") && it.minZoom<=13f}) {"Building contrast was not applied"}
+                    }
+                    val labels=nativeMap!!.style!!.layers.filterIsInstance<org.maplibre.android.style.layers.SymbolLayer>().filter {
+                        !it.id.contains("annotation",true) && (night || (!it.id.contains("shield",true) && !it.id.contains("ref",true)))
+                    }
+                    check(labels.isNotEmpty()) {"Style has no text layers"}
+                    check(labels.all {it.textColor.colorInt==android.graphics.Color.parseColor(if(night) "#F2F7FC" else "#203747") && it.textHaloColor.colorInt==android.graphics.Color.parseColor(if(night) "#0B1B28" else "#FFFFFF") && it.textHaloWidth.value==(if(night)1.6f else 1.3f)}) {"Map labels need contrasting text and halos in both themes"}
                 }
             }
             step("Дневная и ночная темы карты") {
@@ -77,12 +85,13 @@ class NavigationTest {
                 compose.onNodeWithContentDescription(switch).performClick()
                 compose.waitForIdle()
                 compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
-                verifyNightBuildings()
+                verifyMapContrast()
                 compose.onNodeWithContentDescription(if(switch=="Ночная тема") "Дневная тема" else "Ночная тема").assertIsDisplayed().performClick()
                 compose.waitForIdle()
                 compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+                verifyMapContrast()
             }
-            verifyNightBuildings()
+            verifyMapContrast()
             fun zoom()=compose.runOnIdle {nativeMap!!.zoom}
             fun centre()=compose.runOnIdle {nativeMap!!.projection.fromScreenLocation(PointF(nativeView.width/2f,nativeView.height/2f))}
             step("Карта показывает аппараты и разъёмы") {

@@ -92,7 +92,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     LaunchedEffect(map,night,language) {
         val native=map ?: return@LaunchedEffect
         ready=false;loadError=false
-        native.setStyle(Style.Builder().fromUri(if(night) "https://tiles.openfreemap.org/styles/dark" else WORLD_STYLE)) {style->if(night) improveNightMap(style);localizeMapLabels(style,language);ready=true;loadError=false}
+        native.setStyle(Style.Builder().fromUri(if(night) "https://tiles.openfreemap.org/styles/dark" else WORLD_STYLE)) {style->if(night) improveNightMap(style);improveMapLabelContrast(style,night);localizeMapLabels(style,language);ready=true;loadError=false}
     }
     DisposableEffect(mapView,owner) {
         var started=false;var resumed=false
@@ -233,11 +233,35 @@ internal fun improveNightMap(style:org.maplibre.android.maps.Style) {
             layer is org.maplibre.android.style.layers.BackgroundLayer -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.backgroundColor("#102635"))
             layer is org.maplibre.android.style.layers.FillLayer && id.contains("building") -> {
                 layer.minZoom=13f
-                layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.visibility(org.maplibre.android.style.layers.Property.VISIBLE),org.maplibre.android.style.layers.PropertyFactory.fillColor("#456175"),org.maplibre.android.style.layers.PropertyFactory.fillOpacity(.95f),org.maplibre.android.style.layers.PropertyFactory.fillOutlineColor("#91A8B8"))
+                layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.visibility(org.maplibre.android.style.layers.Property.VISIBLE),org.maplibre.android.style.layers.PropertyFactory.fillColor("#2A4353"),org.maplibre.android.style.layers.PropertyFactory.fillOpacity(.95f),org.maplibre.android.style.layers.PropertyFactory.fillOutlineColor("#526D7D"))
             }
-            layer is org.maplibre.android.style.layers.FillExtrusionLayer && id.contains("building") -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.fillExtrusionColor("#456175"),org.maplibre.android.style.layers.PropertyFactory.fillExtrusionOpacity(.95f))
+            layer is org.maplibre.android.style.layers.FillExtrusionLayer && id.contains("building") -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.fillExtrusionColor("#2A4353"),org.maplibre.android.style.layers.PropertyFactory.fillExtrusionOpacity(.95f))
             layer is org.maplibre.android.style.layers.FillLayer && id.contains("water") -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.fillColor("#153F59"))
-            layer is org.maplibre.android.style.layers.LineLayer && (id.contains("road") || id.contains("highway")) -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.lineColor(if(id.contains("casing")) "#203A4B" else if(id.contains("motorway") || id.contains("trunk")) "#C19B6D" else "#7D9BAF"),org.maplibre.android.style.layers.PropertyFactory.lineOpacity(1f))
+            layer is org.maplibre.android.style.layers.LineLayer && (id.contains("road") || id.contains("highway")) -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.lineColor(if(id.contains("casing")) "#132B3B" else if(id.contains("motorway") || id.contains("trunk")) "#E6B776" else if(id.contains("path") || id.contains("footway") || id.contains("cycleway")) "#6A918D" else if(id.contains("primary") || id.contains("secondary") || id.contains("tertiary")) "#C5D8E3" else "#96B2C4"),org.maplibre.android.style.layers.PropertyFactory.lineOpacity(1f))
+        }
+    }
+}
+
+// Text paint must be adapted alongside roads/buildings: dark glyphs on the
+// night style disappear even when street geometry itself is bright enough.
+internal fun improveMapLabelContrast(style:Style,night:Boolean) {
+    style.layers.filterIsInstance<org.maplibre.android.style.layers.SymbolLayer>().forEach {layer->
+        val id=layer.id.lowercase(java.util.Locale.ROOT)
+        val shield=id.contains("shield") || id.contains("ref")
+        if(night || !shield) {
+            layer.setProperties(
+                org.maplibre.android.style.layers.PropertyFactory.textColor(if(night) "#F2F7FC" else "#203747"),
+                org.maplibre.android.style.layers.PropertyFactory.textHaloColor(if(night) "#0B1B28" else "#FFFFFF"),
+                org.maplibre.android.style.layers.PropertyFactory.textHaloWidth(if(night)1.6f else 1.3f),
+                org.maplibre.android.style.layers.PropertyFactory.textHaloBlur(.25f),
+                org.maplibre.android.style.layers.PropertyFactory.textOpacity(1f))
+        }
+        if(!shield && (id.contains("road") || id.contains("highway") || id.contains("street")) && !id.contains("oneway")) {
+            layer.minZoom=minOf(layer.minZoom,13f)
+            // Keep the native collision placement: names stay legible, not stacked.
+            layer.setProperties(
+                org.maplibre.android.style.layers.PropertyFactory.textAllowOverlap(false),
+                org.maplibre.android.style.layers.PropertyFactory.textIgnorePlacement(false))
         }
     }
 }
