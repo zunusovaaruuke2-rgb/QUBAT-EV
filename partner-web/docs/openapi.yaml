@@ -1,0 +1,1446 @@
+openapi: 3.1.0
+info:
+  title: QUBAT EV Partner API — proposed contract
+  version: 0.1.0-draft
+  description: |
+    ПРОЕКТ КОНТРАКТА. Этот HTTP-сервер НЕ РЕАЛИЗОВАН в WEB DEMO 0.1.0.
+    Демо использует локальный ES-модуль репозитория и синтетические данные.
+    Относительный server URL не указывает существующий backend.
+    Реальные OTP/2FA, API операторов, деньги и команды оборудования — отдельные этапы.
+    Все запросы требуют проверки организации, назначения станций и действия на сервере.
+    Ограничения применяются до агрегирования, пагинации и построения выгрузки.
+    Прямой ID, история, вложения и скачивание экспорта не обходят область доступа.
+    Чужой организации ресурс возвращает 404. Финансы требуют finance.read отдельно.
+    Суммы KGS и ставки передаются десятичными строками; float для денег запрещён.
+    Даты отчёта включают обе выбранные даты в Asia/Bishkek; сервер использует
+    полуинтервал [начало from, начало следующего дня после to).
+servers:
+  - url: /api/v1
+    description: Proposed relative route; no running server is supplied
+security:
+  - sessionCookie: []
+tags:
+  - name: Identity
+  - name: Registry
+  - name: Reports
+  - name: Finance
+  - name: Access
+  - name: Operations
+  - name: Integrations
+paths:
+  /auth/otp/requests:
+    post:
+      tags: [Identity]
+      operationId: requestOtp
+      summary: Request a future login challenge
+      description: Rate-limited, enumeration-resistant response; no real SMS/email service in demo.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [destination, channel]
+              properties:
+                destination: {type: string, minLength: 3, maxLength: 254}
+                channel: {type: string, enum: [sms, email]}
+      responses:
+        '202':
+          description: Generic challenge response independent of account existence
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [challengeId, expiresAt]
+                properties:
+                  challengeId: {type: string}
+                  expiresAt: {type: string, format: date-time}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /auth/otp/verifications:
+    post:
+      tags: [Identity]
+      operationId: verifyOtp
+      summary: Verify a challenge and establish a server session
+      description: Secure HttpOnly SameSite session cookie; privileged roles may still require 2FA.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [challengeId, code]
+              properties:
+                challengeId: {type: string}
+                code: {type: string, minLength: 4, maxLength: 12}
+      responses:
+        '200':
+          description: Session established; no station/operator secrets in response
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CurrentUser'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /auth/step-up:
+    post:
+      tags: [Identity]
+      operationId: verifyStepUp
+      summary: Verify a second factor for a specific sensitive action
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [challengeId, proof, action]
+              properties:
+                challengeId: {type: string}
+                proof: {type: string, writeOnly: true}
+                action: {type: string, enum: [payout.create, command.create, access.manage, finance.adjust]}
+      responses:
+        '200':
+          description: Short-lived, action-bound confirmation
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [confirmationToken, expiresAt]
+                properties:
+                  confirmationToken: {type: string, readOnly: true}
+                  expiresAt: {type: string, format: date-time}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '429': {$ref: '#/components/responses/RateLimited'}
+  /me:
+    get:
+      tags: [Identity]
+      operationId: currentUser
+      summary: Get the authenticated identity and active memberships
+      responses:
+        '200':
+          description: Memberships scoped to this identity
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CurrentUser'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /organizations:
+    get:
+      tags: [Identity]
+      operationId: listOrganizations
+      summary: List only organizations available to the current identity
+      responses:
+        '200':
+          description: No organization directory or tenant enumeration
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: '#/components/schemas/Organization'}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+  /organizations/{organizationId}/stations:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Registry]
+      operationId: listStations
+      summary: List authorized stations
+      description: station.read; filter scope precedes pagination. Station count and connector count are distinct.
+      parameters:
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/StationIds'}
+        - name: search
+          in: query
+          schema: {type: string, maxLength: 200}
+        - name: status
+          in: query
+          schema: {type: string, enum: [available, charging, faulted, offline, stale]}
+      responses:
+        '200':
+          description: Only authorized rows and totals
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Station'}}
+                  nextCursor: {type: [string, 'null']}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [Registry]
+      operationId: createStation
+      summary: Create a station record without connecting hardware
+      description: station.write; owner, group and location must belong to the same authorized organization.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StationInput'}
+      responses:
+        '201':
+          description: Created and audited
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Station'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/stations/{stationId}:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - {$ref: '#/components/parameters/StationId'}
+    get:
+      tags: [Registry]
+      operationId: getStation
+      summary: Read a station by internal ID after authorization
+      responses:
+        '200':
+          description: Authorized station with source and freshness timestamps
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Station'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      tags: [Registry]
+      operationId: updateStation
+      summary: Update or archive a station with optimistic concurrency
+      description: station.write; hardware communication is separate from registry editing. Previous/new values and actor are audited.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/StationInput'}
+      responses:
+        '200':
+          description: New resource version
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Station'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/stations/{stationId}/tariffs:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - {$ref: '#/components/parameters/StationId'}
+    get:
+      tags: [Registry]
+      operationId: listTariffVersions
+      summary: Read authorized tariff version history
+      description: tariff.read plus station scope; no financial purchasing terms without finance.read.
+      responses:
+        '200':
+          description: Immutable historical versions
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/TariffVersion'}}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      tags: [Registry]
+      operationId: createTariffVersion
+      summary: Preview or create an effective-dated tariff version
+      description: tariff.write; no overlap; completed sessions retain price/version snapshots. Actual operator tariff propagation is future gated integration.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - {$ref: '#/components/schemas/TariffVersion'}
+                - type: object
+                  properties:
+                    previewOnly: {type: boolean, default: true}
+      responses:
+        '200':
+          description: Preview or saved version, explicitly labelled by saved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [saved, tariff]
+                properties:
+                  saved: {type: boolean}
+                  tariff: {$ref: '#/components/schemas/TariffVersion'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/stations/{stationId}/history:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - {$ref: '#/components/parameters/StationId'}
+    get:
+      tags: [Registry]
+      operationId: stationHistory
+      summary: Read station history with a distinct history.read permission
+      description: Financial and access-management fields require their own permissions; redact unauthorized values.
+      parameters:
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {$ref: '#/components/responses/AuditPage'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /organizations/{organizationId}/sessions:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Reports]
+      operationId: listSessions
+      summary: List sessions in authorized station scope
+      description: session.read; financial and personal fields require separate permissions and are omitted otherwise.
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+        - {$ref: '#/components/parameters/StationIds'}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {$ref: '#/components/parameters/Limit'}
+      responses:
+        '200':
+          description: Authorized sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Session'}}
+                  nextCursor: {type: [string, 'null']}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /organizations/{organizationId}/payments:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Finance]
+      operationId: listPayments
+      summary: List payment ledger entries, including refunds separately
+      description: finance.read plus authorized station scope; no payment credentials.
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+        - {$ref: '#/components/parameters/StationIds'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Scoped immutable ledger entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: {type: array, items: {$ref: '#/components/schemas/Payment'}}
+                  nextCursor: {type: [string, 'null']}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /organizations/{organizationId}/reports/summary:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Reports]
+      operationId: reportSummary
+      summary: Aggregate the authorized subset only
+      description: report.read; finance fields additionally require finance.read. Explicit unauthorized station filters are rejected.
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+        - {$ref: '#/components/parameters/StationIds'}
+      responses:
+        '200':
+          description: Scoped report with exact monetary strings
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReportSummary'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/exports:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    post:
+      tags: [Reports]
+      operationId: createExport
+      summary: Create a scoped XLSX export job
+      description: |
+        report.export and type-specific read rights. Five sheets: Сводка, Сессии,
+        По станциям, Платежи, Расходы. Finance rows/columns require finance.read;
+        restricted sheets retain the sheet name and access notice without hidden data.
+        Job captures filters and data cutoff; authorization rechecked before download.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReportFilter'}
+      responses:
+        '202':
+          description: Export job; ID alone grants no download permission
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ExportJob'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Invalid'}
+    get:
+      tags: [Reports]
+      operationId: listExports
+      summary: List only the current principal's authorized export jobs
+      responses:
+        '200':
+          description: Authorized jobs
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/ExportJob'}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /organizations/{organizationId}/exports/{exportId}/download:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - name: exportId
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: [Reports]
+      operationId: downloadExport
+      summary: Reauthorize export rows and principal before streaming XLSX
+      description: Revoked/station-reduced access invalidates stale result; regenerate or deny. No public object URL.
+      responses:
+        '200':
+          description: Scoped file, private no-store cache policy
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema: {type: string, format: binary}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /organizations/{organizationId}/financial-terms:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Finance]
+      operationId: listFinancialTerms
+      summary: Read authorized financial condition versions
+      description: finance.read; station/group scope checked, including historical versions.
+      parameters:
+        - {$ref: '#/components/parameters/StationIds'}
+      responses:
+        '200':
+          description: Versioned terms
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/FinancialTerms'}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [Finance]
+      operationId: createFinancialTerms
+      summary: Create a new financial terms version without rewriting sessions
+      description: finance.write; nonoverlapping intervals per kind and station; closed period correction is separate.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FinancialTerms'}
+      responses:
+        '201':
+          description: Version created and audited
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FinancialTerms'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/finance/months:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Finance]
+      operationId: monthlyFinance
+      summary: Compare estimated and actual monthly costs without substitution
+      description: finance.read; unpaid accruals, refunds, partner obligation and transfer paid are distinct. Missing actual bill remains null/incomplete.
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+        - {$ref: '#/components/parameters/StationIds'}
+      responses:
+        '200':
+          description: Monthly records in Asia/Bishkek
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/MonthlyFinance'}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /organizations/{organizationId}/expenses:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Finance]
+      operationId: listExpenses
+      summary: List expenses in authorized scope
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+        - {$ref: '#/components/parameters/StationIds'}
+      responses:
+        '200':
+          description: finance.read required
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Expense'}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [Finance]
+      operationId: createExpense
+      summary: Record a bill or other expense with document metadata
+      description: finance.write; receipt belongs to same authorized organization/station; audit required. No real payment is initiated.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Expense'}
+      responses:
+        '201':
+          description: Expense recorded
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Expense'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/expenses/{expenseId}:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - name: expenseId
+        in: path
+        required: true
+        schema: {type: string}
+    patch:
+      tags: [Finance]
+      operationId: updateExpense
+      summary: Update an open expense with audit and expected version
+      description: finance.write; closed periods require explicit adjustment instead of replacing the original ledger/document.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/IfMatch'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Expense'}
+      responses:
+        '200':
+          description: New version with actor and time
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Expense'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /organizations/{organizationId}/receipts/uploads:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    post:
+      tags: [Finance]
+      operationId: requestReceiptUpload
+      summary: Allocate private quarantined receipt storage
+      description: receipt.write; validate scope, MIME allowlist, extension, size and checksum. URL permits one object upload only; no public reads or listing. No upload service in demo.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [stationId, fileName, contentType, sizeBytes, sha256]
+              properties:
+                stationId: {type: string}
+                fileName: {type: string, maxLength: 200}
+                contentType: {type: string, enum: [application/pdf, image/jpeg, image/png]}
+                sizeBytes: {type: integer, minimum: 1, maximum: 10485760}
+                sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+      responses:
+        '201':
+          description: Short-lived restricted upload URL; never log its query signature
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [receiptId, uploadUrl, expiresAt]
+                properties:
+                  receiptId: {type: string}
+                  uploadUrl: {type: string, format: uri}
+                  expiresAt: {type: string, format: date-time}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/receipts/{receiptId}/complete:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - {$ref: '#/components/parameters/ReceiptId'}
+    post:
+      tags: [Finance]
+      operationId: completeReceiptUpload
+      summary: Verify uploaded bytes and enqueue malware scanning
+      description: receipt.write; server checks actual size, magic bytes, checksum and scan result. Files remain quarantined until clean; reject SVG/HTML/executables/archives.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      responses:
+        '202':
+          description: Validation/scanning state
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Receipt'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/receipts/{receiptId}/download:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - {$ref: '#/components/parameters/ReceiptId'}
+    get:
+      tags: [Finance]
+      operationId: downloadReceipt
+      summary: Authorize and issue a short-lived download grant for a clean receipt
+      description: receipt.read and organization/station scope; no grant for quarantine. Prefer authenticated proxy for sensitive receipts. URL expires quickly and never grants write/list access.
+      responses:
+        '200':
+          description: One-object read grant after fresh authorization
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [downloadUrl, expiresAt]
+                properties:
+                  downloadUrl: {type: string, format: uri}
+                  expiresAt: {type: string, format: date-time}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+  /organizations/{organizationId}/payouts:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    post:
+      tags: [Finance]
+      operationId: createPayout
+      summary: Future gated partner payout
+      description: payout.create, current 2FA, contract/station scope and explicit confirmation; no payment backend in demo. Transfer settles partner liability and must not duplicate a previously deducted partner cost.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {$ref: '#/components/parameters/StepUpToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [partnerId, stationIds, period, amount, reason]
+              properties:
+                partnerId: {type: string}
+                stationIds: {type: array, minItems: 1, items: {type: string}}
+                period: {$ref: '#/components/schemas/ReportFilter'}
+                amount: {$ref: '#/components/schemas/KgsMoney'}
+                reason: {type: string, minLength: 1, maxLength: 1000}
+      responses:
+        '202':
+          description: Recorded operation; provider settlement remains separate
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Payment'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/reconciliation:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Finance]
+      operationId: reconciliation
+      summary: Reconcile session payments, provider settlement, refunds and fees
+      description: finance.read; source IDs and explicit unmatched difference; selected station scope applies before aggregation.
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+        - {$ref: '#/components/parameters/StationIds'}
+      responses:
+        '200':
+          description: Separate totals, no silent balancing entry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [sessionPaid, providerReceived, refunds, fees, difference]
+                properties:
+                  sessionPaid: {$ref: '#/components/schemas/KgsMoney'}
+                  providerReceived: {$ref: '#/components/schemas/KgsMoney'}
+                  refunds: {$ref: '#/components/schemas/KgsMoney'}
+                  fees: {$ref: '#/components/schemas/KgsMoney'}
+                  difference: {$ref: '#/components/schemas/KgsMoney'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /organizations/{organizationId}/memberships:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Access]
+      operationId: listMemberships
+      summary: List memberships with access.manage permission
+      responses:
+        '200':
+          description: Scoped access records; personal fields minimized
+          content:
+            application/json:
+              schema: {type: array, items: {$ref: '#/components/schemas/Membership'}}
+        '403': {$ref: '#/components/responses/Forbidden'}
+    post:
+      tags: [Access]
+      operationId: inviteMember
+      summary: Invite a member using a verified phone/email workflow
+      description: access.manage; cannot grant a role, station or capability beyond the inviter's delegable scope. Invitation does not activate unverified identity.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MembershipInput'}
+      responses:
+        '201':
+          description: Pending invitation, delivery is future infrastructure
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Membership'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/memberships/{membershipId}:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - name: membershipId
+        in: path
+        required: true
+        schema: {type: string}
+    patch:
+      tags: [Access]
+      operationId: updateMembership
+      summary: Change a membership with audit and bounded delegation
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/MembershipInput'}
+      responses:
+        '200':
+          description: Updated active or pending assignment
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Membership'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+    delete:
+      tags: [Access]
+      operationId: revokeMembership
+      summary: Revoke access immediately and invalidate cached authorization
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      responses:
+        '204': {description: Revoked and audited; all subsequent requests and exports reauthorize}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /organizations/{organizationId}/discounts:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    post:
+      tags: [Access]
+      operationId: createDiscount
+      summary: Create a bounded discount grant
+      description: discount.manage; station scope, limits and dates required; approver recorded from authenticated session.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/DiscountGrant'}
+      responses:
+        '201':
+          description: Audited discount
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/DiscountGrant'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/free-charge-grants:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    post:
+      tags: [Access]
+      operationId: createFreeChargeGrant
+      summary: Grant free charging separately from ordinary discounts
+      description: free-charge.manage; mandatory actor, approval, reason, station scope, usage/energy limits and expiry. Does not send a command.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/FreeChargeGrant'}
+      responses:
+        '201':
+          description: Audited grant, no hardware action
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/FreeChargeGrant'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/stations/{stationId}/commands:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - {$ref: '#/components/parameters/StationId'}
+    post:
+      tags: [Operations]
+      operationId: createCommand
+      summary: Future gated command on an approved test integration
+      description: |
+        command.create, station capability, current 2FA and explicit confirmation required.
+        Disabled in stage 1. API acceptance is not equipment success. On timeout/unknown
+        query source result before attempting any new start. No direct client OCPP.
+      parameters:
+        - {$ref: '#/components/parameters/CsrfToken'}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+        - {$ref: '#/components/parameters/StepUpToken'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind, reason, confirmed]
+              properties:
+                kind: {type: string, enum: [remote_start, remote_stop, lock, unlock, reset]}
+                connectorId: {type: string}
+                sessionId: {type: string}
+                reason: {type: string, minLength: 1, maxLength: 1000}
+                confirmed: {type: boolean, const: true}
+      responses:
+        '202':
+          description: Command receipt, not success
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Command'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+        '404': {$ref: '#/components/responses/NotFound'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+  /organizations/{organizationId}/commands/{commandId}:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+      - name: commandId
+        in: path
+        required: true
+        schema: {type: string}
+    get:
+      tags: [Operations]
+      operationId: getCommand
+      summary: Read an authorized command result and source timestamps
+      responses:
+        '200':
+          description: Last confirmed result, including timeout or unknown
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Command'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /organizations/{organizationId}/audit:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Operations]
+      operationId: listAudit
+      summary: Read authorized audit history with audit.read
+      description: Apply station scope and field-level financial/access permissions. No secrets, OTP proofs or signed URLs in entries.
+      parameters:
+        - {$ref: '#/components/parameters/From'}
+        - {$ref: '#/components/parameters/To'}
+        - {$ref: '#/components/parameters/StationIds'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200': {$ref: '#/components/responses/AuditPage'}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /organizations/{organizationId}/notifications:
+    parameters:
+      - {$ref: '#/components/parameters/OrganizationId'}
+    get:
+      tags: [Operations]
+      operationId: listNotifications
+      summary: Read notifications for authorized stations and configured thresholds
+      parameters:
+        - {$ref: '#/components/parameters/StationIds'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses:
+        '200':
+          description: Scope-filtered notification data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, stationId, kind, occurredAt, source]
+                      properties:
+                        id: {type: string}
+                        stationId: {type: string}
+                        kind: {type: string, enum: [offline, fault, long_session, low_power, tariff_change]}
+                        occurredAt: {type: string, format: date-time}
+                        source: {type: string}
+                        message: {type: string}
+                  nextCursor: {type: [string, 'null']}
+        '403': {$ref: '#/components/responses/Forbidden'}
+  /integrations/{integrationId}/events:
+    parameters:
+      - name: integrationId
+        in: path
+        required: true
+        schema: {type: string}
+    post:
+      tags: [Integrations]
+      operationId: ingestOperatorEvent
+      summary: Proposed signed official operator ingestion endpoint
+      description: |
+        Separate service identity, signature/timestamp verification and replay protection.
+        No public API availability is assumed. Unique (integrationId, sourceEventId),
+        immutable source payload, occurredAt/receivedAt and source sequence retained.
+        Duplicates return the same receipt; late events cannot overwrite newer telemetry.
+        Late financial changes produce reconciliation and explicit period adjustment.
+      security:
+        - integrationBearer: []
+      parameters:
+        - name: X-Event-Signature
+          in: header
+          required: true
+          schema: {type: string}
+        - name: X-Event-Timestamp
+          in: header
+          required: true
+          schema: {type: string, format: date-time}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/OperatorEvent'}
+      responses:
+        '202':
+          description: Deduplicated receipt, not necessarily applied to a closed period
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [eventId, duplicate, state]
+                properties:
+                  eventId: {type: string}
+                  duplicate: {type: boolean}
+                  state: {type: string, enum: [received, applied, pending_reconciliation, rejected]}
+        '401': {$ref: '#/components/responses/Unauthorized'}
+        '409': {$ref: '#/components/responses/Conflict'}
+        '422': {$ref: '#/components/responses/Invalid'}
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: qubat_session
+      description: Future Secure HttpOnly SameSite cookie. Authorization always rechecked server-side; mutations require CSRF protection.
+    integrationBearer:
+      type: http
+      scheme: bearer
+      description: Future server-to-server scoped credential, rotated and stored outside clients. Signature is also required by ingestion endpoint.
+  parameters:
+    OrganizationId:
+      name: organizationId
+      in: path
+      required: true
+      description: Selector only; membership and organization of each resource are verified from server data.
+      schema: {type: string}
+    StationId:
+      name: stationId
+      in: path
+      required: true
+      schema: {type: string}
+    ReceiptId:
+      name: receiptId
+      in: path
+      required: true
+      schema: {type: string}
+    StationIds:
+      name: stationIds
+      in: query
+      style: form
+      explode: true
+      description: Explicit unauthorized IDs are rejected; omitted means current authorized scope only.
+      schema: {type: array, uniqueItems: true, items: {type: string}}
+    From:
+      name: from
+      in: query
+      required: true
+      description: Inclusive local date, Asia/Bishkek
+      schema: {type: string, format: date}
+    To:
+      name: to
+      in: query
+      required: true
+      description: Inclusive local date, Asia/Bishkek; implemented as next-day exclusive bound
+      schema: {type: string, format: date}
+    Cursor:
+      name: cursor
+      in: query
+      schema: {type: string, maxLength: 1000}
+    Limit:
+      name: limit
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: Session-bound CSRF token, validated together with origin policy
+      schema: {type: string}
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Expected opaque resource version; stale value causes conflict
+      schema: {type: string}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Scoped to identity, organization and operation; same body returns original result, different body returns 409. Durable uniqueness for ledger business IDs.
+      schema: {type: string, minLength: 16, maxLength: 128}
+    StepUpToken:
+      name: X-Step-Up-Token
+      in: header
+      required: true
+      description: Short-lived 2FA confirmation bound to identity and specific operation
+      schema: {type: string}
+  responses:
+    Unauthorized:
+      description: Missing/expired session, service credential or required authentication proof
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Forbidden:
+      description: Authenticated but action, station scope or current second factor is not permitted
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: Resource absent or outside authorized organization/station scope; no existence leak
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Conflict:
+      description: Resource version, idempotency payload, closed-period or operation-state conflict
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Invalid:
+      description: Invalid data, date range, monetary scale, interval overlap or unsupported capability
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    RateLimited:
+      description: Rate limit reached; retry with bounded backoff
+      headers:
+        Retry-After:
+          schema: {type: integer, minimum: 1}
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    AuditPage:
+      description: Authorized history only; confidential fields redacted by capability
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [items]
+            properties:
+              items: {type: array, items: {$ref: '#/components/schemas/AuditEntry'}}
+              nextCursor: {type: [string, 'null']}
+  schemas:
+    Error:
+      type: object
+      required: [code, message, requestId]
+      properties:
+        code: {type: string}
+        message: {type: string}
+        requestId: {type: string}
+        fields: {type: object, additionalProperties: {type: string}}
+    Amount:
+      type: string
+      pattern: '^-?[0-9]+\.[0-9]{2}$'
+      description: Exact KGS monetary amount, two decimal places; never a JSON float
+      example: '135.00'
+    Decimal:
+      type: string
+      pattern: '^-?[0-9]+(\.[0-9]{1,6})?$'
+      description: Exact decimal rate/quantity; individual business fields may impose nonnegative bounds
+      example: '13.500000'
+    KgsMoney:
+      type: object
+      additionalProperties: false
+      required: [amount, currency]
+      properties:
+        amount: {$ref: '#/components/schemas/Amount'}
+        currency: {type: string, const: KGS}
+    Organization:
+      type: object
+      required: [id, name, currency, timeZone]
+      properties:
+        id: {type: string}
+        name: {type: string}
+        currency: {type: string, const: KGS}
+        timeZone: {type: string, const: Asia/Bishkek}
+    CurrentUser:
+      type: object
+      required: [id, displayName, memberships, secondFactorVerified]
+      properties:
+        id: {type: string}
+        displayName: {type: string}
+        memberships: {type: array, items: {$ref: '#/components/schemas/Membership'}}
+        secondFactorVerified: {type: boolean}
+    MembershipInput:
+      type: object
+      required: [role, stationIds, permissions, validFrom]
+      properties:
+        destination: {type: string, description: Verified phone/email used by future invitation workflow}
+        role: {type: string, enum: [qubat_admin, owner, employee, accountant, observer]}
+        stationIds: {type: array, uniqueItems: true, items: {type: string}}
+        groupIds: {type: array, uniqueItems: true, items: {type: string}}
+        permissions: {type: array, uniqueItems: true, items: {type: string}}
+        validFrom: {type: string, format: date-time}
+        validTo: {type: [string, 'null'], format: date-time}
+    Membership:
+      allOf:
+        - {$ref: '#/components/schemas/MembershipInput'}
+        - type: object
+          required: [id, userId, organizationId, state, version]
+          properties:
+            id: {type: string, readOnly: true}
+            userId: {type: string, readOnly: true}
+            organizationId: {type: string, readOnly: true}
+            state: {type: string, enum: [pending, active, revoked, expired]}
+            version: {type: string, readOnly: true}
+    ConnectorInput:
+      type: object
+      required: [number, type, maxKw]
+      properties:
+        id: {type: string, description: Existing connector ID must belong to the station}
+        number: {type: integer, minimum: 1}
+        type: {type: string, enum: [GBT_DC, CCS2, CHAdeMO, Type2, other]}
+        maxKw: {$ref: '#/components/schemas/Decimal'}
+        maxAmperes: {$ref: '#/components/schemas/Decimal'}
+    Connector:
+      allOf:
+        - {$ref: '#/components/schemas/ConnectorInput'}
+        - type: object
+          required: [id, status, lastSeenAt, source]
+          properties:
+            id: {type: string, readOnly: true}
+            status: {type: string, enum: [available, charging, faulted, unavailable, unknown], readOnly: true}
+            lastSeenAt: {type: [string, 'null'], format: date-time, readOnly: true}
+            source: {type: string, readOnly: true}
+    StationInput:
+      type: object
+      required: [name, locationId, ownerId, brandId, address, nominalKw, connectors]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 200}
+        locationId: {type: string}
+        ownerId: {type: string}
+        groupId: {type: [string, 'null']}
+        brandId: {type: string}
+        model: {type: string, maxLength: 100}
+        serialNumber: {type: string, maxLength: 100}
+        externalId: {type: [string, 'null']}
+        ocppId: {type: [string, 'null']}
+        firmware: {type: [string, 'null']}
+        address: {type: string, minLength: 1, maxLength: 500}
+        latitude: {type: number, minimum: -90, maximum: 90}
+        longitude: {type: number, minimum: -180, maximum: 180}
+        operatingHours: {type: string, maxLength: 200}
+        nominalKw: {$ref: '#/components/schemas/Decimal'}
+        connectors: {type: array, minItems: 1, maxItems: 64, items: {$ref: '#/components/schemas/ConnectorInput'}}
+        archived: {type: boolean, default: false}
+    Station:
+      allOf:
+        - {$ref: '#/components/schemas/StationInput'}
+        - type: object
+          required: [id, organizationId, version, source, lastSeenAt, stale, instantaneousKw]
+          properties:
+            id: {type: string, readOnly: true}
+            organizationId: {type: string, readOnly: true}
+            version: {type: string, readOnly: true}
+            source: {type: string, readOnly: true}
+            lastSeenAt: {type: [string, 'null'], format: date-time, readOnly: true}
+            stale: {type: boolean, readOnly: true}
+            instantaneousKw: {$ref: '#/components/schemas/Decimal'}
+            connectors: {type: array, items: {$ref: '#/components/schemas/Connector'}, readOnly: true}
+    TariffVersion:
+      type: object
+      required: [effectiveFrom, basePerKwh, premiumPerKwh]
+      properties:
+        id: {type: string, readOnly: true}
+        version: {type: string, readOnly: true}
+        effectiveFrom: {type: string, format: date-time}
+        effectiveTo: {type: [string, 'null'], format: date-time}
+        basePerKwh: {$ref: '#/components/schemas/Decimal'}
+        premiumPerKwh: {$ref: '#/components/schemas/Decimal'}
+        perMinute: {$ref: '#/components/schemas/Decimal'}
+        idlePerMinute: {$ref: '#/components/schemas/Decimal'}
+        reservationAllowed: {type: boolean}
+        reservationMinutes: {type: integer, minimum: 0}
+        stopThresholdKwh: {$ref: '#/components/schemas/Decimal'}
+        actorId: {type: string, readOnly: true}
+        createdAt: {type: string, format: date-time, readOnly: true}
+    FinancialTerms:
+      type: object
+      required: [stationIds, kind, value, basis, effectiveFrom]
+      properties:
+        id: {type: string, readOnly: true}
+        version: {type: string, readOnly: true}
+        stationIds: {type: array, minItems: 1, uniqueItems: true, items: {type: string}}
+        kind: {type: string, enum: [electricity, platform, acquiring, tax, rent, partner_share, reserve]}
+        value: {$ref: '#/components/schemas/Decimal'}
+        basis: {type: string, enum: [per_kwh, paid_gross, paid_net_refunds, monthly_fixed, profit]}
+        effectiveFrom: {type: string, format: date-time}
+        effectiveTo: {type: [string, 'null'], format: date-time}
+        actorId: {type: string, readOnly: true}
+        roundingPolicyVersion: {type: string}
+    Session:
+      type: object
+      required: [id, stationId, connectorId, sourceId, startedAt, status, energyKwh, tariffVersionId]
+      properties:
+        id: {type: string}
+        stationId: {type: string}
+        connectorId: {type: string}
+        sourceId: {type: string}
+        startedAt: {type: string, format: date-time}
+        endedAt: {type: [string, 'null'], format: date-time}
+        status: {type: string, enum: [active, completed, cancelled, error]}
+        energyKwh: {$ref: '#/components/schemas/Decimal'}
+        tariffVersionId: {type: string}
+        financialTermsVersionIds: {type: array, items: {type: string}}
+        customerAlias: {type: string, description: Pseudonym only when authorized; no unneeded personal data}
+        tariffPerKwh: {$ref: '#/components/schemas/Decimal'}
+        accrued: {$ref: '#/components/schemas/KgsMoney'}
+        paid: {$ref: '#/components/schemas/KgsMoney'}
+        errorReason: {type: [string, 'null']}
+    Payment:
+      type: object
+      required: [id, sourceId, stationId, kind, amount, status, occurredAt]
+      properties:
+        id: {type: string}
+        sourceId: {type: string}
+        sessionId: {type: [string, 'null']}
+        stationId: {type: string}
+        kind: {type: string, enum: [accrual, payment, refund, fee, payout, adjustment]}
+        amount: {$ref: '#/components/schemas/KgsMoney'}
+        status: {type: string, enum: [pending, succeeded, failed, cancelled]}
+        occurredAt: {type: string, format: date-time}
+        method: {type: string, description: Method label only, without credentials or card data}
+        relatedTransactionId: {type: [string, 'null']}
+    ReportFilter:
+      type: object
+      additionalProperties: false
+      required: [from, to, timeZone]
+      properties:
+        from: {type: string, format: date}
+        to: {type: string, format: date}
+        timeZone: {type: string, const: Asia/Bishkek}
+        ownerId: {type: string}
+        locationId: {type: string}
+        groupId: {type: string}
+        stationIds: {type: array, uniqueItems: true, items: {type: string}}
+        connectorIds: {type: array, uniqueItems: true, items: {type: string}}
+        customerAlias: {type: string}
+        sessionStatus: {type: string, enum: [active, completed, cancelled, error]}
+        paymentStatus: {type: string, enum: [pending, succeeded, failed, cancelled]}
+        operationType: {type: string, enum: [accrual, payment, refund, fee, payout, adjustment]}
+    ReportSummary:
+      type: object
+      required: [filter, generatedAt, energyKwh, completedSessions, cancelledSessions, errorSessions]
+      properties:
+        filter: {$ref: '#/components/schemas/ReportFilter'}
+        generatedAt: {type: string, format: date-time}
+        energyKwh: {$ref: '#/components/schemas/Decimal'}
+        completedSessions: {type: integer, minimum: 0}
+        cancelledSessions: {type: integer, minimum: 0}
+        errorSessions: {type: integer, minimum: 0}
+        durationSeconds: {type: integer, minimum: 0}
+        uniqueCustomers: {type: integer, minimum: 0}
+        paidRevenue: {$ref: '#/components/schemas/KgsMoney'}
+        unpaidAccrual: {$ref: '#/components/schemas/KgsMoney'}
+        refunds: {$ref: '#/components/schemas/KgsMoney'}
+        averageTariffPerKwh: {$ref: '#/components/schemas/Decimal'}
+    ExportJob:
+      type: object
+      required: [id, status, filter, createdAt, expiresAt]
+      properties:
+        id: {type: string}
+        status: {type: string, enum: [queued, running, ready, failed, expired, invalidated]}
+        filter: {$ref: '#/components/schemas/ReportFilter'}
+        createdAt: {type: string, format: date-time}
+        expiresAt: {type: string, format: date-time}
+        dataCutoff: {type: string, format: date-time}
+        failureCode: {type: [string, 'null']}
+    Expense:
+      type: object
+      required: [stationId, category, periodFrom, periodTo, amount, documentNumber, paid]
+      properties:
+        id: {type: string, readOnly: true}
+        version: {type: string, readOnly: true}
+        stationId: {type: string}
+        category: {type: string, enum: [electricity_actual, rent, connectivity, maintenance, salary, other]}
+        periodFrom: {type: string, format: date}
+        periodTo: {type: string, format: date}
+        amount: {$ref: '#/components/schemas/KgsMoney'}
+        documentNumber: {type: string, maxLength: 100}
+        documentDate: {type: string, format: date}
+        paid: {type: boolean}
+        paidAt: {type: [string, 'null'], format: date-time}
+        receiptId: {type: [string, 'null']}
+        comment: {type: string, maxLength: 2000}
+        actorId: {type: string, readOnly: true}
+        updatedAt: {type: string, format: date-time, readOnly: true}
+    Receipt:
+      type: object
+      required: [id, stationId, status, sizeBytes, contentType, sha256]
+      properties:
+        id: {type: string}
+        stationId: {type: string}
+        status: {type: string, enum: [allocated, uploaded, scanning, clean, rejected, quarantined]}
+        sizeBytes: {type: integer, maximum: 10485760}
+        contentType: {type: string, enum: [application/pdf, image/jpeg, image/png]}
+        sha256: {type: string, pattern: '^[a-f0-9]{64}$'}
+        rejectionReason: {type: [string, 'null']}
+    MonthlyFinance:
+      type: object
+      required: [month, stationId, revenue, electricityEstimated, electricityActual, actualComplete, partnerPaid, partnerLiability]
+      properties:
+        month: {type: string, pattern: '^[0-9]{4}-(0[1-9]|1[0-2])$'}
+        stationId: {type: string}
+        revenue: {$ref: '#/components/schemas/KgsMoney'}
+        energyKwh: {$ref: '#/components/schemas/Decimal'}
+        electricityEstimated: {$ref: '#/components/schemas/KgsMoney'}
+        electricityActual:
+          oneOf:
+            - {$ref: '#/components/schemas/KgsMoney'}
+            - {type: 'null'}
+        actualComplete: {type: boolean}
+        platformFee: {$ref: '#/components/schemas/KgsMoney'}
+        acquiringFee: {$ref: '#/components/schemas/KgsMoney'}
+        tax: {$ref: '#/components/schemas/KgsMoney'}
+        rent: {$ref: '#/components/schemas/KgsMoney'}
+        other: {$ref: '#/components/schemas/KgsMoney'}
+        partnerCost: {$ref: '#/components/schemas/KgsMoney'}
+        partnerPaid: {$ref: '#/components/schemas/KgsMoney'}
+        partnerLiability: {$ref: '#/components/schemas/KgsMoney'}
+        estimatedProfit: {$ref: '#/components/schemas/KgsMoney'}
+        actualProfit:
+          oneOf:
+            - {$ref: '#/components/schemas/KgsMoney'}
+            - {type: 'null'}
+        marginPercent:
+          oneOf:
+            - {$ref: '#/components/schemas/Decimal'}
+            - {type: 'null'}
+    DiscountGrant:
+      type: object
+      required: [subjectId, stationIds, kind, value, validFrom, validTo, maxUses, reason]
+      properties:
+        id: {type: string, readOnly: true}
+        subjectId: {type: string}
+        stationIds: {type: array, minItems: 1, uniqueItems: true, items: {type: string}}
+        kind: {type: string, enum: [percent, fixed_kgs]}
+        value: {$ref: '#/components/schemas/Decimal'}
+        validFrom: {type: string, format: date-time}
+        validTo: {type: string, format: date-time}
+        maxUses: {type: integer, minimum: 1}
+        reason: {type: string, minLength: 1, maxLength: 1000}
+        approvedBy: {type: string, readOnly: true}
+    FreeChargeGrant:
+      type: object
+      required: [subjectId, stationIds, validFrom, validTo, maxUses, maxEnergyKwh, reason]
+      properties:
+        id: {type: string, readOnly: true}
+        subjectId: {type: string}
+        stationIds: {type: array, minItems: 1, uniqueItems: true, items: {type: string}}
+        validFrom: {type: string, format: date-time}
+        validTo: {type: string, format: date-time}
+        maxUses: {type: integer, minimum: 1}
+        maxEnergyKwh: {$ref: '#/components/schemas/Decimal'}
+        reason: {type: string, minLength: 1, maxLength: 1000}
+        approvedBy: {type: string, readOnly: true}
+    AuditEntry:
+      type: object
+      required: [id, actorId, occurredAt, action, resourceType, resourceId, requestId]
+      properties:
+        id: {type: string}
+        stationId: {type: [string, 'null']}
+        actorId: {type: string}
+        occurredAt: {type: string, format: date-time}
+        action: {type: string}
+        resourceType: {type: string}
+        resourceId: {type: string}
+        reason: {type: [string, 'null']}
+        before: {type: object, additionalProperties: true}
+        after: {type: object, additionalProperties: true}
+        requestId: {type: string}
+    Command:
+      type: object
+      required: [id, stationId, kind, status, requestedAt, actorId]
+      properties:
+        id: {type: string}
+        stationId: {type: string}
+        kind: {type: string, enum: [remote_start, remote_stop, lock, unlock, reset]}
+        status: {type: string, enum: [queued, sent, accepted, succeeded, failed, timed_out, unknown]}
+        requestedAt: {type: string, format: date-time}
+        completedAt: {type: [string, 'null'], format: date-time}
+        actorId: {type: string}
+        sourceCommandId: {type: [string, 'null']}
+        reason: {type: [string, 'null']}
+    OperatorEvent:
+      type: object
+      additionalProperties: false
+      required: [sourceEventId, sourceStationId, type, occurredAt, payload]
+      properties:
+        sourceEventId: {type: string, minLength: 1}
+        sourceStationId: {type: string, minLength: 1}
+        sourceSessionId: {type: string}
+        sourcePaymentId: {type: string}
+        sequence: {type: [string, 'null']}
+        type: {type: string, enum: [telemetry, status, session, payment, refund, command_result]}
+        occurredAt: {type: string, format: date-time}
+        receivedAt: {type: string, format: date-time, readOnly: true}
+        payload: {type: object, additionalProperties: true}

@@ -1,0 +1,40 @@
+name: Partner web demo
+on:
+  push:
+    branches: [feat/partner-web-demo]
+    paths: ['partner-web/**', '.github/workflows/partner-web.yml']
+  pull_request:
+    paths: ['partner-web/**', '.github/workflows/partner-web.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: partner-web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax and business rules
+        run: |
+          npm run check
+          npm test
+      - name: Generate example workbook
+        run: |
+          mkdir -p work
+          node --input-type=module - <<'JS'
+          import {createDemoStore,DemoRepository} from './dist/core.mjs';
+          import {exportWorkbook} from './dist/excel.mjs';
+          import {writeFileSync} from 'node:fs';
+          const repo=new DemoRepository(createDemoStore(),'owner-a');
+          const report=repo.exportReport({from:'2026-10-01',to:'2026-10-31'});
+          writeFileSync('work/QUBAT_EV_Partner_Demo.xlsx',exportWorkbook(report));
+          JS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QUBAT-EV-partner-web-example
+          path: partner-web/work/*.xlsx
