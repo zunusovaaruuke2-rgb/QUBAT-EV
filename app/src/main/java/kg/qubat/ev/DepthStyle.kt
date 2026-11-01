@@ -52,25 +52,64 @@ import androidx.compose.ui.unit.Dp
 @Composable fun DepthSurface(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,shape:Shape=RoundedCornerShape(18.dp),color:Color=SurfaceGreen,
     contentColor:Color=contentColorFor(color),shadowElevation:Dp=3.dp,border:BorderStroke?=null,content:@Composable ()->Unit) {
     val source=remember {MutableInteractionSource()}
-    Surface(onClick=onClick,modifier=Modifier.pressFeedback(source,enabled,.985f).then(modifier).depthFrame(shape,color,minOf(shadowElevation,4.dp)),enabled=enabled,shape=shape,color=Color.Transparent,contentColor=contentColor,border=border,interactionSource=source,content=content)
+    Surface(onClick=rememberPressAction(enabled,onClick),modifier=Modifier.pressFeedback(source,enabled,.985f).then(modifier).depthFrame(shape,color,minOf(shadowElevation,4.dp)),enabled=enabled,shape=shape,color=Color.Transparent,contentColor=contentColor,border=border,interactionSource=source,content=content)
 }
 @Composable fun DepthButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,shape:Shape=RoundedCornerShape(17.dp),
     colors:ButtonColors=ButtonDefaults.buttonColors(),contentPadding:PaddingValues=ButtonDefaults.ContentPadding,content:@Composable RowScope.()->Unit) {
     val source=remember {MutableInteractionSource()}
-    Button(onClick,Modifier.pressFeedback(source,enabled).then(modifier).depthFrame(shape,colors.containerColor,3.dp,fill=false),enabled,shape,colors,contentPadding=contentPadding,interactionSource=source,content=content)
+    Button(rememberPressAction(enabled,onClick),Modifier.pressFeedback(source,enabled).then(modifier).depthFrame(shape,colors.containerColor,3.dp,fill=false),enabled,shape,colors,contentPadding=contentPadding,interactionSource=source,content=content)
 }
 @Composable fun DepthOutlinedButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,shape:Shape=RoundedCornerShape(17.dp),content:@Composable RowScope.()->Unit) {
     val source=remember {MutableInteractionSource()}
-    OutlinedButton(onClick,Modifier.pressFeedback(source,enabled).then(modifier).depthFrame(shape,SurfaceGreen,2.dp,fill=false),enabled,shape,interactionSource=source,content=content)
+    OutlinedButton(rememberPressAction(enabled,onClick),Modifier.pressFeedback(source,enabled).then(modifier).depthFrame(shape,SurfaceGreen,2.dp,fill=false),enabled,shape,interactionSource=source,content=content)
 }
 @Composable fun DepthTonalButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,content:@Composable RowScope.()->Unit) {
     val source=remember {MutableInteractionSource()}
-    FilledTonalButton(onClick,Modifier.pressFeedback(source,enabled).then(modifier).depthFrame(RoundedCornerShape(24.dp),MaterialTheme.colorScheme.secondaryContainer,2.dp,fill=false),enabled,interactionSource=source,content=content)
+    FilledTonalButton(rememberPressAction(enabled,onClick),Modifier.pressFeedback(source,enabled).then(modifier).depthFrame(RoundedCornerShape(24.dp),MaterialTheme.colorScheme.secondaryContainer,2.dp,fill=false),enabled,interactionSource=source,content=content)
 }
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun DepthChip(selected:Boolean,onClick:()->Unit,modifier:Modifier=Modifier,label:@Composable ()->Unit) {
     val source=remember {MutableInteractionSource()}
-    FilterChip(selected,onClick,label,Modifier.pressFeedback(source).then(modifier).depthFrame(RoundedCornerShape(8.dp),if(selected)Lime.copy(alpha=.14f) else SurfaceGreen,1.dp,fill=true),interactionSource=source)
+    FilterChip(selected,rememberPressAction(true,onClick),label,Modifier.pressFeedback(source).then(modifier).depthFrame(RoundedCornerShape(8.dp),if(selected)Lime.copy(alpha=.14f) else SurfaceGreen,1.dp,fill=true),interactionSource=source)
+}
+
+// Let the press become visible before an action replaces the current screen.
+// One pending action per control prevents duplicate taps; disposal cancels it.
+@Composable private fun rememberPressAction(enabled:Boolean,onClick:()->Unit):()->Unit {
+    val scope=rememberCoroutineScope()
+    val pause=remember {androidx.compose.animation.core.Animatable(1f)}
+    val action by rememberUpdatedState(onClick)
+    val allowed by rememberUpdatedState(enabled)
+    var pending by remember {mutableStateOf(false)}
+    return remember(scope) {{
+        if(allowed && !pending) {
+            pending=true
+            scope.launch {
+                try {
+                    pause.snapTo(0f)
+                    pause.animateTo(1f,tween(140))
+                    if(allowed)action()
+                } finally {pending=false}
+            }
+        }
+    }}
+}
+
+// Animate only the incoming page; no duplicate map or list is composed.
+@Composable fun Modifier.pageOpening(page:Any):Modifier {
+    val progress=remember {androidx.compose.animation.core.Animatable(1f)}
+    LaunchedEffect(page) {
+        progress.snapTo(0f)
+        progress.animateTo(1f,tween(280))
+    }
+    return graphicsLayer {
+        val remaining=1f-progress.value
+        transformOrigin=TransformOrigin(0f,.5f)
+        cameraDistance=18f*density
+        rotationY=-12f*remaining
+        translationX=size.width*.035f*remaining
+        alpha=1f-.25f*remaining
+    }
 }
 
 // Only the drawing layer animates; layout and scroll positions do not change.
@@ -98,23 +137,23 @@ import androidx.compose.ui.unit.Dp
 }
 @Composable fun Modifier.pressClickable(enabled:Boolean=true,role:Role?=null,onClick:()->Unit):Modifier {
     val source=remember {MutableInteractionSource()}
-    return Modifier.pressFeedback(source,enabled).then(this).clickable(interactionSource=source,indication=LocalIndication.current,enabled=enabled,role=role,onClick=onClick)
+    return Modifier.pressFeedback(source,enabled).then(this).clickable(interactionSource=source,indication=LocalIndication.current,enabled=enabled,role=role,onClick=rememberPressAction(enabled,onClick))
 }
 @Composable fun PressTextButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,contentPadding:PaddingValues=ButtonDefaults.TextButtonContentPadding,content:@Composable RowScope.()->Unit) {
     val source=remember {MutableInteractionSource()}
-    TextButton(onClick,Modifier.pressFeedback(source,enabled).then(modifier),enabled,contentPadding=contentPadding,interactionSource=source,content=content)
+    TextButton(rememberPressAction(enabled,onClick),Modifier.pressFeedback(source,enabled).then(modifier),enabled,contentPadding=contentPadding,interactionSource=source,content=content)
 }
 @Composable fun PressIconButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,content:@Composable ()->Unit) {
     val source=remember {MutableInteractionSource()}
-    IconButton(onClick,Modifier.pressFeedback(source,enabled).then(modifier),enabled,interactionSource=source,content=content)
+    IconButton(rememberPressAction(enabled,onClick),Modifier.pressFeedback(source,enabled).then(modifier),enabled,interactionSource=source,content=content)
 }
 @Composable fun PressFilledIconButton(onClick:()->Unit,modifier:Modifier=Modifier,enabled:Boolean=true,shape:Shape=RoundedCornerShape(16.dp),colors:IconButtonColors=IconButtonDefaults.filledIconButtonColors(),content:@Composable ()->Unit) {
     val source=remember {MutableInteractionSource()}
-    FilledIconButton(onClick,Modifier.pressFeedback(source,enabled).then(modifier),enabled,shape,colors,interactionSource=source,content=content)
+    FilledIconButton(rememberPressAction(enabled,onClick),Modifier.pressFeedback(source,enabled).then(modifier),enabled,shape,colors,interactionSource=source,content=content)
 }
 @Composable fun RowScope.PressNavigationBarItem(selected:Boolean,onClick:()->Unit,icon:@Composable ()->Unit,label:@Composable ()->Unit,colors:NavigationBarItemColors) {
     val source=remember {MutableInteractionSource()}
-    NavigationBarItem(selected,onClick,icon,modifier=Modifier.pressFeedback(source,pressedScale=.97f),label=label,colors=colors,interactionSource=source)
+    NavigationBarItem(selected,rememberPressAction(true,onClick),icon,modifier=Modifier.pressFeedback(source,pressedScale=.97f),label=label,colors=colors,interactionSource=source)
 }
 
 @Composable fun PressOutlinedTextField(value:String,onValueChange:(String)->Unit,modifier:Modifier=Modifier,singleLine:Boolean=false,
