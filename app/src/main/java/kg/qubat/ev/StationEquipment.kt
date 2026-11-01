@@ -1,6 +1,8 @@
 package kg.qubat.ev
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -53,8 +55,10 @@ import androidx.compose.ui.unit.sp
                     listOf(Offset(.35f,.35f),Offset(.65f,.35f),Offset(.5f,.64f)).forEach {p->drawCircle(color,1.8.dp.toPx(),Offset(size.width*p.x,size.height*p.y))}
                 }
             }
-            Surface(Modifier.align(Alignment.TopEnd).offset(x=5.dp,y=(-4).dp).size(15.dp),shape=CircleShape,color=SurfaceGreen,border=BorderStroke(1.dp,color)) {
-                Box(contentAlignment=Alignment.Center) {Text(port.number.toString(),fontSize=9.sp,color=Color.White,fontWeight=FontWeight.Bold)}
+            Box(Modifier.align(Alignment.TopEnd).offset(x=3.dp,y=(-3).dp).size(19.dp)
+                .background(if(LocalNight.current) Color(0xFFECF6FA) else Color(0xFF102638),CircleShape)
+                .border(1.5.dp,color,CircleShape),contentAlignment=Alignment.Center) {
+                Text(port.number.toString(),fontSize=11.sp,lineHeight=12.sp,color=if(LocalNight.current) Color(0xFF102638) else Color.White,fontWeight=FontWeight.Black,modifier=Modifier.testTag("port-number-${port.id}"))
             }
         }
     }
@@ -66,7 +70,7 @@ import androidx.compose.ui.unit.sp
             station.chargers.chunked(columns).forEach {units->
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.fillMaxWidth()) {
                     units.forEach {charger->
-                        Surface(Modifier.weight(1f),shape=RoundedCornerShape(14.dp),color=Color(0xFF19382D),border=BorderStroke(1.dp,Color(0xFF315044))) {
+                        Surface(Modifier.weight(1f),shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline)) {
                             Column(Modifier.padding(vertical=6.dp)) {
                                 Row(Modifier.fillMaxWidth().padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                                     Text(charger.number.toString(),fontSize=13.sp,fontWeight=FontWeight.Bold)

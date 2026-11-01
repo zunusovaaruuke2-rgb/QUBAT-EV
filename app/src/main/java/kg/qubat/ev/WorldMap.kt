@@ -48,6 +48,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
 @Suppress("DEPRECATION")
 @Composable fun WorldMap(stations:List<Station>,city:String?,location:GeoPoint?,selectedId:String,
     modifier:Modifier,focusRequest:Int,zoomRequest:Int,onSelect:(Station)->Unit) {
+    val night=LocalNight.current
     val context=LocalContext.current
     val owner=LocalLifecycleOwner.current
     val density=LocalDensity.current.density
@@ -76,10 +77,15 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                 }
                 map=native
                 viewport="Масштаб 5.0; 41.500, 74.700"
-                native.setStyle(Style.Builder().fromUri(WORLD_STYLE)) { ready=true;loadError=false }
+
 
             }
         }
+    }
+    LaunchedEffect(map,night) {
+        val native=map ?: return@LaunchedEffect
+        ready=false;loadError=false
+        native.setStyle(Style.Builder().fromUri(if(night) "https://tiles.openfreemap.org/styles/dark" else WORLD_STYLE)) {ready=true;loadError=false}
     }
     DisposableEffect(mapView,owner) {
         var started=false;var resumed=false

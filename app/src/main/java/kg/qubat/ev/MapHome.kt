@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.sp
             Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen,shadowElevation=4.dp,modifier=Modifier.weight(1f)) {
                 TextButton(onClick={filters=true},modifier=Modifier.fillMaxWidth()) {Icon(Icons.Default.Place,null,modifier=Modifier.size(18.dp));Text(city ?: "Кыргызстан",modifier=Modifier.weight(1f),fontWeight=FontWeight.SemiBold);Icon(Icons.Default.ArrowDropDown,null)}
             }
+            Surface(shape=RoundedCornerShape(16.dp),color=SurfaceGreen) {ThemeToggle()}
             FilledIconButton(onClick={filters=true},shape=RoundedCornerShape(16.dp),modifier=Modifier.size(50.dp),colors=IconButtonDefaults.filledIconButtonColors(containerColor=SurfaceGreen,contentColor=Lime)) {Icon(Icons.Default.Settings,"Фильтры карты")}
         }
         Column(Modifier.align(Alignment.CenterEnd).padding(end=16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {

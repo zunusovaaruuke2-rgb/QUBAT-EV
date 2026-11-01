@@ -33,7 +33,7 @@ import com.google.maps.android.compose.*
     var loaded by remember {mutableStateOf(false)}
     Box(modifier) {
         GoogleMap(modifier=Modifier.matchParentSize(),cameraPositionState=camera,contentPadding=PaddingValues(top=82.dp,bottom=230.dp),
-            properties=MapProperties(minZoomPreference=0f,maxZoomPreference=21f,mapStyleOptions=MapStyleOptions("""[{"elementType":"geometry","stylers":[{"color":"#16372b"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#b9cfbd"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#173428"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0c2229"}]}]""")),
+            properties=MapProperties(minZoomPreference=0f,maxZoomPreference=21f,mapStyleOptions=if(!LocalNight.current) null else MapStyleOptions("""[{"elementType":"geometry","stylers":[{"color":"#16372b"}]},{"elementType":"labels.text.fill","stylers":[{"color":"#b9cfbd"}]},{"elementType":"labels.text.stroke","stylers":[{"color":"#173428"}]},{"featureType":"water","elementType":"geometry","stylers":[{"color":"#0c2229"}]}]""")),
             uiSettings=MapUiSettings(mapToolbarEnabled=false,zoomControlsEnabled=false,scrollGesturesEnabled=true,zoomGesturesEnabled=true),onMapLoaded={loaded=true}) {
             stations.forEach { s -> Marker(state=remember(s.id) {MarkerState(position=LatLng(s.point.lat,s.point.lon))},icon=remember(s,selectedId) {BitmapDescriptorFactory.fromBitmap(stationMarker(s,s.id==selectedId))},title="ДЕМО · ${s.city}",snippet="${s.availableConnectors} из ${s.connectorCount} свободно",onClick={onSelect(s);true})}
             location?.let {Marker(state=remember(it) {MarkerState(position=LatLng(it.lat,it.lon))},title="Ваша позиция")}

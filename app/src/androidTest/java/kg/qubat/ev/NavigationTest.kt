@@ -43,6 +43,15 @@ class NavigationTest {
             compose.onNodeWithContentDescription("Моя позиция").assertIsDisplayed()
             val map=compose.onNodeWithTag("world-map")
             compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+            step("Дневная и ночная темы карты") {
+                val switch=if(compose.onAllNodesWithContentDescription("Ночная тема").fetchSemanticsNodes().isNotEmpty()) "Ночная тема" else "Дневная тема"
+                compose.onNodeWithContentDescription(switch).performClick()
+                compose.waitForIdle()
+                compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+                compose.onNodeWithContentDescription(if(switch=="Ночная тема") "Дневная тема" else "Ночная тема").assertIsDisplayed().performClick()
+                compose.waitForIdle()
+                compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+            }
             var nativeMap:MapLibreMap?=null
             lateinit var nativeView:MapView
             compose.runOnIdle {nativeView=findMapView(compose.activity.window.decorView)!!;nativeView.getMapAsync {nativeMap=it}}
@@ -54,6 +63,8 @@ class NavigationTest {
                 val markerOffset=20*compose.activity.resources.displayMetrics.density
                 map.performTouchInput {click(Offset(pixel.x,pixel.y-markerOffset))}
                 compose.waitUntil(10000) {compose.onAllNodesWithTag("map-station-card").fetchSemanticsNodes().isNotEmpty()}
+                compose.onNodeWithTag("port-number-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("1").assertIsDisplayed()
+                compose.onNodeWithTag("port-number-demo-bishkek-unit-1-port-2",useUnmergedTree=true).assertTextEquals("2").assertIsDisplayed()
                 compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-1").assertIsDisplayed().performClick()
                 compose.onNodeWithTag("connector-dialog-state").assertTextEquals("Свободен")
                 compose.onNodeWithText("Закрыть").performClick()
@@ -142,9 +153,10 @@ class NavigationTest {
         }
         step("Старт и остановка симуляции") {
             compose.onNodeWithText("Зарядка",useUnmergedTree=true).performClick()
-            compose.onNodeWithText("Начать симуляцию",substring=true).performScrollTo().performClick()
+            compose.onNodeWithTag("start-charge").performScrollTo().performClick()
             visible("Зарядка идёт")
             android.os.SystemClock.sleep(1300)
+            compose.onNodeWithTag("charge-power-chart").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("Остановить симуляцию",substring=true).performScrollTo().performClick()
             visible("Аппарат 1 · разъём 1 · Завершён")
             compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo()

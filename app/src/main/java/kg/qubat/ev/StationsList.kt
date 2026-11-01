@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.sp
         Row(Modifier.fillMaxWidth().padding(12.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(query,onQuery,modifier=Modifier.weight(1f),singleLine=true,label={Text("Город или название станции",fontSize=12.sp)},
                 leadingIcon={Icon(Icons.Default.Search,null)},shape=RoundedCornerShape(16.dp),keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}))
+            ThemeToggle()
             FilledIconButton(onClick={keyboard?.hide();filters=true}) {Icon(Icons.Default.Settings,"Фильтры списка")}
         }
         Column(Modifier.padding(horizontal=16.dp).padding(bottom=10.dp),verticalArrangement=Arrangement.spacedBy(7.dp)) {

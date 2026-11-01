@@ -53,16 +53,11 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-val Forest=Color(0xFF081D17)
-val SurfaceGreen=Color(0xFF112D24)
-val Lime=Color(0xFFB5F481)
-val Muted=Color(0xFFA5BFB2)
-val Amber=Color(0xFFFFCF80)
 val Ru=Locale("ru","KG")
 fun money(minor: Long) = String.format(Ru,"%,.2f сом",minor/100.0)
 fun energy(kwh: Double) = String.format(Ru,"%.3f",kwh)
 class MainActivity: ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); enableEdgeToEdge(); setContent { QubatApp() } }
+    override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); enableEdgeToEdge(); setContent { QubatTheme { QubatApp() } } }
 }
 private enum class Tab(val label: String,val icon: ImageVector) {
     HOME("Карта",Icons.Default.Home), STATIONS("Список",Icons.Default.Place), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
@@ -139,9 +134,9 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     val visible=location?.let { p -> filtered.sortedBy { distanceKm(p,it.point) } } ?: filtered
     val selected=stations.first { it.id==selectedId }
     val sessionStation=state.session?.let { s -> stations.first { it.id==s.stationId } }
-    MaterialTheme(colorScheme=darkColorScheme(primary=Lime,onPrimary=Forest,background=Forest,onBackground=Color(0xFFF0F8EF),surface=SurfaceGreen,onSurface=Color(0xFFF0F8EF),onSurfaceVariant=Muted,secondary=Lime,outline=Color(0xFF315044))) {
+    run {
         Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) },bottomBar={
-            NavigationBar(containerColor=Color(0xFF0C241C)) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={Icon(item.icon,item.label)},label={Text(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=Color(0xFF284B36),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
+            NavigationBar(containerColor=SurfaceGreen) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={Icon(item.icon,item.label)},label={Text(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 if(tab==Tab.HOME) {
@@ -154,9 +149,9 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                         onDetail={detailId=it.id},onConnector={_,port->focusedConnectorId=port.id})
                 } else {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
-                    Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Lime),contentAlignment=Alignment.Center) { Icon(Icons.Default.PlayArrow,"QUBAT",tint=Forest) }
+                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.qubat_logo),"QUBAT",Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)))
                     Column(Modifier.weight(1f).padding(start=12.dp)) { Text("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); Text("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp) }
-                    Text("ДЕМО",color=Lime,fontSize=11.sp,fontWeight=FontWeight.Bold)
+                    ThemeToggle()
                 }
                 HorizontalDivider(color=Color(0xFF203C30))
                 Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -164,35 +159,16 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                         Tab.HOME -> Unit
                         Tab.STATIONS -> Unit
                         Tab.CHARGE -> {
-                            Eyebrow("УЧЕБНЫЙ СЕАНС"); Title(if(state.session!=null) "Зарядка идёт" else "Готовы к зарядке?")
-                            DemoNotice()
                             val station=sessionStation ?: selected
                             val chosenId=state.session?.connectorId ?: selectedConnectorId
                             val chosenPort=station.connectors.firstOrNull {it.id==chosenId}
                                 ?: station.connectors.firstOrNull {it.state==ConnectorState.FREE}
-                            Panel {
-                                Text(station.city,color=Lime,fontSize=13.sp); Text(station.title,fontSize=22.sp,fontWeight=FontWeight.Bold)
-                                Text("GB/T DC  ·  80 кВт  ·  13,5 сом/кВт·ч",color=Muted,fontSize=13.sp)
-                                chosenPort?.let {Text("Аппарат ${station.chargerNumber(it.id)} · разъём ${it.number} · ${it.state.title}",color=Color(it.state.argb),fontSize=13.sp)}
-                                if(state.session!=null) Text("Заряд батареи: ${demoBatteryPercent(state.progress.energyKwh)}% · демо",color=Lime,fontWeight=FontWeight.Bold)
-                                Text(if(state.session!=null) "● Симуляция активна" else station.status.title,color=if(station.status==StationStatus.AVAILABLE)Lime else Amber)
-                            }
-                            Box(Modifier.fillMaxWidth().height(220.dp),contentAlignment=Alignment.Center) {
-                                CircularProgressIndicator(progress={if(state.session!=null) (state.progress.energyKwh/(state.session!!.budgetMinor/1350.0)).toFloat().coerceIn(0f,1f) else 0f},modifier=Modifier.size(204.dp),color=Lime,trackColor=Color(0xFF234337),strokeWidth=8.dp)
-                                Column(horizontalAlignment=Alignment.CenterHorizontally) { Text(energy(state.progress.energyKwh),fontSize=37.sp,fontWeight=FontWeight.Bold);Text("кВт·ч",color=Muted); Text(if(state.session!=null) "Подача энергии · демо" else "Последний сеанс",color=Lime,fontSize=11.sp) }
-                            }
-                            Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                                Metric("Время", "%02d:%02d:%02d".format(state.progress.seconds/3600,state.progress.seconds/60%60,state.progress.seconds%60),Modifier.weight(1f))
-                                Metric("Стоимость",money(state.progress.costMinor),Modifier.weight(1f))
-                            }
-                            Text("Доступно: ${money((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0))}",color=Muted)
-                            if(state.session!=null) Button(onClick={vm.stop();message("Демо-сеанс завершён. Запись добавлена в кошелёк.")},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Amber)) { Icon(Icons.Default.Close,null);Text(" Остановить симуляцию") }
-                            else {
-                                Button(onClick={if(vm.start(station,chosenPort?.id)) message("Запущена симуляция. Реальная станция не подключена.") else message("Станция недоступна или недостаточно учебного баланса")},enabled=chosenPort?.state==ConnectorState.FREE && state.balanceMinor>0,modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.PlayArrow,null);Text(" Начать симуляцию") }
-                                if(chosenPort?.id in state.completedConnectorIds) TextButton(onClick={chosenPort?.let {vm.releaseConnector(it.id)}}) {Text("Освободить разъём после сеанса")}
-                                OutlinedButton(onClick={tabName=Tab.STATIONS.name},modifier=Modifier.fillMaxWidth()) {Text("Выбрать другую станцию")}
-                            }
-                            Text("Симуляция рассчитывается по времени: 80 кВт, 13,5 сом/кВт·ч. Продолжается при сворачивании; автоматически завершается при исчерпании учебного баланса.",color=Muted,fontSize=12.sp)
+                            ChargeContent(station,chosenPort,state,
+                                onChoose={selectedId=station.id;selectedConnectorId=it.id},
+                                onStart={if(vm.start(station,chosenPort?.id)) message("Запущена симуляция. Реальная станция не подключена.") else message("Станция недоступна или недостаточно учебного баланса")},
+                                onStop={vm.stop();message("Демо-сеанс завершён. Запись добавлена в кошелёк.")},
+                                onRelease={chosenPort?.let {vm.releaseConnector(it.id)}},
+                                onStations={tabName=Tab.STATIONS.name})
                         }
                         Tab.WALLET -> {
                             Eyebrow("ТОЛЬКО УЧЕБНЫЕ СРЕДСТВА"); Title("Кошелёк")
@@ -206,7 +182,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                             Title("История операций")
                             if(state.history.isEmpty()) Panel {Text("Здесь появится ваша история");Text("Завершите демо-зарядку или пополните учебный баланс.",color=Muted)}
                             state.history.forEach { item -> Panel {
-                                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(item.title,modifier=Modifier.weight(1f),fontWeight=FontWeight.Medium);Text(if(item.amountMinor>0) "+${money(item.amountMinor)}" else money(item.amountMinor),color=if(item.amountMinor>0)Lime else Color.White,fontSize=13.sp)}
+                                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(item.title,modifier=Modifier.weight(1f),fontWeight=FontWeight.Medium);Text(if(item.amountMinor>0) "+${money(item.amountMinor)}" else money(item.amountMinor),color=if(item.amountMinor>0)Lime else MaterialTheme.colorScheme.onSurface,fontSize=13.sp)}
                                 Text(item.detail,color=Muted,fontSize=12.sp)
                                 Text(SimpleDateFormat("dd.MM.yyyy · HH:mm",Ru).format(Date(item.timestamp)),color=Muted,fontSize=11.sp)
                             } }
@@ -215,6 +191,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                             Eyebrow("ЛИЧНЫЙ КАБИНЕТ");Title("Профиль")
                             Panel { Icon(Icons.Default.Person,null,tint=Lime,modifier=Modifier.size(40.dp)); Text("Демо-пользователь",fontSize=24.sp,fontWeight=FontWeight.Bold); Text("Без регистрации · данные на этом устройстве",color=Muted) }
                             Panel {Text("Мой автомобиль",color=Muted);Text("Учебный электромобиль · GB/T DC",fontWeight=FontWeight.Medium);Text("Проверяйте разъём своего автомобиля перед реальной зарядкой.",color=Muted,fontSize=12.sp)}
+                            Panel {Row(verticalAlignment=Alignment.CenterVertically) {Text("Оформление",Modifier.weight(1f));ThemeToggle()};Text(if(LocalNight.current) "Ночная тема" else "Дневная тема",color=Muted)}
                             Panel {Text("Язык интерфейса");Text("Русский",color=Lime);Text("Регион · Кыргызская Республика",color=Muted)}
                             Panel {Text("О приложении",fontWeight=FontWeight.Bold);Text("QUBAT EV  ${BuildConfig.VERSION_NAME}",color=Lime);Text("Нативное приложение на Kotlin и Jetpack Compose. Все станции, их статусы и операции — демонстрационные. API EEJANN и платежи не подключены.",color=Muted,fontSize=13.sp)}
                             Panel {Text("Конфиденциальность",fontWeight=FontWeight.Bold);Text("Геопозиция запрашивается только по кнопке и используется для расстояний. Фоновое отслеживание отключено. Учебный баланс и последние 100 операций сохраняются локально. При использовании карты её провайдер получает сетевые запросы; внешний навигатор получает выбранную точку.",color=Muted,fontSize=13.sp)}
