@@ -64,7 +64,7 @@ class MainActivity: ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); enableEdgeToEdge(); setContent { QubatApp() } }
 }
 private enum class Tab(val label: String,val icon: ImageVector) {
-    HOME("Главная",Icons.Default.Home), STATIONS("Станции",Icons.Default.Place), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
+    HOME("Карта",Icons.Default.Home), STATIONS("Станции",Icons.Default.Place), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
 }
 @Composable fun QubatApp(vm: ChargingViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
@@ -135,6 +135,11 @@ private enum class Tab(val label: String,val icon: ImageVector) {
             NavigationBar(containerColor=Color(0xFF0C241C)) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={Icon(item.icon,item.label)},label={Text(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=Color(0xFF284B36),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
+                if(tab==Tab.HOME) {
+                    MapHome(filterStations(DemoData.stations,"",city,minPower,statusName?.let { StationStatus.valueOf(it) }),city,location,locating,locationMessage,minPower,statusName,
+                        onCity={city=it},onPower={minPower=it},onStatus={statusName=it},onLocate={askLocation()},
+                        onDetail={detailId=it.id;selectedId=it.id},onCharge={selectedId=it.id;tabName=Tab.CHARGE.name})
+                } else {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
                     Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Lime),contentAlignment=Alignment.Center) { Icon(Icons.Default.PlayArrow,"QUBAT",tint=Forest) }
                     Column(Modifier.weight(1f).padding(start=12.dp)) { Text("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); Text("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp) }
@@ -143,21 +148,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 HorizontalDivider(color=Color(0xFF203C30))
                 Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                     when(tab) {
-                        Tab.HOME -> {
-                            Eyebrow("ЗАРЯЖАЙТЕСЬ ПО ПУТИ")
-                            Text("Ваша энергия.\nВаша страна.",fontSize=34.sp,lineHeight=39.sp,fontWeight=FontWeight.Bold)
-                            Text("4 учебные станции · 80 кВт · GB/T DC",color=Muted)
-                            DemoNotice()
-                            CountryMap(visible,city,location,selectedId) { detailId=it.id; selectedId=it.id }
-                            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp)) {
-                                Button(onClick={tabName=Tab.STATIONS.name},modifier=Modifier.weight(1f)) { Text("Найти станцию") }
-                                OutlinedButton(onClick={askLocation()},enabled=!locating) { Icon(Icons.Default.LocationOn,"Моя позиция") }
-                            }
-                            Text(locationMessage,color=Muted,fontSize=12.sp)
-                            val nearest=location?.let { nearestStation(DemoData.stations,it) }
-                            if(nearest!=null) { Title("Ближайшая демо-станция"); StationCard(nearest,location,state.session?.stationId,{detailId=nearest.id},{selectedId=nearest.id;tabName=Tab.CHARGE.name}) }
-                            else { Title("Выберите направление"); CityPicker(city) {city=it;tabName=Tab.STATIONS.name} }
-                        }
+                        Tab.HOME -> Unit
                         Tab.STATIONS -> {
                             Eyebrow("СЕТЬ QUBAT · ДЕМОНСТРАЦИЯ"); Title("Станции Кыргызстана")
                             DemoNotice()
@@ -224,6 +215,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                         }
                     }
                     Spacer(Modifier.height(8.dp))
+                }
                 }
             }
             detailId?.let { id ->

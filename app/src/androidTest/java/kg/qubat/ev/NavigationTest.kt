@@ -15,8 +15,13 @@ class NavigationTest {
     private fun visible(text: String) = compose.onNodeWithText(text,substring=true).performScrollTo().assertIsDisplayed()
     @Test fun mainNavigationAndDemoDisclosure() {
         step("Главная и раскрытие демо-данных") {
-            visible("Ваша энергия.\nВаша страна.")
-            visible("Демо-данные. Станции вымышленные. Платежей нет.")
+            compose.onNodeWithContentDescription("Фильтры карты").assertIsDisplayed().performClick()
+            compose.onNodeWithText("Фильтры").assertIsDisplayed()
+            compose.onNodeWithText("Показать станции · 4").performScrollTo().performClick()
+            compose.onNodeWithContentDescription("Моя позиция").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Демо-станция Бишкек").performClick()
+            compose.onNodeWithText("Север · DEMO 01").assertIsDisplayed()
+            compose.onNodeWithContentDescription("Закрыть карточку").performClick()
         }
         step("Поиск по Кыргызстану и пустое состояние") {
             compose.onNodeWithText("Станции",useUnmergedTree=true).performClick()
