@@ -71,6 +71,7 @@ private fun translateUncached(text:String,language:AppLanguage):String {
     val key=text.trim()
     val exact=translationByKey[key]
     if(exact!=null) return text.replace(key,if(language==AppLanguage.EN) exact.en else exact.ky)
+    partnerTranslation(text,language)?.let {return it}
     val summary=summaryPattern.matchEntire(text)
     if(summary!=null) {
         val (count,free,total)=summary.destructured

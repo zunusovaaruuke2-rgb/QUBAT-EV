@@ -1,6 +1,8 @@
 package kg.qubat.ev
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.background
@@ -103,7 +105,8 @@ private val paymentOptions=listOf(
     notice?.let {text->AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={notice=null},title={AppText("QUBAT EV")},text={AppText(text)},confirmButton={PressTextButton(onClick={notice=null}) {AppText("Понятно")}})}
 }
 
-@Composable fun ProfileContent(available:Long,onWallet:()->Unit) {
+@OptIn(ExperimentalFoundationApi::class)
+@Composable fun ProfileContent(available:Long,partnerLabel:String?=null,onPartner:()->Unit={},onPartnerDemo:()->Unit={},onWallet:()->Unit) {
     val context=LocalContext.current
     val prefs=remember {context.getSharedPreferences("qubat_profile",0)}
     var name by remember {mutableStateOf(prefs.getString("name","").orEmpty())}
@@ -140,7 +143,10 @@ private val paymentOptions=listOf(
         item(key="setting-2",contentType="setting") {AccountRow("Информация о машине",car.ifBlank {LocalTranslate.current("Добавить автомобиль")}+(if(plate.isNotBlank()) " · $plate" else ""),"EV",Color(0xFFC27E24),"edit-car",translateSubtitle=false) {editor="car"}}
         item(key="setting-3",contentType="setting") {AccountRow("Мои полисы","Страхование автомобиля","П",Color(0xFF586FAF)) {info="Страховые полисы пока не подключены. Оформление и оплата ОСАГО в приложении недоступны."}}
         item(key="setting-4",contentType="setting") {AccountRow("Язык",LocalAppLanguage.current.nativeName,LocalAppLanguage.current.code.uppercase(),tag="profile-language") {languagePicker=true}}
-        item(key="setting-5",contentType="setting") {AccountRow("О приложении","QUBAT EV · ${BuildConfig.VERSION_NAME}","Q") {info="Демонстрационное приложение зарядки электромобилей. Станции и операции вымышленные. Банки, платёжные системы и реальные зарядные станции не подключены."}}
+        item(key="setting-5",contentType="setting") {AccountRow("О приложении","QUBAT EV · ${BuildConfig.VERSION_NAME}","Q",tag="profile-about") {info="Демонстрационное приложение зарядки электромобилей. Станции и операции вымышленные. Банки, платёжные системы и реальные зарядные станции не подключены."}}
+        if(partnerLabel!=null) item(key="partner",contentType="setting") {
+            AccountRow("Кабинет партнёра",partnerLabel,"EV",tag="partner-entry",translateSubtitle=false,onClick=onPartner)
+        }
         item(key="footer") {AppText("Личный профиль сохраняется только на этом устройстве",fontSize=10.sp,color=Muted)}
     }
     if(languagePicker) LanguagePicker {languagePicker=false}
@@ -158,7 +164,7 @@ private val paymentOptions=listOf(
             editor=null
         },modifier=Modifier.testTag("save-profile")) {AppText("Сохранить")}},dismissButton={PressTextButton(onClick={editor=null}) {AppText("Отмена")}})
     }
-    info?.let {text->AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={info=null},title={AppText("QUBAT EV")},text={AppText(text)},confirmButton={PressTextButton(onClick={info=null}) {AppText("Понятно")}})}
+    info?.let {text->AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={info=null},title={AppText("QUBAT EV",if(text.startsWith("Демонстрационное приложение")) Modifier.testTag("partner-demo-access").combinedClickable(onClick={},onLongClick={info=null;onPartnerDemo()}) else Modifier)},text={AppText(text)},confirmButton={PressTextButton(onClick={info=null}) {AppText("Понятно")}})}
 }
 
 @Composable private fun HistoryCard(entry:HistoryEntry) {

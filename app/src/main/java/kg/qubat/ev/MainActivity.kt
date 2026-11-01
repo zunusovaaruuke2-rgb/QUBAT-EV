@@ -60,7 +60,7 @@ class MainActivity: ComponentActivity() {
 private enum class Tab(val label: String,val icon: ImageVector) {
     HOME("Карта",Icons.Default.Home), STATIONS("Список",Icons.Default.Place), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
 }
-@Composable fun QubatApp(vm: ChargingViewModel = viewModel()) {
+@Composable internal fun QubatDriverApp(vm:ChargingViewModel,partnerLabel:String?,onPartner:()->Unit,onPartnerDemo:()->Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
     var tabName by rememberSaveable { mutableStateOf(Tab.HOME.name) }
     val tab=Tab.valueOf(tabName)
@@ -139,7 +139,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 } else if(tab==Tab.WALLET) {
                     WalletContent((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0),state.session!=null,state.history) {amount,method->vm.topUp(amount,method)}
                 } else if(tab==Tab.PROFILE) {
-                    ProfileContent((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0)) {tabName=Tab.WALLET.name}
+                    ProfileContent((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0),partnerLabel=partnerLabel,onPartner=onPartner,onPartnerDemo=onPartnerDemo) {tabName=Tab.WALLET.name}
                 } else {
                 if(tab==Tab.CHARGE) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
