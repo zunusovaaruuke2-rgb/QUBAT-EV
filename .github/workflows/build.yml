@@ -27,13 +27,13 @@ jobs:
       - name: Install SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Build, unit tests and lint
-        run: ./gradlew --no-daemon assembleDebug testDebugUnitTest lintDebug assembleDebugAndroidTest
+        run: ./gradlew --no-daemon assembleDebug assembleRelease testDebugUnitTest lintDebug assembleDebugAndroidTest
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: QUBAT-EV-debug-and-reports
+          name: QUBAT-EV-optimized-and-reports
           path: |
-            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/release/*.apk
             app/build/reports/
             app/build/test-results/
   compose-smoke:
@@ -64,7 +64,7 @@ jobs:
           api-level: 35
           arch: x86_64
           disable-animations: true
-          script: bash -c './gradlew connectedDebugAndroidTest; qubat_ui_exit=$?; if [ "$qubat_ui_exit" -ne 0 ]; then adb logcat -d -s QUBAT_MAP:E AndroidRuntime:E; fi; exit "$qubat_ui_exit"'
+          script: bash -c './gradlew connectedDebugAndroidTest && ./gradlew assembleRelease && python3 scripts/smoke_optimized.py; qubat_ui_exit=$?; if [ "$qubat_ui_exit" -ne 0 ]; then adb logcat -d -s QUBAT_MAP:E AndroidRuntime:E; fi; exit "$qubat_ui_exit"'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

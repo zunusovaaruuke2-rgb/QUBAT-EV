@@ -124,4 +124,14 @@ class DomainTest {
         assertEquals("Visa",translate("Visa",AppLanguage.KY))
         assertEquals("Карта",translate("Карта",AppLanguage.RU))
     }
+    @Test fun `inactive station and unaffected apparatus retain identity`() {
+        val first=DemoData.stations.first()
+        val other=DemoData.stations[1]
+        val port=first.freeConnector()!!
+        assertSame(first,first.withConnectorSession(null,emptySet()))
+        assertSame(other,other.withConnectorSession(port.id,emptySet(),50))
+        val active=first.withConnectorSession(port.id,emptySet(),50)
+        assertSame(first.chargers[1],active.chargers[1])
+        assertEquals(50,active.connectors.first {it.id==port.id}.percent)
+    }
 }

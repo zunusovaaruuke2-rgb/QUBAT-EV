@@ -111,8 +111,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     val stations=remember(state.session?.connectorId,state.completedConnectorIds,demoBatteryPercent(state.progress.energyKwh)) {
         DemoData.stations.map {it.withConnectorSession(state.session?.connectorId,state.completedConnectorIds,demoBatteryPercent(state.progress.energyKwh))}
     }
-    val filtered=filterStations(stations,query,city,minPower,statusName?.let { StationStatus.valueOf(it) })
-    val visible=location?.let { p -> filtered.sortedBy { distanceKm(p,it.point) } } ?: filtered
+    val filtered=remember(stations,query,city,minPower,statusName) {filterStations(stations,query,city,minPower,statusName?.let { StationStatus.valueOf(it) })}
+    val visible=remember(filtered,location) {location?.let { p -> filtered.sortedBy { distanceKm(p,it.point) } } ?: filtered}
     val selected=stations.first { it.id==selectedId }
     val sessionStation=state.session?.let { s -> stations.first { it.id==s.stationId } }
     fun openConnector(site:Station,port:Connector) {

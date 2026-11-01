@@ -161,6 +161,14 @@ class NavigationTest {
             compose.onNodeWithText("Список",useUnmergedTree=true).performClick()
             compose.onNodeWithText("Станции Кыргызстана").assertDoesNotExist()
             compose.onNodeWithText("Свободен").assertDoesNotExist()
+            step("Быстрая прокрутка списка туда и обратно") {
+                val list=compose.onNodeWithTag("stations-list")
+                repeat(3) {list.performTouchInput {swipeUp(durationMillis=180)}}
+                repeat(3) {list.performTouchInput {swipeDown(durationMillis=180)}}
+                list.performScrollToIndex(0)
+                compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-1").assertIsDisplayed()
+                compose.onNodeWithTag("port-number-demo-bishkek-unit-1-port-2",useUnmergedTree=true).assertTextEquals("2")
+            }
             compose.onNodeWithContentDescription("Поиск станции").performClick()
             compose.onNodeWithTag("station-search-field").performTextInput("Тянь-Шань")
             compose.onNodeWithTag("station-search-field").performImeAction()

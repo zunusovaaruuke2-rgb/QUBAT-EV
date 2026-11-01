@@ -1,9 +1,12 @@
 package kg.qubat.ev
 
 import kotlin.math.*
+import androidx.compose.runtime.Immutable
 
 enum class StationStatus(val title: String) { AVAILABLE("Свободна"), BUSY("Занята"), OFFLINE("Недоступна") }
+@Immutable
 data class GeoPoint(val lat: Double, val lon: Double)
+@Immutable
 data class City(val name: String, val point: GeoPoint)
 enum class ConnectorState(val title:String,val argb:Int) {
     FREE("Свободен",0xFF45D58B.toInt()),
@@ -13,18 +16,21 @@ enum class ConnectorState(val title:String,val argb:Int) {
     CONNECTED("Подключён",0xFF70AAFF.toInt()),
     OFFLINE("Недоступен",0xFF8E9D99.toInt())
 }
+@Immutable
 data class Connector(val id:String,val number:Int,val state:ConnectorState,val percent:Int?=null)
+@Immutable
 data class Charger(val id:String,val number:Int,val connectors:List<Connector>,val powerKw:Int=80) {
-    val state:ConnectorState get() = listOf(ConnectorState.FREE,ConnectorState.CHARGING,ConnectorState.CONNECTED,ConnectorState.ERROR,ConnectorState.COMPLETED)
+    val state:ConnectorState = listOf(ConnectorState.FREE,ConnectorState.CHARGING,ConnectorState.CONNECTED,ConnectorState.ERROR,ConnectorState.COMPLETED)
         .firstOrNull {value->connectors.any {it.state==value}} ?: ConnectorState.OFFLINE
 }
+@Immutable
 data class Station(val id:String,val city:String,val title:String,val point:GeoPoint,val chargers:List<Charger>,
     val powerKw:Int=80,val tariffMinor:Long=1350,val connector:String="GB/T DC") {
-    val connectors:List<Connector> get()=chargers.flatMap {it.connectors}
+    val connectors:List<Connector> =chargers.flatMap {it.connectors}
     val chargerCount:Int get()=chargers.size
     val connectorCount:Int get()=connectors.size
-    val availableConnectors:Int get()=connectors.count {it.state==ConnectorState.FREE}
-    val status:StationStatus get()=when {
+    val availableConnectors:Int =connectors.count {it.state==ConnectorState.FREE}
+    val status:StationStatus =when {
         availableConnectors>0 -> StationStatus.AVAILABLE
         connectors.all {it.state==ConnectorState.OFFLINE} -> StationStatus.OFFLINE
         else -> StationStatus.BUSY
@@ -34,13 +40,18 @@ data class Station(val id:String,val city:String,val title:String,val point:GeoP
 }
 fun demoBatteryPercent(energyKwh:Double):Int = (20 + energyKwh.coerceAtLeast(0.0) / 60.0 * 100).toInt().coerceIn(20,100)
 
-fun Station.withConnectorSession(activeId:String?,completed:Set<String>,activePercent:Int=20):Station=copy(chargers=chargers.map {unit->
-    unit.copy(connectors=unit.connectors.map {port->when {
-        port.id==activeId -> port.copy(state=ConnectorState.CHARGING,percent=activePercent.coerceIn(0,100))
-        port.id in completed -> port.copy(state=ConnectorState.COMPLETED,percent=null)
-        else -> port
-    }})
-})
+fun Station.withConnectorSession(activeId:String?,completed:Set<String>,activePercent:Int=20):Station {
+    if(connectors.none {it.id==activeId || it.id in completed}) return this
+    val updated=chargers.map {unit->
+        val ports=unit.connectors.map {port->when {
+            port.id==activeId -> port.copy(state=ConnectorState.CHARGING,percent=activePercent.coerceIn(0,100))
+            port.id in completed -> port.copy(state=ConnectorState.COMPLETED,percent=null)
+            else -> port
+        }}
+        if(ports==unit.connectors) unit else unit.copy(connectors=ports)
+    }
+    return if(updated==chargers) this else copy(chargers=updated)
+}
 
 object DemoData {
     val cities = listOf(

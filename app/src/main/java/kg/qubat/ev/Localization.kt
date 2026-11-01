@@ -29,11 +29,14 @@ val LocalTranslate=staticCompositionLocalOf<(String)->String> {{it}}
 @Composable fun AppText(text:String,modifier:Modifier=Modifier,color:Color=Color.Unspecified,fontSize:TextUnit=TextUnit.Unspecified,
     fontStyle:FontStyle?=null,fontWeight:FontWeight?=null,letterSpacing:TextUnit=TextUnit.Unspecified,
     textAlign:TextAlign?=null,lineHeight:TextUnit=TextUnit.Unspecified,maxLines:Int=Int.MAX_VALUE) {
-    Text(LocalTranslate.current(text),modifier=modifier,color=color,fontSize=fontSize,fontStyle=fontStyle,fontWeight=fontWeight,letterSpacing=letterSpacing,textAlign=textAlign,lineHeight=lineHeight,maxLines=maxLines)
+    val translator=LocalTranslate.current
+    val translated=remember(text,translator) {translator(text)}
+    Text(translated,modifier=modifier,color=color,fontSize=fontSize,fontStyle=fontStyle,fontWeight=fontWeight,letterSpacing=letterSpacing,textAlign=textAlign,lineHeight=lineHeight,maxLines=maxLines)
 }
 @Composable fun AppIcon(imageVector:ImageVector,contentDescription:String?,modifier:Modifier=Modifier,tint:Color=LocalContentColor.current) {
     val localize=LocalTranslate.current
-    Icon(imageVector,contentDescription?.let(localize),modifier,tint)
+    val description=remember(contentDescription,localize) {contentDescription?.let(localize)}
+    Icon(imageVector,description,modifier,tint)
 }
 @Composable fun Modifier.appDescription(text:String):Modifier {
     val description=LocalTranslate.current(text)
@@ -57,15 +60,19 @@ private data class Translation(val ru:String,val en:String,val ky:String) {
 }
 internal fun translate(text:String,language:AppLanguage):String {
     if(language==AppLanguage.RU || text.isBlank() || text.none {it in 'А'..'я' || it=='ё' || it=='Ё'}) return text
+    val cache=translationCaches.getValue(language)
+    return synchronized(cache) {cache[text] ?: translateUncached(text,language).also {cache[text]=it}}
+}
+private fun translateUncached(text:String,language:AppLanguage):String {
     val key=text.trim()
     val exact=translationByKey[key]
     if(exact!=null) return text.replace(key,if(language==AppLanguage.EN) exact.en else exact.ky)
-    val summary=Regex("^(\\d+) (?:аппарата|аппаратов) · свободно (\\d+) из (\\d+) разъёмов$").matchEntire(text)
+    val summary=summaryPattern.matchEntire(text)
     if(summary!=null) {
         val (count,free,total)=summary.destructured
         return if(language==AppLanguage.EN) "$count chargers · $free of $total connectors available" else "$count түзмөк · $total туташтыргыч · $free бош"
     }
-    val available=Regex("^Свободно (\\d+) из (\\d+) разъёмов · (.+)$").matchEntire(text)
+    val available=availablePattern.matchEntire(text)
     if(available!=null) {
         val (free,total,tail)=available.destructured
         return if(language==AppLanguage.EN) "$free of $total connectors available · ${translate(tail,language)}" else "$total туташтыргыч · $free бош · ${translate(tail,language)}"
@@ -283,3 +290,11 @@ private val translations=listOf(
 )
 private val translationByKey=translations.associateBy {it.ru}
 private val translationsByLength=translations.sortedByDescending {it.ru.length}
+
+private val summaryPattern=Regex("^(\\d+) (?:аппарата|аппаратов) · свободно (\\d+) из (\\d+) разъёмов$")
+private val availablePattern=Regex("^Свободно (\\d+) из (\\d+) разъёмов · (.+)$")
+private val translationCaches=AppLanguage.entries.associateWith {
+    object:LinkedHashMap<String,String>(128,.75f,true) {
+        override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,String>?)=size>512
+    }
+}

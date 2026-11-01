@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -29,10 +30,11 @@ import androidx.compose.ui.unit.sp
 @Composable fun ConnectorBadge(charger:Charger,port:Connector,onClick:()->Unit) {
     val localize=LocalTranslate.current
     val color=Color(port.state.argb)
-    val description="Аппарат ${charger.number}, разъём ${port.number}, GB/T DC, ${port.state.title}"+(port.percent?.let {", $it процентов, демо"} ?: "")
+    val description=remember(charger.number,port,localize) {localize("Аппарат ${charger.number}, разъём ${port.number}, GB/T DC, ${port.state.title}"+(port.percent?.let {", $it процентов, демо"} ?: ""))}
+    val status=remember(port.state,localize) {localize(port.state.title)}
     Box(Modifier.fillMaxWidth().height(56.dp).testTag("connector-${port.id}")
         .clickable(role=Role.Button,onClick=onClick)
-        .semantics {contentDescription=localize(description);stateDescription=localize(port.state.title)},contentAlignment=Alignment.Center) {
+        .semantics {contentDescription=description;stateDescription=status},contentAlignment=Alignment.Center) {
         Box(Modifier.size(38.dp),contentAlignment=Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {drawCircle(color,style=Stroke(3.dp.toPx()))}
             when(port.state) {
@@ -42,7 +44,10 @@ import androidx.compose.ui.unit.sp
                 ConnectorState.OFFLINE -> AppIcon(Icons.Default.Close,null,tint=color,modifier=Modifier.size(19.dp))
                 else -> Canvas(Modifier.size(18.dp)) {
                     drawCircle(color,style=Stroke(1.5.dp.toPx()))
-                    listOf(Offset(.35f,.35f),Offset(.65f,.35f),Offset(.5f,.64f)).forEach {p->drawCircle(color,1.8.dp.toPx(),Offset(size.width*p.x,size.height*p.y))}
+                    val radius=1.8.dp.toPx()
+                    drawCircle(color,radius,Offset(size.width*.35f,size.height*.35f))
+                    drawCircle(color,radius,Offset(size.width*.65f,size.height*.35f))
+                    drawCircle(color,radius,Offset(size.width*.5f,size.height*.64f))
                 }
             }
             Box(Modifier.align(Alignment.TopEnd).offset(x=3.dp,y=(-3).dp).size(19.dp)
@@ -70,13 +75,14 @@ import androidx.compose.ui.unit.sp
             }
         },confirmButton={TextButton(onClick={openedId=null}) {AppText("Закрыть")}})
     }
-    BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val columns=if(maxWidth>=300.dp) 3 else 2
+    val columns=if(LocalConfiguration.current.screenWidthDp>=348) 3 else 2
+    val rows=remember(station.chargers,columns) {station.chargers.chunked(columns)}
+    Box(Modifier.fillMaxWidth()) {
         Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            station.chargers.chunked(columns).forEach {units->
+            rows.forEach {units->
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.fillMaxWidth()) {
                     units.forEach {charger->
-                        Surface(onClick={openedId=charger.id},modifier=Modifier.weight(1f).testTag("apparatus-${charger.id}"),shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline)) {
+                        Box(Modifier.weight(1f).background(MaterialTheme.colorScheme.surfaceVariant,RoundedCornerShape(14.dp)).border(1.dp,MaterialTheme.colorScheme.outline,RoundedCornerShape(14.dp)).clickable(role=Role.Button) {openedId=charger.id}.testTag("apparatus-${charger.id}")) {
                             Column(Modifier.padding(vertical=6.dp)) {
                                 Row(Modifier.fillMaxWidth().padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                                     AppText(charger.number.toString(),fontSize=13.sp,fontWeight=FontWeight.Bold)
@@ -96,6 +102,8 @@ import androidx.compose.ui.unit.sp
     }
 }
 @Composable fun LocationEquipmentCard(station:Station,location:GeoPoint?,onDetail:()->Unit,onConnector:(Connector)->Unit) {
+    val summary=remember(station.availableConnectors,station.connectorCount) {"Свободно ${station.availableConnectors} из ${station.connectorCount} разъёмов · 13,5 сом/кВт·ч"}
+    val distance=remember(station.point,location) {location?.let {"${String.format(Ru,"%.1f",distanceKm(it,station.point))} км по прямой"}}
     Surface(onClick=onDetail,shape=RoundedCornerShape(22.dp),color=SurfaceGreen) {
         Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
@@ -105,8 +113,8 @@ import androidx.compose.ui.unit.sp
                 }
                 IconButton(onClick=onDetail) {AppIcon(Icons.Default.Place,"Маршрут и детали ${station.city}",tint=Lime)}
             }
-            AppText("Свободно ${station.availableConnectors} из ${station.connectorCount} разъёмов · 13,5 сом/кВт·ч",color=Muted,fontSize=11.sp)
-            location?.let {AppText("${String.format(Ru,"%.1f",distanceKm(it,station.point))} км по прямой",color=Muted,fontSize=11.sp)}
+            AppText(summary,color=Muted,fontSize=11.sp)
+            distance?.let {AppText(it,color=Muted,fontSize=11.sp)}
             StationEquipment(station,onConnector)
         }
     }

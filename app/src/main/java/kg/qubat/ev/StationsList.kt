@@ -6,6 +6,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -43,14 +44,27 @@ import androidx.compose.ui.unit.sp
     onQuery:(String)->Unit,onCity:(String?)->Unit,onPower:(Int)->Unit,onStatus:(String?)->Unit,onDetail:(Station)->Unit,onConnector:(Station,Connector)->Unit) {
     var filters by rememberSaveable {mutableStateOf(false)}
     val keyboard=LocalSoftwareKeyboardController.current
+    val listState=rememberLazyListState()
+    val detailCallback=rememberUpdatedState(onDetail)
+    val connectorCallback=rememberUpdatedState(onConnector)
+    var displayedLocation by remember {mutableStateOf(location)}
+    var orderedIds by remember {mutableStateOf(stations.map {it.id})}
+    val scrolling by remember {derivedStateOf {listState.isScrollInProgress}}
+    LaunchedEffect(stations,location,scrolling) {if(!scrolling) {displayedLocation=location;orderedIds=stations.map {it.id}}}
+    val ordered=remember(stations,orderedIds,query) {val rank=orderedIds.withIndex().associate {it.value to it.index};stations.sortedBy {rank[it.id] ?: Int.MAX_VALUE}}
     Column(Modifier.fillMaxSize()) {
         StationSearchControls(query,onQuery,{keyboard?.hide();filters=true},"Фильтры списка")
-        LazyColumn(Modifier.weight(1f),contentPadding=PaddingValues(horizontal=12.dp,vertical=4.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+        LazyColumn(Modifier.weight(1f).testTag("stations-list"),state=listState,contentPadding=PaddingValues(horizontal=12.dp,vertical=4.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             if(stations.isEmpty()) item {
                 Panel {AppText("Демо-станций пока нет");AppText("С такими фильтрами учебных точек нет.",color=Muted)
                     TextButton(onClick={onQuery("");onCity(null);onPower(0);onStatus(null)}) {AppText("Сбросить фильтры")}}
             }
-            items(stations,key={it.id}) {station->LocationEquipmentCard(station,location,{onDetail(station)}) {onConnector(station,it)}}
+            items(ordered,key={it.id},contentType={it.chargerCount}) {station->
+                val latestStation=rememberUpdatedState(station)
+                val openDetail=remember(station.id) {{detailCallback.value(latestStation.value)}}
+                val openConnector=remember(station.id) {{port:Connector->connectorCallback.value(latestStation.value,port)}}
+                LocationEquipmentCard(station,displayedLocation,openDetail,openConnector)
+            }
             item {Spacer(Modifier.height(12.dp))}
         }
     }
