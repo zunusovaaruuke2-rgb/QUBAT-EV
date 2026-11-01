@@ -212,7 +212,7 @@ class NavigationTest {
                 var native:MapLibreMap?=null
                 lateinit var view:MapView
                 compose.runOnIdle {view=findMapView(compose.activity.window.decorView)!!;view.getMapAsync {native=it}}
-                compose.waitUntil(10000) {native!=null && native!!.zoom>=15.4}
+                compose.waitUntil(10000) {compose.runOnIdle {native!=null && native!!.zoom>=15.4}}
                 fun nearMe()=compose.runOnIdle {val p=native!!.projection.fromScreenLocation(PointF(view.width/2f,view.height/2f));distanceKm(GeoPoint(p.latitude,p.longitude),GeoPoint(42.875,74.57))<.15}
                 compose.waitUntil(10000) {nearMe()}
                 val world=compose.onNodeWithTag("world-map")
