@@ -28,13 +28,21 @@ class NavigationTest {
     }
     private fun lazyContainer()=compose.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex))
     private fun scrollTag(tag:String):SemanticsNodeInteraction {
-        if(compose.onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()) lazyContainer().performScrollToNode(hasTestTag(tag))
-        return compose.onNodeWithTag(tag).performScrollTo()
+        lazyContainer().performScrollToNode(hasTestTag(tag))
+        val node=compose.onNodeWithTag(tag)
+        compose.waitForIdle()
+        try {node.performScrollTo().assertIsDisplayed()} catch(failure:AssertionError) {
+            throw AssertionError("Scroll target $tag: ${node.printToString()}",failure)
+        }
+        return node
     }
     private fun visible(text:String) {
-        if(compose.onAllNodesWithText(text,substring=true).fetchSemanticsNodes().isEmpty()) lazyContainer().performScrollToNode(hasText(text,substring=true))
         val node=compose.onNodeWithText(text,substring=true)
-        try {node.assertIsDisplayed()} catch(_:AssertionError) {node.performScrollTo().assertIsDisplayed()}
+        try {node.assertIsDisplayed();return} catch(_:AssertionError) {}
+        val lazy=compose.onAllNodes(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex))
+        if(lazy.fetchSemanticsNodes().isNotEmpty()) lazy.onFirst().performScrollToNode(hasText(text,substring=true))
+        else node.performScrollTo()
+        try {node.assertIsDisplayed()} catch(failure:AssertionError) {throw AssertionError("Visible target $text: ${node.printToString()}",failure)}
     }
     private fun findMapView(view:View):MapView? {
         if(view is MapView) return view
@@ -198,7 +206,7 @@ class NavigationTest {
         step("Кошелёк") {
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()
             visible("Учебный баланс")
-            listOf("Visa","О!Деньги","Элкарт","ELQR","MBANK","Бакай","Демир").forEach {scrollTag("payment-$it").assertIsDisplayed()}
+            listOf("Visa","О!Деньги","Элкарт","ELQR","MBANK","Бакай","Демир").forEach {method->step("Кошелёк · $method") {scrollTag("payment-$method").assertIsDisplayed()}}
             compose.onNodeWithTag("wallet-scroll").performScrollToIndex(0)
             val vm=compose.runOnIdle {androidx.lifecycle.ViewModelProvider(compose.activity)[ChargingViewModel::class.java]}
             val before=compose.runOnIdle {vm.state.value.balanceMinor}
