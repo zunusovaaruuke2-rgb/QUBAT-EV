@@ -232,6 +232,20 @@ class NavigationTest {
                 fun nearMe()=compose.runOnIdle {val p=native!!.projection.fromScreenLocation(PointF(view.width/2f,view.height/2f));distanceKm(GeoPoint(p.latitude,p.longitude),GeoPoint(42.875,74.57))<.15}
                 compose.waitUntil(10000) {nearMe()}
                 val world=compose.onNodeWithTag("world-map")
+                fun anchored()=compose.runOnIdle {
+                    val pixel=native!!.projection.toScreenLocation(org.maplibre.android.geometry.LatLng(42.875,74.57))
+                    native!!.queryRenderedFeatures(pixel,USER_LOCATION_DOT).any {feature->
+                        val p=feature.geometry() as? org.maplibre.geojson.Point
+                        p!=null && kotlin.math.abs(p.latitude()-42.875)<.000001 && kotlin.math.abs(p.longitude()-74.57)<.000001
+                    }
+                }
+                compose.waitUntil(10000) {anchored()}
+                val oldPixel=compose.runOnIdle {native!!.projection.toScreenLocation(org.maplibre.android.geometry.LatLng(42.875,74.57))}
+                world.performTouchInput {down(center);moveTo(center+Offset(width*.12f,height*.04f),500);up()}
+                compose.waitUntil(10000) {compose.runOnIdle {val p=native!!.projection.toScreenLocation(org.maplibre.android.geometry.LatLng(42.875,74.57));kotlin.math.abs(p.x-oldPixel.x)>20} && anchored()}
+                val oldZoom=compose.runOnIdle {native!!.zoom}
+                compose.onNodeWithContentDescription("Увеличить карту").performClick()
+                compose.waitUntil(10000) {compose.runOnIdle {native!!.zoom>oldZoom+.5} && anchored()}
                 world.performTouchInput {swipeLeft()}
                 compose.onNodeWithContentDescription("Моя позиция").performClick()
                 compose.waitUntil(10000) {nearMe()}

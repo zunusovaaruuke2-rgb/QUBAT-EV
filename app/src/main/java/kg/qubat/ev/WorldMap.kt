@@ -54,7 +54,6 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     val density=LocalDensity.current.density
     val select by rememberUpdatedState(onSelect)
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
-    var cameraTick by remember {mutableIntStateOf(0)}
     var viewport by remember { mutableStateOf("Карта загружается") }
     var ready by remember { mutableStateOf(false) }
     var loadError by remember {mutableStateOf(false)}
@@ -72,7 +71,6 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                     setAllGesturesEnabled(false)
                     isCompassEnabled=false; isAttributionEnabled=false; isLogoEnabled=false
                 }
-                native.addOnCameraMoveListener {cameraTick++}
                 native.addOnCameraIdleListener {
                     val centre=native.projection.fromScreenLocation(PointF(view.width/2f,view.height/2f))
                     viewport=String.format(Locale.ROOT,"Масштаб %.1f; %.3f, %.3f",native.zoom,centre.latitude,centre.longitude)
@@ -126,6 +124,10 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
         }
 
     }
+    LaunchedEffect(map,ready,location) {
+        val style=map?.style ?: return@LaunchedEffect
+        if(ready) updateUserLocation(style,location)
+    }
     LaunchedEffect(map,city) {
         val target=DemoData.cities.firstOrNull {it.name==city}?.point
         map?.moveCamera(CameraUpdateFactory.newLatLngZoom(target?.let {LatLng(it.lat,it.lon)} ?: LatLng(41.5,74.7),if(target==null)5.0 else 11.0))
@@ -173,15 +175,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                 )
             })
         if(location!=null && ready) {
-            val pixel=remember(map,location,cameraTick) {map?.projection?.toScreenLocation(LatLng(location.lat,location.lon))}
-            androidx.compose.foundation.Canvas(Modifier.matchParentSize().testTag("user-location").semantics {contentDescription="Вы здесь";stateDescription="${location.lat},${location.lon}"}) {
-                pixel?.let {point->
-                    val centre=Offset(point.x,point.y)
-                    drawCircle(androidx.compose.ui.graphics.Color(0xFF3287FF).copy(alpha=.2f),20.dp.toPx(),centre)
-                    drawCircle(androidx.compose.ui.graphics.Color.White,9.dp.toPx(),centre)
-                    drawCircle(androidx.compose.ui.graphics.Color(0xFF287DFA),6.dp.toPx(),centre)
-                }
-            }
+            Spacer(Modifier.size(1.dp).testTag("user-location").semantics {contentDescription="Вы здесь";stateDescription="${location.lat},${location.lon}"})
         }
         Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=86.dp,start=16.dp,end=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(8.dp),color=SurfaceGreen.copy(alpha=.92f)) {
             Text(buildAnnotatedString {
@@ -240,4 +234,27 @@ internal fun improveNightMap(style:org.maplibre.android.maps.Style) {
             layer is org.maplibre.android.style.layers.LineLayer && (id.contains("road") || id.contains("highway")) -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.lineColor(if(id.contains("casing")) "#203A4B" else if(id.contains("motorway") || id.contains("trunk")) "#C19B6D" else "#7D9BAF"),org.maplibre.android.style.layers.PropertyFactory.lineOpacity(1f))
         }
     }
+}
+
+internal const val USER_LOCATION_SOURCE="qubat-user-position"
+internal const val USER_LOCATION_DOT="qubat-user-position-dot"
+internal fun updateUserLocation(style:Style,point:GeoPoint?) {
+    val source=style.getSourceAs<org.maplibre.android.style.sources.GeoJsonSource>(USER_LOCATION_SOURCE)
+    if(point==null) {
+        source?.setGeoJson(org.maplibre.geojson.FeatureCollection.fromFeatures(emptyArray<org.maplibre.geojson.Feature>()))
+        return
+    }
+    val geometry=org.maplibre.geojson.Point.fromLngLat(point.lon,point.lat)
+    if(source==null) {
+        style.addSource(org.maplibre.android.style.sources.GeoJsonSource(USER_LOCATION_SOURCE,geometry))
+        style.addLayer(org.maplibre.android.style.layers.CircleLayer("qubat-user-position-halo",USER_LOCATION_SOURCE).withProperties(
+            org.maplibre.android.style.layers.PropertyFactory.circleColor("#3287FF"),
+            org.maplibre.android.style.layers.PropertyFactory.circleOpacity(.2f),
+            org.maplibre.android.style.layers.PropertyFactory.circleRadius(20f)))
+        style.addLayer(org.maplibre.android.style.layers.CircleLayer(USER_LOCATION_DOT,USER_LOCATION_SOURCE).withProperties(
+            org.maplibre.android.style.layers.PropertyFactory.circleColor("#287DFA"),
+            org.maplibre.android.style.layers.PropertyFactory.circleRadius(6f),
+            org.maplibre.android.style.layers.PropertyFactory.circleStrokeColor("#FFFFFF"),
+            org.maplibre.android.style.layers.PropertyFactory.circleStrokeWidth(3f)))
+    } else source.setGeoJson(geometry)
 }
