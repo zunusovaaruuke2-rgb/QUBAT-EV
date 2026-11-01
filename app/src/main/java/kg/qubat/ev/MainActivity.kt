@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -64,13 +65,18 @@ class MainActivity: ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) { super.onCreate(savedInstanceState); enableEdgeToEdge(); setContent { QubatApp() } }
 }
 private enum class Tab(val label: String,val icon: ImageVector) {
-    HOME("Карта",Icons.Default.Home), STATIONS("Станции",Icons.Default.Place), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
+    HOME("Карта",Icons.Default.Home), STATIONS("Список",Icons.Default.Place), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
 }
 @Composable fun QubatApp(vm: ChargingViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
     var tabName by rememberSaveable { mutableStateOf(Tab.HOME.name) }
     val tab=Tab.valueOf(tabName)
     var selectedId by rememberSaveable { mutableStateOf(DemoData.stations.first().id) }
+    var selectedConnectorId by rememberSaveable {mutableStateOf<String?>(null)}
+    var focusedConnectorId by rememberSaveable {mutableStateOf<String?>(null)}
+    LaunchedEffect(state.session?.connectorId) {
+        state.session?.let {selectedId=it.stationId;selectedConnectorId=it.connectorId}
+    }
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var city by rememberSaveable { mutableStateOf<String?>(null) }
@@ -126,19 +132,26 @@ private enum class Tab(val label: String,val icon: ImageVector) {
         if(context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED) locate()
         else permission.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.ACCESS_FINE_LOCATION))
     }
-    val filtered=filterStations(DemoData.stations,query,city,minPower,statusName?.let { StationStatus.valueOf(it) })
+    val stations=remember(state.session?.connectorId,state.completedConnectorIds) {
+        DemoData.stations.map {it.withConnectorSession(state.session?.connectorId,state.completedConnectorIds)}
+    }
+    val filtered=filterStations(stations,query,city,minPower,statusName?.let { StationStatus.valueOf(it) })
     val visible=location?.let { p -> filtered.sortedBy { distanceKm(p,it.point) } } ?: filtered
-    val selected=DemoData.stations.first { it.id==selectedId }
-    val sessionStation=state.session?.let { s -> DemoData.stations.first { it.id==s.stationId } }
+    val selected=stations.first { it.id==selectedId }
+    val sessionStation=state.session?.let { s -> stations.first { it.id==s.stationId } }
     MaterialTheme(colorScheme=darkColorScheme(primary=Lime,onPrimary=Forest,background=Forest,onBackground=Color(0xFFF0F8EF),surface=SurfaceGreen,onSurface=Color(0xFFF0F8EF),onSurfaceVariant=Muted,secondary=Lime,outline=Color(0xFF315044))) {
         Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) },bottomBar={
             NavigationBar(containerColor=Color(0xFF0C241C)) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={Icon(item.icon,item.label)},label={Text(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=Color(0xFF284B36),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
                 if(tab==Tab.HOME) {
-                    MapHome(filterStations(DemoData.stations,"",city,minPower,statusName?.let { StationStatus.valueOf(it) }),city,location,locating,locationMessage,minPower,statusName,
+                    MapHome(filterStations(stations,"",city,minPower,statusName?.let { StationStatus.valueOf(it) }),city,location,locating,locationMessage,minPower,statusName,
                         onCity={city=it},onPower={minPower=it},onStatus={statusName=it},onLocate={askLocation()},
-                        onDetail={detailId=it.id;selectedId=it.id},onCharge={selectedId=it.id;tabName=Tab.CHARGE.name})
+                        onDetail={detailId=it.id;selectedId=it.id},onConnector={_,port->focusedConnectorId=port.id})
+                } else if(tab==Tab.STATIONS) {
+                    StationsList(visible,query,city,minPower,statusName,location,
+                        onQuery={query=it},onCity={city=it},onPower={minPower=it},onStatus={statusName=it},
+                        onDetail={detailId=it.id},onConnector={_,port->focusedConnectorId=port.id})
                 } else {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
                     Box(Modifier.size(40.dp).clip(RoundedCornerShape(13.dp)).background(Lime),contentAlignment=Alignment.Center) { Icon(Icons.Default.PlayArrow,"QUBAT",tint=Forest) }
@@ -149,27 +162,18 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                     when(tab) {
                         Tab.HOME -> Unit
-                        Tab.STATIONS -> {
-                            Eyebrow("СЕТЬ QUBAT · ДЕМОНСТРАЦИЯ"); Title("Станции Кыргызстана")
-                            DemoNotice()
-                            OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}),label={Text("Город или название станции")},leadingIcon={Icon(Icons.Default.Search,null)},shape=RoundedCornerShape(18.dp))
-                            CityPicker(city) {city=it}
-                            Text("Мощность",color=Muted,fontSize=12.sp)
-                            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf(0,50,80,120).forEach { power -> FilterChip(selected=minPower==power,onClick={minPower=power},label={Text(if(power==0) "Любая" else "≥ $power кВт")}) } }
-                            FlowRowCompatStatus(statusName) {statusName=it}
-                            TextButton(onClick={askLocation()},enabled=!locating) { Icon(Icons.Default.LocationOn,null); Text(" Определить ближайшую") }
-                            Text(locationMessage,color=Muted,fontSize=12.sp)
-                            Text("Найдено: ${visible.size} · все точки вымышленные",color=Muted,fontSize=12.sp)
-                            if(visible.isEmpty()) Panel { Text("Демо-станций пока нет",fontWeight=FontWeight.Bold); Text("В этом городе или с такими фильтрами нет учебных точек. Это не информация о реальной сети.",color=Muted); TextButton(onClick={query="";city=null;minPower=0;statusName=null}) {Text("Сбросить фильтры")} }
-                            visible.forEach { s -> StationCard(s,location,state.session?.stationId,{detailId=s.id},{selectedId=s.id;tabName=Tab.CHARGE.name}) }
-                        }
+                        Tab.STATIONS -> Unit
                         Tab.CHARGE -> {
                             Eyebrow("УЧЕБНЫЙ СЕАНС"); Title(if(state.session!=null) "Зарядка идёт" else "Готовы к зарядке?")
                             DemoNotice()
                             val station=sessionStation ?: selected
+                            val chosenId=state.session?.connectorId ?: selectedConnectorId
+                            val chosenPort=station.connectors.firstOrNull {it.id==chosenId}
+                                ?: station.connectors.firstOrNull {it.state==ConnectorState.FREE}
                             Panel {
                                 Text(station.city,color=Lime,fontSize=13.sp); Text(station.title,fontSize=22.sp,fontWeight=FontWeight.Bold)
                                 Text("GB/T DC  ·  80 кВт  ·  13,5 сом/кВт·ч",color=Muted,fontSize=13.sp)
+                                chosenPort?.let {Text("Аппарат ${station.chargerNumber(it.id)} · разъём ${it.number} · ${it.state.title}",color=Color(it.state.argb),fontSize=13.sp)}
                                 Text(if(state.session!=null) "● Симуляция активна" else station.status.title,color=if(station.status==StationStatus.AVAILABLE)Lime else Amber)
                             }
                             Box(Modifier.fillMaxWidth().height(220.dp),contentAlignment=Alignment.Center) {
@@ -183,7 +187,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                             Text("Доступно: ${money((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0))}",color=Muted)
                             if(state.session!=null) Button(onClick={vm.stop();message("Демо-сеанс завершён. Запись добавлена в кошелёк.")},modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Amber)) { Icon(Icons.Default.Close,null);Text(" Остановить симуляцию") }
                             else {
-                                Button(onClick={if(vm.start(station)) message("Запущена симуляция. Реальная станция не подключена.") else message("Станция недоступна или недостаточно учебного баланса")},enabled=station.status==StationStatus.AVAILABLE && state.balanceMinor>0,modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.PlayArrow,null);Text(" Начать симуляцию") }
+                                Button(onClick={if(vm.start(station,chosenPort?.id)) message("Запущена симуляция. Реальная станция не подключена.") else message("Станция недоступна или недостаточно учебного баланса")},enabled=chosenPort?.state==ConnectorState.FREE && state.balanceMinor>0,modifier=Modifier.fillMaxWidth()) { Icon(Icons.Default.PlayArrow,null);Text(" Начать симуляцию") }
+                                if(chosenPort?.id in state.completedConnectorIds) TextButton(onClick={chosenPort?.let {vm.releaseConnector(it.id)}}) {Text("Освободить разъём после сеанса")}
                                 OutlinedButton(onClick={tabName=Tab.STATIONS.name},modifier=Modifier.fillMaxWidth()) {Text("Выбрать другую станцию")}
                             }
                             Text("Симуляция рассчитывается по времени: 80 кВт, 13,5 сом/кВт·ч. Продолжается при сворачивании; автоматически завершается при исчерпании учебного баланса.",color=Muted,fontSize=12.sp)
@@ -218,8 +223,31 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 }
                 }
             }
+            focusedConnectorId?.let {id->
+                val site=stations.firstOrNull {s->s.connectors.any {it.id==id}}
+                val port=site?.connectors?.firstOrNull {it.id==id}
+                if(site!=null && port!=null) AlertDialog(onDismissRequest={focusedConnectorId=null},
+                    title={Text("Аппарат ${site.chargerNumber(id)} · разъём ${port.number}")},
+                    text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                        Text(port.state.title,color=Color(port.state.argb),fontWeight=FontWeight.Bold,modifier=Modifier.testTag("connector-dialog-state"))
+                        Text("${site.city} · ${site.title}")
+                        Text("GB/T DC · 80 кВт · 13,5 сом/кВт·ч",color=Muted,fontSize=13.sp)
+                        port.percent?.let {Text("Демо-уровень заряда: $it%",color=Color(port.state.argb))}
+                        Text(when(port.state) {
+                            ConnectorState.FREE -> "Разъём свободен. Можно выбрать для учебной зарядки."
+                            ConnectorState.CONNECTED -> "Автомобиль уже подключён и ожидает старта. Разъём занят."
+                            ConnectorState.CHARGING -> "Идёт демонстрационная зарядка. Разъём занят."
+                            ConnectorState.COMPLETED -> "Сеанс завершён. Разъём ещё не освобождён."
+                            ConnectorState.ERROR -> "Демонстрационная ошибка разъёма. Запуск недоступен."
+                            ConnectorState.OFFLINE -> "Разъём недоступен."
+                        },color=Muted,fontSize=13.sp)
+                    }},confirmButton={
+                        if(port.state==ConnectorState.FREE) TextButton(onClick={selectedId=site.id;selectedConnectorId=id;focusedConnectorId=null;tabName=Tab.CHARGE.name}) {Text("Выбрать разъём")}
+                        else if(id in state.completedConnectorIds) TextButton(onClick={vm.releaseConnector(id);focusedConnectorId=null}) {Text("Освободить разъём")}
+                    },dismissButton={TextButton(onClick={focusedConnectorId=null}) {Text("Закрыть")}})
+            }
             detailId?.let { id ->
-                val s=DemoData.stations.first {it.id==id}
+                val s=stations.first {it.id==id}
                 AlertDialog(onDismissRequest={detailId=null},title={Text("${s.city} · ДЕМО")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     Text(s.title,fontWeight=FontWeight.Bold);Text("${s.status.title} · ${s.availableConnectors} из ${s.connectorCount} мест свободно\n80 кВт на место · GB/T DC · 13,5 сом/кВт·ч")
                     Text("Вымышленная станция у центра города. По этим координатам зарядной станции может не быть. Маршрут — только для проверки интерфейса.",color=Amber)
@@ -251,14 +279,6 @@ private enum class Tab(val label: String,val icon: ImageVector) {
         FilterChip(selected=selected==StationStatus.AVAILABLE.name,onClick={onSelect(StationStatus.AVAILABLE.name)},label={Text("Свободны")})
     };Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {StationStatus.entries.filter {it!=StationStatus.AVAILABLE}.forEach {s -> FilterChip(selected=selected==s.name,onClick={onSelect(s.name)},label={Text(s.title)})}} }
 }
-@Composable fun StationCard(s:Station,location:GeoPoint?,activeId:String?,onDetail:()->Unit,onCharge:()->Unit) {Panel {
-    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {Text(s.city,color=Muted);Text(if(activeId==s.id) "Ваш демо-сеанс" else s.status.title,color=if(s.status==StationStatus.AVAILABLE)Lime else Amber,fontSize=12.sp)}
-    Text(s.title,fontSize=20.sp,fontWeight=FontWeight.Bold)
-    Text("${s.availableConnectors} из ${s.connectorCount} свободно · 80 кВт / GB/T DC",color=Lime,fontWeight=FontWeight.Medium)
-    Text("13,5 сом/кВт·ч · вымышленная точка",color=Muted,fontSize=12.sp)
-    location?.let {Text("${String.format(Ru,"%.1f",distanceKm(it,s.point))} км по прямой",color=Muted,fontSize=12.sp)}
-    Row(horizontalArrangement=Arrangement.spacedBy(10.dp)) {OutlinedButton(onClick=onDetail,modifier=Modifier.weight(1f)) {Text("Подробнее")};Button(onClick=onCharge,modifier=Modifier.weight(1f)) {Text("Зарядка")}}
-}}
 fun openRoute(context:android.content.Context,s:Station,message:(String)->Unit) {
     // Official 2GIS deep link, longitude first; navigator determines the source.
     val uri=Uri.parse("dgis://2gis.ru/routeSearch/rsType/car/to/${s.point.lon},${s.point.lat}")

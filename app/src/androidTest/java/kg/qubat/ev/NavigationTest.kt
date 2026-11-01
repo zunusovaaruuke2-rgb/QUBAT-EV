@@ -25,7 +25,10 @@ class NavigationTest {
             throw AssertionError("QUBAT UI step: $name — ${failure.message}",failure)
         }
     }
-    private fun visible(text: String) = compose.onNodeWithText(text,substring=true).performScrollTo().assertIsDisplayed()
+    private fun visible(text:String) {
+        val node=compose.onNodeWithText(text,substring=true)
+        try {node.assertIsDisplayed()} catch(_:AssertionError) {node.performScrollTo().assertIsDisplayed()}
+    }
     private fun findMapView(view:View):MapView? {
         if(view is MapView) return view
         if(view is ViewGroup) for(index in 0 until view.childCount) findMapView(view.getChildAt(index))?.let {return it}
@@ -45,6 +48,16 @@ class NavigationTest {
             compose.waitUntil(10000) {nativeMap!=null}
             fun zoom()=compose.runOnIdle {nativeMap!!.zoom}
             fun centre()=compose.runOnIdle {nativeMap!!.projection.fromScreenLocation(PointF(nativeView.width/2f,nativeView.height/2f))}
+            step("Карта показывает аппараты и разъёмы") {
+                val pixel=compose.runOnIdle {val p=DemoData.stations.first().point;nativeMap!!.projection.toScreenLocation(org.maplibre.android.geometry.LatLng(p.lat,p.lon))}
+                val markerOffset=20*compose.activity.resources.displayMetrics.density
+                map.performTouchInput {click(Offset(pixel.x,pixel.y-markerOffset))}
+                compose.waitUntil(10000) {compose.onAllNodesWithTag("map-station-card").fetchSemanticsNodes().isNotEmpty()}
+                compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-1").assertIsDisplayed().performClick()
+                compose.onNodeWithTag("connector-dialog-state").assertTextEquals("Свободен")
+                compose.onNodeWithText("Закрыть").performClick()
+                compose.onNodeWithContentDescription("Закрыть карточку").performClick()
+            }
             val initial=zoom()
             step("Увеличение масштаба карты") {
                 compose.onNodeWithContentDescription("Увеличить карту").performClick()
@@ -101,14 +114,23 @@ class NavigationTest {
                 assertAnchor(fixed,.43f,.44f)
             }
             compose.onNodeWithContentDescription("Уменьшить карту").performClick()
+
         }
         step("Поиск по Кыргызстану и пустое состояние") {
-            compose.onNodeWithText("Станции",useUnmergedTree=true).performClick()
+            compose.onNodeWithText("Список",useUnmergedTree=true).performClick()
             visible("Станции Кыргызстана")
             compose.onNodeWithText("Город или название станции").performTextInput("Нарын")
             compose.onNodeWithText("Город или название станции").performImeAction()
             visible("Тянь-Шань · DEMO 05")
-            compose.onNodeWithText("Город или название станции").performScrollTo().performTextClearance()
+            step("Список показывает состояния отдельных разъёмов") {
+                listOf("1-port-2" to "Заряжается","2-port-1" to "Подключён","3-port-1" to "Завершён","3-port-2" to "Ошибка").forEach {(suffix,title)->
+                    compose.onNodeWithTag("connector-demo-naryn-unit-$suffix").performScrollTo().performClick()
+                    compose.onNodeWithTag("connector-dialog-state").assertTextEquals(title)
+                    compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
+                    compose.onNodeWithText("Закрыть").performClick()
+                }
+            }
+            compose.onNodeWithText("Город или название станции").performTextClearance()
             compose.onNodeWithText("Город или название станции").performTextInput("Несуществующий город")
             compose.onNodeWithText("Город или название станции").performImeAction()
             visible("Демо-станций пока нет")
@@ -123,6 +145,9 @@ class NavigationTest {
             visible("Зарядка идёт")
             android.os.SystemClock.sleep(1300)
             compose.onNodeWithText("Остановить симуляцию",substring=true).performScrollTo().performClick()
+            visible("Аппарат 1 · разъём 1 · Завершён")
+            compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo().performClick()
+            visible("Аппарат 1 · разъём 1 · Свободен")
         }
         step("История и профиль") {
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()

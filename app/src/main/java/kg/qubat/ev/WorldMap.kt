@@ -109,7 +109,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
         if(!ready) return@LaunchedEffect
         native.clear()
         stations.forEach { station ->
-            val iconKey="${station.connectorCount}:${station.availableConnectors}:${station.status}:${station.id==selectedId}"
+            val iconKey="${station.chargerCount}:${station.connectors.joinToString {it.state.name}}:${station.id==selectedId}"
             val icon=icons.getOrPut(iconKey) {IconFactory.getInstance(context).fromBitmap(stationMarker(station,station.id==selectedId))}
             native.addMarker(MarkerOptions().position(LatLng(station.point.lat,station.point.lon))
                 .title("ДЕМО · ${station.city}")
@@ -186,16 +186,12 @@ internal fun stationMarker(station:Station,selected:Boolean):Bitmap {
     canvas.drawCircle(56f,56f,52f,paint)
     paint.style=Paint.Style.STROKE;paint.strokeWidth=12f
     val arc=360f/station.connectorCount
-    repeat(station.connectorCount) { index ->
-        paint.color=when {
-            station.status==StationStatus.OFFLINE -> android.graphics.Color.rgb(130,141,142)
-            index<station.availableConnectors -> android.graphics.Color.rgb(25,143,80)
-            else -> android.graphics.Color.rgb(232,155,66)
-        }
-        canvas.drawArc(RectF(15f,15f,97f,97f),-90+index*arc,arc-6,false,paint)
+    station.connectors.forEachIndexed {index,port->
+        paint.color=port.state.argb
+        canvas.drawArc(RectF(15f,15f,97f,97f),-90+index*arc,(arc-3).coerceAtLeast(1f),false,paint)
     }
     paint.style=Paint.Style.FILL;paint.color=android.graphics.Color.rgb(12,48,37)
     paint.textSize=40f;paint.textAlign=Paint.Align.CENTER;paint.typeface=android.graphics.Typeface.DEFAULT_BOLD
-    canvas.drawText(station.connectorCount.toString(),56f,70f,paint)
+    canvas.drawText(station.chargerCount.toString(),56f,70f,paint)
     return bitmap
 }

@@ -5,9 +5,41 @@ import kotlin.math.*
 enum class StationStatus(val title: String) { AVAILABLE("Свободна"), BUSY("Занята"), OFFLINE("Недоступна") }
 data class GeoPoint(val lat: Double, val lon: Double)
 data class City(val name: String, val point: GeoPoint)
-data class Station(val id: String, val city: String, val title: String, val point: GeoPoint,
-    val status: StationStatus, val powerKw: Int = 80, val tariffMinor: Long = 1350,
-    val connector: String = "GB/T DC", val connectorCount: Int = 4, val availableConnectors: Int = 4)
+enum class ConnectorState(val title:String,val argb:Int) {
+    FREE("Свободен",0xFF45D58B.toInt()),
+    CHARGING("Заряжается",0xFFFF6868.toInt()),
+    COMPLETED("Завершён",0xFFFFCA62.toInt()),
+    ERROR("Ошибка",0xFFFFCA62.toInt()),
+    CONNECTED("Подключён",0xFF70AAFF.toInt()),
+    OFFLINE("Недоступен",0xFF8E9D99.toInt())
+}
+data class Connector(val id:String,val number:Int,val state:ConnectorState,val percent:Int?=null)
+data class Charger(val id:String,val number:Int,val connectors:List<Connector>,val powerKw:Int=80) {
+    val state:ConnectorState get() = listOf(ConnectorState.FREE,ConnectorState.CHARGING,ConnectorState.CONNECTED,ConnectorState.ERROR,ConnectorState.COMPLETED)
+        .firstOrNull {value->connectors.any {it.state==value}} ?: ConnectorState.OFFLINE
+}
+data class Station(val id:String,val city:String,val title:String,val point:GeoPoint,val chargers:List<Charger>,
+    val powerKw:Int=80,val tariffMinor:Long=1350,val connector:String="GB/T DC") {
+    val connectors:List<Connector> get()=chargers.flatMap {it.connectors}
+    val chargerCount:Int get()=chargers.size
+    val connectorCount:Int get()=connectors.size
+    val availableConnectors:Int get()=connectors.count {it.state==ConnectorState.FREE}
+    val status:StationStatus get()=when {
+        availableConnectors>0 -> StationStatus.AVAILABLE
+        connectors.all {it.state==ConnectorState.OFFLINE} -> StationStatus.OFFLINE
+        else -> StationStatus.BUSY
+    }
+    fun freeConnector(id:String?=null):Connector?=connectors.firstOrNull {(id==null || it.id==id) && it.state==ConnectorState.FREE}
+    fun chargerNumber(connectorId:String):Int?=chargers.firstOrNull {unit->unit.connectors.any {it.id==connectorId}}?.number
+}
+fun Station.withConnectorSession(activeId:String?,completed:Set<String>):Station=copy(chargers=chargers.map {unit->
+    unit.copy(connectors=unit.connectors.map {port->when {
+        port.id==activeId -> port.copy(state=ConnectorState.CHARGING,percent=null)
+        port.id in completed -> port.copy(state=ConnectorState.COMPLETED,percent=null)
+        else -> port
+    }})
+})
+
 object DemoData {
     val cities = listOf(
         City("Бишкек", GeoPoint(42.8746,74.5698)), City("Ош", GeoPoint(40.5283,72.7985)),
@@ -23,9 +55,24 @@ object DemoData {
         val ids=listOf("bishkek","osh","jalal","karakol","naryn","talas","batken","balykchy","tokmok","cholpon","karabalta","toktogul","uzgen","kyzylkiya","kochkor","karakul")
         val titles=listOf("Север","Юг","Долина","Иссык-Куль","Тянь-Шань","Манас","Айгуль","Озеро","Чуй","Берег","Запад","Перевал","Восток","Ала-Тоо","Кочкор","Нарын-ГЭС")
         val count=if(index%2==0) 4 else 8
-        val status=when { index==2 || index==10 -> StationStatus.BUSY; index==3 || index==13 -> StationStatus.OFFLINE; else -> StationStatus.AVAILABLE }
-        Station("demo-${ids[index]}",city.name,"${titles[index]} · DEMO ${"%02d".format(index+1)}",city.point,status,
-            connectorCount=count,availableConnectors=if(status==StationStatus.AVAILABLE) count-1 else 0)
+        val id="demo-${ids[index]}"
+        val chargers=(1..count).map {number->
+            val pattern=listOf(
+                listOf(ConnectorState.FREE,ConnectorState.CHARGING),
+                listOf(ConnectorState.CONNECTED,ConnectorState.FREE),
+                listOf(ConnectorState.COMPLETED,ConnectorState.ERROR),
+                listOf(ConnectorState.FREE,ConnectorState.FREE))[(number-1+index)%4]
+            Charger("$id-unit-$number",number,(1..2).map {portNumber->
+                val state=when {
+                    index==3 || index==13 -> ConnectorState.OFFLINE
+                    index==2 || index==10 -> listOf(ConnectorState.CHARGING,ConnectorState.CONNECTED,ConnectorState.COMPLETED,ConnectorState.ERROR)[(number+portNumber)%4]
+                    else -> pattern[portNumber-1]
+                }
+                Connector("$id-unit-$number-port-$portNumber",portNumber,state,
+                    if(state==ConnectorState.CHARGING) 25+(index*7+number*13+portNumber*11)%65 else null)
+            })
+        }
+        Station(id,city.name,"${titles[index]} · DEMO ${"%02d".format(index+1)}",city.point,chargers)
     }
 }
 fun normalized(value: String) = value.lowercase(java.util.Locale.ROOT).replace('ё','е').replace('–','-').replace("джалал", "жалал").trim()
