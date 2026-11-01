@@ -12,6 +12,7 @@ import org.maplibre.android.maps.MapView
 import org.maplibre.android.maps.MapLibreMap
 import android.view.View
 import android.view.ViewGroup
+import android.graphics.PointF
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import org.junit.Rule
 import org.junit.Test
@@ -38,20 +39,22 @@ class NavigationTest {
             val map=compose.onNodeWithTag("world-map")
             compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
             var nativeMap:MapLibreMap?=null
-            compose.runOnIdle {findMapView(compose.activity.window.decorView)!!.getMapAsync {nativeMap=it}}
+            lateinit var nativeView:MapView
+            compose.runOnIdle {nativeView=findMapView(compose.activity.window.decorView)!!;nativeView.getMapAsync {nativeMap=it}}
             compose.waitUntil(10000) {nativeMap!=null}
-            fun camera()=compose.runOnIdle {nativeMap!!.cameraPosition}
-            val initial=camera().zoom
+            fun zoom()=compose.runOnIdle {nativeMap!!.zoom}
+            fun centre()=compose.runOnIdle {nativeMap!!.projection.fromScreenLocation(PointF(nativeView.width/2f,nativeView.height/2f))}
+            val initial=zoom()
             step("Увеличение масштаба карты") {
                 compose.onNodeWithContentDescription("Увеличить карту").performClick()
-                try {compose.waitUntil(10000) {camera().zoom>initial+0.5}}
-                catch(failure:Throwable) {throw AssertionError("Масштаб до: $initial; после: ${camera().zoom}; ${map.fetchSemanticsNode().config[SemanticsProperties.StateDescription]}",failure)}
+                try {compose.waitUntil(10000) {zoom()>initial+0.5}}
+                catch(failure:Throwable) {throw AssertionError("Масштаб до: $initial; после: ${zoom()}; ${map.fetchSemanticsNode().config[SemanticsProperties.StateDescription]}",failure)}
             }
-            val zoomed=camera().target!!
+            val initialLongitude=centre().longitude
             step("Перемещение нативной карты") {
                 onView(isAssignableFrom(MapView::class.java)).perform(GeneralSwipeAction(Swipe.SLOW,GeneralLocation.CENTER,GeneralLocation.CENTER_LEFT,Press.FINGER))
-                try {compose.waitUntil(10000) {val target=camera().target!!;kotlin.math.abs(target.longitude-zoomed.longitude)>0.001}}
-                catch(failure:Throwable) {throw AssertionError("Центр до: $zoomed; после: ${camera().target}",failure)}
+                try {compose.waitUntil(10000) {kotlin.math.abs(centre().longitude-initialLongitude)>0.001}}
+                catch(failure:Throwable) {throw AssertionError("Долгота до: $initialLongitude; центр экрана после: ${centre()}",failure)}
             }
             compose.onNodeWithContentDescription("Уменьшить карту").performClick()
         }

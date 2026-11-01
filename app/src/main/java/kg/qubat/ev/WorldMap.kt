@@ -5,6 +5,7 @@ package kg.qubat.ev
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.PointF
 import android.graphics.RectF
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.clickable
@@ -71,8 +72,8 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                     setLogoMargins(px(12),px(135),px(12),px(12))
                 }
                 native.addOnCameraIdleListener {
-                    val camera=native.cameraPosition
-                    viewport=String.format(Locale.ROOT,"Масштаб %.1f; %.3f, %.3f",camera.zoom,camera.target?.latitude ?: 0.0,camera.target?.longitude ?: 0.0)
+                    val centre=native.projection.fromScreenLocation(PointF(view.width/2f,view.height/2f))
+                    viewport=String.format(Locale.ROOT,"Масштаб %.1f; %.3f, %.3f",native.zoom,centre.latitude,centre.longitude)
                 }
                 native.setOnMarkerClickListener { marker -> markerStations[marker.id]?.let(select); true }
                 map=native
