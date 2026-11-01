@@ -2,7 +2,16 @@ package kg.qubat.ev
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.geometry.Offset
+import androidx.test.espresso.Espresso.onView
+import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
+import androidx.test.espresso.action.GeneralSwipeAction
+import androidx.test.espresso.action.GeneralLocation
+import androidx.test.espresso.action.Swipe
+import androidx.test.espresso.action.Press
+import org.maplibre.android.maps.MapView
+import org.maplibre.android.maps.MapLibreMap
+import android.view.View
+import android.view.ViewGroup
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import org.junit.Rule
 import org.junit.Test
@@ -15,6 +24,11 @@ class NavigationTest {
         }
     }
     private fun visible(text: String) = compose.onNodeWithText(text,substring=true).performScrollTo().assertIsDisplayed()
+    private fun findMapView(view:View):MapView? {
+        if(view is MapView) return view
+        if(view is ViewGroup) for(index in 0 until view.childCount) findMapView(view.getChildAt(index))?.let {return it}
+        return null
+    }
     @Test fun mainNavigationAndDemoDisclosure() {
         step("Главная и раскрытие демо-данных") {
             compose.onNodeWithContentDescription("Фильтры карты").assertIsDisplayed().performClick()
@@ -23,12 +37,22 @@ class NavigationTest {
             compose.onNodeWithContentDescription("Моя позиция").assertIsDisplayed()
             val map=compose.onNodeWithTag("world-map")
             compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
-            val initial=map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].substringBefore(";")
-            compose.onNodeWithContentDescription("Увеличить карту").performClick()
-            compose.waitUntil(10000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].substringBefore(";")!=initial}
-            val zoomed=map.fetchSemanticsNode().config[SemanticsProperties.StateDescription]
-            map.performTouchInput {swipe(start=Offset(width*.55f,height*.4f),end=Offset(width*.15f,height*.4f),durationMillis=500)}
-            compose.waitUntil(10000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription]!=zoomed}
+            var nativeMap:MapLibreMap?=null
+            compose.runOnIdle {findMapView(compose.activity.window.decorView)!!.getMapAsync {nativeMap=it}}
+            compose.waitUntil(10000) {nativeMap!=null}
+            fun camera()=compose.runOnIdle {nativeMap!!.cameraPosition}
+            val initial=camera().zoom
+            step("Увеличение масштаба карты") {
+                compose.onNodeWithContentDescription("Увеличить карту").performClick()
+                try {compose.waitUntil(10000) {camera().zoom>initial+0.5}}
+                catch(failure:Throwable) {throw AssertionError("Масштаб до: $initial; после: ${camera().zoom}; ${map.fetchSemanticsNode().config[SemanticsProperties.StateDescription]}",failure)}
+            }
+            val zoomed=camera().target!!
+            step("Перемещение нативной карты") {
+                onView(isAssignableFrom(MapView::class.java)).perform(GeneralSwipeAction(Swipe.SLOW,GeneralLocation.CENTER,GeneralLocation.CENTER_LEFT,Press.FINGER))
+                try {compose.waitUntil(10000) {val target=camera().target!!;kotlin.math.abs(target.longitude-zoomed.longitude)>0.001}}
+                catch(failure:Throwable) {throw AssertionError("Центр до: $zoomed; после: ${camera().target}",failure)}
+            }
             compose.onNodeWithContentDescription("Уменьшить карту").performClick()
         }
         step("Поиск по Кыргызстану и пустое состояние") {

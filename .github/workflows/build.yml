@@ -62,12 +62,7 @@ jobs:
           api-level: 35
           arch: x86_64
           disable-animations: true
-          script: |
-            set +e
-            ./gradlew connectedDebugAndroidTest
-            ui_test_exit=$?
-            if [ "$ui_test_exit" -ne 0 ]; then adb logcat -d -t 500; fi
-            exit "$ui_test_exit"
+          script: bash -c './gradlew connectedDebugAndroidTest; qubat_ui_exit=$?; if [ "$qubat_ui_exit" -ne 0 ]; then adb logcat -d -s QUBAT_MAP:E AndroidRuntime:E; fi; exit "$qubat_ui_exit"'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
