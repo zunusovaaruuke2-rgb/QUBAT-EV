@@ -43,19 +43,28 @@ class NavigationTest {
             compose.onNodeWithContentDescription("Моя позиция").assertIsDisplayed()
             val map=compose.onNodeWithTag("world-map")
             compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+            var nativeMap:MapLibreMap?=null
+            lateinit var nativeView:MapView
+            compose.runOnIdle {nativeView=findMapView(compose.activity.window.decorView)!!;nativeView.getMapAsync {nativeMap=it}}
+            compose.waitUntil(10000) {nativeMap!=null}
+            fun verifyNightBuildings() {
+                if(compose.onAllNodesWithContentDescription("Дневная тема").fetchSemanticsNodes().isNotEmpty()) compose.runOnIdle {
+                    val layers=nativeMap!!.style!!.layers.filterIsInstance<org.maplibre.android.style.layers.FillLayer>().filter {it.id.contains("building",ignoreCase=true)}
+                    check(layers.isNotEmpty()) {"Night style has no building layers"}
+                    check(layers.any {it.fillColor.colorInt==android.graphics.Color.parseColor("#456175") && it.minZoom<=13f}) {"Building contrast was not applied"}
+                }
+            }
             step("Дневная и ночная темы карты") {
                 val switch=if(compose.onAllNodesWithContentDescription("Ночная тема").fetchSemanticsNodes().isNotEmpty()) "Ночная тема" else "Дневная тема"
                 compose.onNodeWithContentDescription(switch).performClick()
                 compose.waitForIdle()
                 compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+                verifyNightBuildings()
                 compose.onNodeWithContentDescription(if(switch=="Ночная тема") "Дневная тема" else "Ночная тема").assertIsDisplayed().performClick()
                 compose.waitForIdle()
                 compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
             }
-            var nativeMap:MapLibreMap?=null
-            lateinit var nativeView:MapView
-            compose.runOnIdle {nativeView=findMapView(compose.activity.window.decorView)!!;nativeView.getMapAsync {nativeMap=it}}
-            compose.waitUntil(10000) {nativeMap!=null}
+            verifyNightBuildings()
             fun zoom()=compose.runOnIdle {nativeMap!!.zoom}
             fun centre()=compose.runOnIdle {nativeMap!!.projection.fromScreenLocation(PointF(nativeView.width/2f,nativeView.height/2f))}
             step("Карта показывает аппараты и разъёмы") {
@@ -65,6 +74,11 @@ class NavigationTest {
                 compose.waitUntil(10000) {compose.onAllNodesWithTag("map-station-card").fetchSemanticsNodes().isNotEmpty()}
                 compose.onNodeWithTag("port-number-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("1").assertIsDisplayed()
                 compose.onNodeWithTag("port-number-demo-bishkek-unit-1-port-2",useUnmergedTree=true).assertTextEquals("2").assertIsDisplayed()
+                compose.onNodeWithTag("apparatus-demo-bishkek-unit-1").performSemanticsAction(SemanticsActions.OnClick) {it()}
+                compose.onNodeWithText("Аппарат 1").assertIsDisplayed()
+                compose.onNodeWithText("GB/T · разъём 1").assertIsDisplayed()
+                compose.onNodeWithText("GB/T · разъём 2").assertIsDisplayed()
+                compose.onNodeWithText("Закрыть").performClick()
                 compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-1").assertIsDisplayed().performClick()
                 compose.onNodeWithTag("connector-dialog-state").assertTextEquals("Свободен")
                 compose.onNodeWithText("Закрыть").performClick()

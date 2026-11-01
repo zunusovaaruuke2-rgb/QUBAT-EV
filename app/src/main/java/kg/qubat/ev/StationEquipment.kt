@@ -11,7 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -53,13 +53,29 @@ import androidx.compose.ui.unit.sp
     }
 }
 @Composable fun StationEquipment(station:Station,onConnector:(Connector)->Unit) {
+    var openedId by remember(station.id) {mutableStateOf<String?>(null)}
+    station.chargers.firstOrNull {it.id==openedId}?.let {unit->
+        AlertDialog(onDismissRequest={openedId=null},title={Text("Аппарат ${unit.number}")},text={
+            Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Text("${station.title} · ${unit.powerKw} кВт",fontSize=13.sp)
+                unit.connectors.forEach {port->
+                    Surface(onClick={openedId=null;onConnector(port)},shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant) {
+                        Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically) {
+                            Box(Modifier.width(56.dp)) {ConnectorBadge(unit,port) {openedId=null;onConnector(port)}}
+                            Column {Text("GB/T · разъём ${port.number}",fontWeight=FontWeight.Bold,fontSize=14.sp);Text(port.state.title+(port.percent?.let {" · $it%"} ?: ""),fontSize=12.sp,color=Muted)}
+                        }
+                    }
+                }
+            }
+        },confirmButton={TextButton(onClick={openedId=null}) {Text("Закрыть")}})
+    }
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val columns=if(maxWidth>=300.dp) 3 else 2
         Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
             station.chargers.chunked(columns).forEach {units->
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.fillMaxWidth()) {
                     units.forEach {charger->
-                        Surface(Modifier.weight(1f),shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline)) {
+                        Surface(onClick={openedId=charger.id},modifier=Modifier.weight(1f).testTag("apparatus-${charger.id}"),shape=RoundedCornerShape(14.dp),color=MaterialTheme.colorScheme.surfaceVariant,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outline)) {
                             Column(Modifier.padding(vertical=6.dp)) {
                                 Row(Modifier.fillMaxWidth().padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                                     Text(charger.number.toString(),fontSize=13.sp,fontWeight=FontWeight.Bold)
@@ -79,7 +95,7 @@ import androidx.compose.ui.unit.sp
     }
 }
 @Composable fun LocationEquipmentCard(station:Station,location:GeoPoint?,onDetail:()->Unit,onConnector:(Connector)->Unit) {
-    Surface(shape=RoundedCornerShape(22.dp),color=SurfaceGreen) {
+    Surface(onClick=onDetail,shape=RoundedCornerShape(22.dp),color=SurfaceGreen) {
         Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

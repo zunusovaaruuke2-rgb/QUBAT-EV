@@ -87,7 +87,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     LaunchedEffect(map,night) {
         val native=map ?: return@LaunchedEffect
         ready=false;loadError=false
-        native.setStyle(Style.Builder().fromUri(if(night) "https://tiles.openfreemap.org/styles/dark" else WORLD_STYLE)) {ready=true;loadError=false}
+        native.setStyle(Style.Builder().fromUri(if(night) "https://tiles.openfreemap.org/styles/dark" else WORLD_STYLE)) {style->if(night) improveNightMap(style);ready=true;loadError=false}
     }
     DisposableEffect(mapView,owner) {
         var started=false;var resumed=false
@@ -224,4 +224,20 @@ internal fun userLocationMarker():Bitmap {
     paint.color=android.graphics.Color.WHITE;canvas.drawCircle(40f,40f,18f,paint)
     paint.color=0xFF287DFA.toInt();canvas.drawCircle(40f,40f,12f,paint)
     return image
+}
+
+internal fun improveNightMap(style:org.maplibre.android.maps.Style) {
+    style.layers.forEach {layer->
+        val id=layer.id.lowercase(java.util.Locale.ROOT)
+        when {
+            layer is org.maplibre.android.style.layers.BackgroundLayer -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.backgroundColor("#102635"))
+            layer is org.maplibre.android.style.layers.FillLayer && id.contains("building") -> {
+                layer.minZoom=13f
+                layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.visibility(org.maplibre.android.style.layers.Property.VISIBLE),org.maplibre.android.style.layers.PropertyFactory.fillColor("#456175"),org.maplibre.android.style.layers.PropertyFactory.fillOpacity(.95f),org.maplibre.android.style.layers.PropertyFactory.fillOutlineColor("#91A8B8"))
+            }
+            layer is org.maplibre.android.style.layers.FillExtrusionLayer && id.contains("building") -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.fillExtrusionColor("#456175"),org.maplibre.android.style.layers.PropertyFactory.fillExtrusionOpacity(.95f))
+            layer is org.maplibre.android.style.layers.FillLayer && id.contains("water") -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.fillColor("#153F59"))
+            layer is org.maplibre.android.style.layers.LineLayer && (id.contains("road") || id.contains("highway")) -> layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.lineColor(if(id.contains("casing")) "#203A4B" else if(id.contains("motorway") || id.contains("trunk")) "#C19B6D" else "#7D9BAF"),org.maplibre.android.style.layers.PropertyFactory.lineOpacity(1f))
+        }
+    }
 }

@@ -67,7 +67,7 @@ import androidx.compose.ui.unit.sp
                 }
             }
             Surface(shape=RoundedCornerShape(10.dp),color=SurfaceGreen.copy(alpha=.94f)) {Text("ДЕМО",modifier=Modifier.padding(horizontal=10.dp,vertical=6.dp),fontSize=11.sp,color=Muted)}
-            if(selected!=null) Surface(modifier=Modifier.testTag("map-station-card"),shape=RoundedCornerShape(24.dp),color=SurfaceGreen,shadowElevation=8.dp) {
+            if(selected!=null) Surface(onClick={onDetail(selected)},modifier=Modifier.testTag("map-station-card"),shape=RoundedCornerShape(24.dp),color=SurfaceGreen,shadowElevation=8.dp) {
                 Column(Modifier.heightIn(max=450.dp).verticalScroll(rememberScrollState()).padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {Text(selected.title,fontSize=18.sp,fontWeight=FontWeight.Bold);Text("${selected.city} · ДЕМО",color=Muted,fontSize=12.sp)}
