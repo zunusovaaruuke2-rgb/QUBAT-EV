@@ -224,12 +224,13 @@ class NavigationTest {
             visible("Тест QUBAT")
         }
         step("Три языка интерфейса") {
-            compose.onNodeWithTag("profile-language").performScrollTo().performClick()
+            compose.onNodeWithTag("profile-language").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) {it()}
+            try {compose.waitUntil(5000) {compose.onAllNodesWithText("English").fetchSemanticsNodes().isNotEmpty()}} catch(failure:Throwable) {throw AssertionError(compose.onRoot().printToString(),failure)}
             compose.onNodeWithText("English").performClick()
             compose.onNodeWithText("Wallet",useUnmergedTree=true).assertIsDisplayed().performClick()
             visible("Demo balance")
             compose.onNodeWithText("Profile",useUnmergedTree=true).performClick()
-            compose.onNodeWithTag("profile-language").performScrollTo().performClick()
+            compose.onNodeWithTag("profile-language").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) {it()}
             compose.onNodeWithText("Кыргызча").performClick()
             compose.onNodeWithText("Капчык",useUnmergedTree=true).performClick()
             visible("Демо-баланс")
@@ -237,7 +238,7 @@ class NavigationTest {
             compose.waitUntil(5000) {compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
             visible("Демо-баланс")
             compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
-            compose.onNodeWithTag("profile-language").performScrollTo().performClick()
+            compose.onNodeWithTag("profile-language").performScrollTo().performSemanticsAction(SemanticsActions.OnClick) {it()}
             compose.onNodeWithText("Русский").performClick()
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).assertIsDisplayed()
         }
