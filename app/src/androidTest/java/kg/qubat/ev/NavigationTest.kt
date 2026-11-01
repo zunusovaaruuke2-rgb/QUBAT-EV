@@ -2,6 +2,7 @@ package kg.qubat.ev
 
 import androidx.compose.ui.test.*
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.matcher.ViewMatchers.isAssignableFrom
 import androidx.test.espresso.action.GeneralSwipeAction
@@ -147,6 +148,7 @@ class NavigationTest {
             compose.onNodeWithText("Остановить симуляцию",substring=true).performScrollTo().performClick()
             visible("Аппарат 1 · разъём 1 · Завершён")
             compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo().performClick()
+            compose.onNode(hasScrollAction()).performSemanticsAction(SemanticsActions.ScrollBy) { it(0f,-10000f) }
             compose.waitUntil(5000) {
                 compose.onAllNodesWithText("Аппарат 1 · разъём 1 · Свободен").fetchSemanticsNodes().isNotEmpty()
             }
