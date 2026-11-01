@@ -13,6 +13,10 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -77,6 +81,9 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     var locationMessage by remember { mutableStateOf("Местоположение не определено") }
     var cancelLocation by remember { mutableStateOf<CancellationSignal?>(null) }
     val context=LocalContext.current
+    val keyboard=LocalSoftwareKeyboardController.current
+    val contentScroll=key(tab) { rememberScrollState() }
+    LaunchedEffect(tab) { keyboard?.hide() }
     val scope=rememberCoroutineScope()
     val snackbar=remember { SnackbarHostState() }
     fun message(text:String) { scope.launch { snackbar.showSnackbar(text) } }
@@ -124,7 +131,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     val selected=DemoData.stations.first { it.id==selectedId }
     val sessionStation=state.session?.let { s -> DemoData.stations.first { it.id==s.stationId } }
     MaterialTheme(colorScheme=darkColorScheme(primary=Lime,onPrimary=Forest,background=Forest,onBackground=Color(0xFFF0F8EF),surface=SurfaceGreen,onSurface=Color(0xFFF0F8EF),onSurfaceVariant=Muted,secondary=Lime,outline=Color(0xFF315044))) {
-        Scaffold(containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) },bottomBar={
+        Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) },bottomBar={
             NavigationBar(containerColor=Color(0xFF0C241C)) { Tab.entries.forEach { item -> NavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={Icon(item.icon,item.label)},label={Text(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=Color(0xFF284B36),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
@@ -134,7 +141,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                     Text("ДЕМО",color=Lime,fontSize=11.sp,fontWeight=FontWeight.Bold)
                 }
                 HorizontalDivider(color=Color(0xFF203C30))
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
                     when(tab) {
                         Tab.HOME -> {
                             Eyebrow("ЗАРЯЖАЙТЕСЬ ПО ПУТИ")
@@ -154,7 +161,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                         Tab.STATIONS -> {
                             Eyebrow("СЕТЬ QUBAT · ДЕМОНСТРАЦИЯ"); Title("Станции Кыргызстана")
                             DemoNotice()
-                            OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,label={Text("Город или название станции")},leadingIcon={Icon(Icons.Default.Search,null)},shape=RoundedCornerShape(18.dp))
+                            OutlinedTextField(value=query,onValueChange={query=it},modifier=Modifier.fillMaxWidth(),singleLine=true,keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}),label={Text("Город или название станции")},leadingIcon={Icon(Icons.Default.Search,null)},shape=RoundedCornerShape(18.dp))
                             CityPicker(city) {city=it}
                             Text("Мощность",color=Muted,fontSize=12.sp)
                             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf(0,50,80,120).forEach { power -> FilterChip(selected=minPower==power,onClick={minPower=power},label={Text(if(power==0) "Любая" else "≥ $power кВт")}) } }
