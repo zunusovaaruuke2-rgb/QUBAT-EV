@@ -45,6 +45,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     var map by remember { mutableStateOf<MapLibreMap?>(null) }
     var viewport by remember { mutableStateOf("Карта загружается") }
     var ready by remember { mutableStateOf(false) }
+    var loadError by remember {mutableStateOf(false)}
     val markerStations=remember { mutableMapOf<Long,Station>() }
     val icons=remember {mutableMapOf<String,org.maplibre.android.annotations.Icon>()}
     val mapView=remember {
@@ -52,6 +53,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
         MapLibre.getInstance(context)
         MapView(context).also { view ->
             view.onCreate(null)
+            view.addOnDidFailLoadingMapListener { error -> loadError=true; android.util.Log.e("QUBAT_MAP",error) }
             view.getMapAsync { native ->
                 native.cameraPosition=CameraPosition.Builder().target(LatLng(41.5,74.7)).zoom(5.0).build()
                 native.setMinZoomPreference(0.0)
@@ -70,12 +72,10 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                     viewport=String.format(Locale.ROOT,"Масштаб %.1f; %.3f, %.3f",camera.zoom,camera.target?.latitude ?: 0.0,camera.target?.longitude ?: 0.0)
                 }
                 native.setOnMarkerClickListener { marker -> markerStations[marker.id]?.let(select); true }
-                // Keep markers and gestures working even when the basemap network is unavailable.
-                native.setStyle(Style.Builder().fromJson("""{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#dae4d8"}}]}""")) {
-                    map=native
-                    viewport="Масштаб 5.0; 41.500, 74.700"
-                    native.setStyle(Style.Builder().fromUri(WORLD_STYLE)) { ready=true }
-                }
+                map=native
+                viewport="Масштаб 5.0; 41.500, 74.700"
+                native.setStyle(Style.Builder().fromUri(WORLD_STYLE)) { ready=true;loadError=false }
+
             }
         }
     }
@@ -104,6 +104,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     }
     LaunchedEffect(map,stations,selectedId,ready,location) {
         val native=map ?: return@LaunchedEffect
+        if(!ready) return@LaunchedEffect
         native.clear();markerStations.clear()
         stations.forEach { station ->
             val iconKey="${station.connectorCount}:${station.availableConnectors}:${station.status}:${station.id==selectedId}"
@@ -133,7 +134,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
             Text("© OpenStreetMap · OpenMapTiles · OpenFreeMap",fontSize=10.sp,color=Muted,modifier=Modifier.clickable {context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW,android.net.Uri.parse("https://openfreemap.org/")))}.padding(6.dp))
         }
         if(!ready) Surface(modifier=Modifier.align(Alignment.TopStart).padding(top=140.dp,start=16.dp),shape=androidx.compose.foundation.shape.RoundedCornerShape(10.dp),color=SurfaceGreen) {
-            Text("Загрузка карты · нужен интернет",modifier=Modifier.padding(8.dp),fontSize=11.sp,color=Muted)
+            Text(if(loadError) "Карта недоступна · проверьте интернет" else "Загрузка карты · нужен интернет",modifier=Modifier.padding(8.dp),fontSize=11.sp,color=Muted)
         }
     }
 }

@@ -50,6 +50,8 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
+      - name: Check public world map style
+        run: curl --fail --location --retry 2 --max-time 30 https://tiles.openfreemap.org/styles/liberty --output /tmp/qubat-world-style.json
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -60,7 +62,12 @@ jobs:
           api-level: 35
           arch: x86_64
           disable-animations: true
-          script: ./gradlew connectedDebugAndroidTest
+          script: |
+            set +e
+            ./gradlew connectedDebugAndroidTest
+            ui_test_exit=$?
+            if [ "$ui_test_exit" -ne 0 ]; then adb logcat -d -t 500; fi
+            exit "$ui_test_exit"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
