@@ -24,6 +24,8 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
       - name: Install SDK
         run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - name: Build, unit tests and lint
@@ -50,6 +52,8 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
       - name: Check public world map style
         run: |
           curl --fail --location --retry 2 --max-time 30 https://tiles.openfreemap.org/styles/liberty --output /tmp/qubat-world-style.json
@@ -65,6 +69,11 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: bash -c './gradlew connectedDebugAndroidTest && ./gradlew assembleRelease && python3 scripts/smoke_optimized.py; qubat_ui_exit=$?; if [ "$qubat_ui_exit" -ne 0 ]; then adb logcat -d -s QUBAT_MAP:E AndroidRuntime:E; fi; exit "$qubat_ui_exit"'
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: QUBAT-EV-verified-apk
+          path: app/build/outputs/apk/release/app-release.apk
       - uses: actions/upload-artifact@v4
         if: always()
         with:

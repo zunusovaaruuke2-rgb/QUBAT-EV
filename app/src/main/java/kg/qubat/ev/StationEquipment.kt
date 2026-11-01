@@ -35,7 +35,7 @@ import androidx.compose.ui.unit.sp
     Box(Modifier.fillMaxWidth().height(56.dp).testTag("connector-${port.id}")
         .clickable(role=Role.Button,onClick=onClick)
         .semantics {contentDescription=description;stateDescription=status},contentAlignment=Alignment.Center) {
-        Box(Modifier.size(38.dp).depthFrame(CircleShape,SurfaceGreen,1.dp),contentAlignment=Alignment.Center) {
+        Box(Modifier.size(38.dp).depthFrame(CircleShape,SurfaceGreen,0.dp),contentAlignment=Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {drawCircle(color,style=Stroke(3.dp.toPx()))}
             when(port.state) {
                 ConnectorState.CHARGING -> if(port.percent!=null) AppText("${port.percent}%",color=color,fontSize=12.sp,fontWeight=FontWeight.Bold) else AppIcon(Icons.Default.PlayArrow,null,tint=color,modifier=Modifier.size(18.dp))
@@ -82,7 +82,7 @@ import androidx.compose.ui.unit.sp
             rows.forEach {units->
                 Row(horizontalArrangement=Arrangement.spacedBy(6.dp),modifier=Modifier.fillMaxWidth()) {
                     units.forEach {charger->
-                        Box(Modifier.weight(1f).depthFrame(RoundedCornerShape(14.dp),MaterialTheme.colorScheme.surfaceVariant,1.dp).clickable(role=Role.Button) {openedId=charger.id}.testTag("apparatus-${charger.id}")) {
+                        Box(Modifier.weight(1f).depthFrame(RoundedCornerShape(14.dp),MaterialTheme.colorScheme.surfaceVariant,0.dp).clickable(role=Role.Button) {openedId=charger.id}.testTag("apparatus-${charger.id}")) {
                             Column(Modifier.padding(vertical=6.dp)) {
                                 Row(Modifier.fillMaxWidth().padding(horizontal=6.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween) {
                                     AppText(charger.number.toString(),fontSize=13.sp,fontWeight=FontWeight.Bold)
