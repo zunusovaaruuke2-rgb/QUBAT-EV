@@ -147,6 +147,9 @@ class NavigationTest {
             compose.onNodeWithText("Остановить симуляцию",substring=true).performScrollTo().performClick()
             visible("Аппарат 1 · разъём 1 · Завершён")
             compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo().performClick()
+            compose.waitUntil(5000) {
+                compose.onAllNodesWithText("Аппарат 1 · разъём 1 · Свободен").fetchSemanticsNodes().isNotEmpty()
+            }
             visible("Аппарат 1 · разъём 1 · Свободен")
         }
         step("История и профиль") {
