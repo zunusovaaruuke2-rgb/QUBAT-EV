@@ -57,18 +57,48 @@ class NavigationTest {
                 try {compose.waitUntil(10000) {kotlin.math.abs(centre().longitude-initialLongitude)>0.001}}
                 catch(failure:Throwable) {throw AssertionError("Долгота до: $initialLongitude; центр экрана после: ${centre()}",failure)}
             }
-            step("Масштабирование двумя пальцами") {
-                val beforePinch=zoom()
+            fun pinch(startRadius:Float,endRadius:Float,shiftX:Float=0f,shiftY:Float=0f) {
                 map.performTouchInput {
-                    down(0,Offset(width*.43f,height*.4f));down(1,Offset(width*.57f,height*.4f))
-                    for(index in 1..10) {
-                        updatePointerTo(0,Offset(width*(.43f-.015f*index),height*.4f))
-                        updatePointerTo(1,Offset(width*(.57f+.015f*index),height*.4f))
-                        move(32)
+                    val origin=Offset(width*.35f,height*.38f)
+                    down(0,origin-Offset(width*startRadius,0f));down(1,origin+Offset(width*startRadius,0f))
+                    for(index in 1..20) {
+                        val fraction=index/20f
+                        // Start translation after the pinch has crossed touch slop.
+                        val shiftFraction=((index-5)/15f).coerceIn(0f,1f)
+                        val focus=origin+Offset(width*shiftX*shiftFraction,height*shiftY*shiftFraction)
+                        val radius=width*(startRadius+(endRadius-startRadius)*fraction)
+                        updatePointerTo(0,focus-Offset(radius,0f))
+                        updatePointerTo(1,focus+Offset(radius,0f))
+                        move(24)
                     }
                     up(0);up(1)
                 }
-                compose.waitUntil(10000) {zoom()>beforePinch+0.4}
+            }
+            fun anchor()=compose.runOnIdle {nativeMap!!.projection.fromScreenLocation(PointF(nativeView.width*.35f,nativeView.height*.38f))}
+            fun assertAnchor(point:org.maplibre.android.geometry.LatLng,x:Float=.35f,y:Float=.38f) {
+                val error=compose.runOnIdle {
+                    val actual=nativeMap!!.projection.toScreenLocation(point)
+                    kotlin.math.hypot(actual.x-nativeView.width*x,actual.y-nativeView.height*y)
+                }
+                val tolerance=12*compose.activity.resources.displayMetrics.density
+                org.junit.Assert.assertTrue("Точка между пальцами сместилась на $error px (допуск $tolerance)",error<=tolerance)
+            }
+            step("Приближение сохраняет точку между пальцами") {
+                val before=zoom();val fixed=anchor()
+                pinch(.07f,.20f)
+                compose.waitUntil(10000) {zoom()>before+0.4}
+                assertAnchor(fixed)
+            }
+            step("Отдаление сохраняет точку между пальцами") {
+                val before=zoom();val fixed=anchor()
+                pinch(.20f,.07f)
+                compose.waitUntil(10000) {zoom()<before-0.4}
+                assertAnchor(fixed)
+            }
+            step("Одновременный сдвиг и масштаб без скачка") {
+                val fixed=anchor()
+                pinch(.07f,.20f,.08f,.06f)
+                assertAnchor(fixed,.43f,.44f)
             }
             compose.onNodeWithContentDescription("Уменьшить карту").performClick()
         }

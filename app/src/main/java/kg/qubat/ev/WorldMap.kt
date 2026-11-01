@@ -17,7 +17,6 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.LinkAnnotation
 import kotlin.math.log2
-import kotlin.math.roundToInt
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -127,7 +126,10 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     LaunchedEffect(focusRequest) {if(focusRequest>0) map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(41.5,74.7),5.0))}
     var previousZoom by remember {mutableIntStateOf(zoomRequest)}
     LaunchedEffect(zoomRequest) {
-        if(zoomRequest!=previousZoom) map?.animateCamera(if(zoomRequest>previousZoom)CameraUpdateFactory.zoomIn() else CameraUpdateFactory.zoomOut())
+        if(zoomRequest!=previousZoom) map?.let {native ->
+            val delta=(zoomRequest-previousZoom).toDouble()
+            native.setZoom((native.zoom+delta).coerceIn(0.0,19.0),PointF(mapView.width/2f,mapView.height/2f),200L)
+        }
         previousZoom=zoomRequest
     }
     Box(modifier) {
@@ -137,16 +139,20 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
             .pointerInput(map) {
                 detectTransformGestures(panZoomLock=true) { centroid,pan,scale,_ ->
                     val native=map ?: return@detectTransformGestures
-                    if(pan!=Offset.Zero) {
-                        val target=native.projection.fromScreenLocation(PointF(mapView.width/2f-pan.x,mapView.height/2f-pan.y))
-                        native.moveCamera(CameraUpdateFactory.newLatLng(target))
+                    native.cancelTransitions()
+                    // centroid is the PREVIOUS finger centre. Zoom around it first,
+                    // then translate by the centroid movement to keep the same map point under the fingers.
+                    // Direct native values avoid the SDK's cached CameraPosition during continuous gestures.
+                    if(scale.isFinite() && scale>0f && scale!=1f) {
+                        native.setZoom((native.zoom+log2(scale.toDouble())).coerceIn(0.0,19.0),PointF(centroid.x,centroid.y),0L)
                     }
-                    if(scale!=1f && scale>0f) native.moveCamera(CameraUpdateFactory.zoomBy(log2(scale.toDouble()),android.graphics.Point(centroid.x.roundToInt(),centroid.y.roundToInt())))
+                    if(pan!=Offset.Zero) native.scrollBy(pan.x,pan.y)
+
                 }
             }
             .pointerInput(map,stations) {
                 detectTapGestures(
-                    onDoubleTap={ point ->map?.animateCamera(CameraUpdateFactory.zoomBy(1.0,android.graphics.Point(point.x.roundToInt(),point.y.roundToInt())))},
+                    onDoubleTap={ point ->map?.let {native ->native.setZoom((native.zoom+1).coerceIn(0.0,19.0),PointF(point.x,point.y),200L)}},
                     onTap={ point ->
                         val native=map ?: return@detectTapGestures
                         fun distance(station:Station):Float {
