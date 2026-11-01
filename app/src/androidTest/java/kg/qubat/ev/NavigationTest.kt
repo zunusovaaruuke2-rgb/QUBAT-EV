@@ -147,10 +147,15 @@ class NavigationTest {
             android.os.SystemClock.sleep(1300)
             compose.onNodeWithText("Остановить симуляцию",substring=true).performScrollTo().performClick()
             visible("Аппарат 1 · разъём 1 · Завершён")
-            compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo().performClick()
+            compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo()
+                .performSemanticsAction(SemanticsActions.OnClick) { it() }
             compose.onNode(hasScrollAction()).performSemanticsAction(SemanticsActions.ScrollBy) { it(0f,-10000f) }
-            compose.waitUntil(5000) {
-                compose.onAllNodesWithText("Аппарат 1 · разъём 1 · Свободен").fetchSemanticsNodes().isNotEmpty()
+            try {
+                compose.waitUntil(5000) {
+                    compose.onAllNodesWithText("Аппарат 1 · разъём 1 · Свободен").fetchSemanticsNodes().isNotEmpty()
+                }
+            } catch(failure:Throwable) {
+                throw AssertionError(compose.onRoot().printToString(),failure)
             }
             visible("Аппарат 1 · разъём 1 · Свободен")
         }
