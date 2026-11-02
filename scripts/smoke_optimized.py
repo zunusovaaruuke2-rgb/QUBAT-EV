@@ -47,9 +47,6 @@ def capture(name):
     (OUT / (name + ".png")).write_bytes(adb("exec-out", "screencap", "-p", binary=True))
 
 
-snapshot = adb("exec-out", "run-as", PKG, "cat", "files/qubat-partner-network-v2.bin", binary=True)
-assert len(snapshot) > 100, "Persisted debug snapshot missing before APK upgrade"
-print("Private snapshot before release install: " + str(len(snapshot)) + " bytes", flush=True)
 adb("install", "-r", "app/build/outputs/apk/release/app-release.apk")
 adb("logcat", "-c")
 adb("shell", "am", "force-stop", PKG)
@@ -57,7 +54,8 @@ adb("shell", "am", "start", "-W", "-n", PKG + "/.MainActivity")
 time.sleep(2.5)
 sizes = re.findall(r"(\d+)x(\d+)", adb("shell", "wm", "size"))
 w, h = map(int, sizes[-1])
-# Verify the new native cabinet in the optimized APK, including persisted debug-to-release data.
+# Verify editing and persistence in the actual optimized APK.
+# Instrumentation may clean app data after its own tests; seed this scenario in release.
 def find_label(label, exact=False, scroll=True):
     for attempt in range(30 if scroll else 1):
         matches = []
@@ -71,9 +69,33 @@ def find_label(label, exact=False, scroll=True):
         if scroll:
             # Short, slow drags keep small titles visible between hierarchy snapshots;
             # a fast fling can jump past the first card below the tall filter panel.
-            adb("shell", "input", "swipe", str(w // 2), str(int(h * .68)), str(w // 2), str(int(h * .48)), "550")
+            drag_up()
     print(ET.tostring(tree(), encoding="unicode"))
     raise AssertionError("Optimized native partner label missing: " + label)
+
+def drag_up():
+    scrolls = [n for n in tree().iter("node") if n.get("scrollable") == "true"]
+    if not scrolls:
+        raise AssertionError("No visible scroll container")
+    node = max(scrolls, key=lambda n: (bounds(n)[2]-bounds(n)[0]) * (bounds(n)[3]-bounds(n)[1]))
+    x1, y1, x2, y2 = bounds(node)
+    adb("shell", "input", "swipe", str((x1+x2)//2), str(int(y1+(y2-y1)*.75)), str((x1+x2)//2), str(int(y1+(y2-y1)*.45)), "550")
+
+
+def find_id(tag):
+    for _ in range(35):
+        nodes = [n for n in tree().iter("node") if n.get("resource-id") == tag and bounds(n)[2] > bounds(n)[0] and bounds(n)[3] > bounds(n)[1]]
+        if nodes:
+            return nodes[0]
+        drag_up()
+    raise AssertionError("Optimized native tag missing: " + tag)
+
+
+def fill(tag, value):
+    tap(find_id(tag))
+    adb("shell", "input", "keycombination", "113", "29")
+    adb("shell", "input", "text", value)
+
 
 navigation("Профиль")
 tap(find_label("О приложении", exact=True))
@@ -87,13 +109,30 @@ if not menu:
     raise AssertionError("Optimized native partner menu missing")
 tap(menu[0])
 tap(find_label("Точки", exact=True, scroll=False))
-tap(find_label("QUBAT 1 · ДЕМО"))
+tap(find_id("network-point-partner-demo-a-1"))
 find_label("‹ Все точки", exact=True, scroll=False)
 find_label("QUBAT 1 · ДЕМО", exact=True, scroll=False)
-tap(find_label("Параметры", exact=True))
-find_label("14,75")  # UI test saved a future tariff: serialization must survive R8 and app restart.
+tap(find_id("network-point-tab-parameters"))
+tap(find_id("network-tariff-edit"))
+fill("network-tariff-customer", "15.25")
+fill("network-tariff-reason", "DEMO-release-persistence")
+tap(find_id("network-tariff-editor-save"))
+find_label("15,25")
+capture("native-partner-release-edited")
+# Wait for the atomic background write, then kill the process rather than recreate an Activity.
+time.sleep(2)
+adb("shell", "am", "force-stop", PKG)
+adb("shell", "am", "start", "-W", "-n", PKG + "/.MainActivity")
+time.sleep(2.5)
+navigation("Профиль")
+tap(find_label("Кабинет партнёра", exact=True))
+tap(find_id("network-menu"))
+tap(find_label("Точки", exact=True, scroll=False))
+tap(find_id("network-point-partner-demo-a-1"))
+tap(find_id("network-point-tab-parameters"))
+find_label("15,25")
 capture("native-partner-release-persistence")
-print("Optimized native partner cabinet opened; persisted tariff 14.75 survived app restart and release optimization.")
+print("Optimized native partner tariff 15.25 saved and survived process restart.", flush=True)
 
 back = [n for n in tree().iter("node") if n.get("content-desc") == "Назад в приложение"]
 assert back, "Native cabinet return missing"

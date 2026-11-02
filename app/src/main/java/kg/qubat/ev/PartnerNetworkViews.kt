@@ -1,4 +1,9 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package kg.qubat.ev
+
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.semantics.semantics
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.horizontalScroll
@@ -64,7 +69,7 @@ private fun networkId() = "demo-" + UUID.randomUUID().toString().take(12)
 
 @Composable private fun NetworkEditor(title: String, tag: String, error: String?, onDismiss: () -> Unit, onSave: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        DepthSurface(Modifier.padding(16.dp).widthIn(max = 560.dp).fillMaxWidth().imePadding().testTag(tag)) {
+        DepthSurface(Modifier.padding(16.dp).widthIn(max = 560.dp).fillMaxWidth().imePadding().testTag(tag).semantics { testTagsAsResourceId = true }) {
             Column(Modifier.padding(18.dp).heightIn(max = 680.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 AppText(title, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                 Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)

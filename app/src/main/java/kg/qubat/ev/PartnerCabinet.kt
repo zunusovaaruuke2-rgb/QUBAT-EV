@@ -1,4 +1,8 @@
+@file:OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+
 package kg.qubat.ev
+
+import androidx.compose.ui.semantics.testTagsAsResourceId
 
 import android.content.Intent
 import android.provider.OpenableColumns
@@ -103,7 +107,7 @@ private fun knownSum(values:List<BigDecimal?>):BigDecimal?=if(values.isEmpty()||
             PressTextButton(onClick=onSignOut,modifier=Modifier.testTag("network-drawer-sign-out")){AppText("Выйти из кабинета")}
         }
     }}) {
-        Surface(Modifier.fillMaxSize().testTag("partner-screen").semantics{stateDescription="Отчёт загружен"},color=Forest) {
+        Surface(Modifier.fillMaxSize().testTag("partner-screen").semantics{stateDescription="Отчёт загружен";testTagsAsResourceId=true},color=Forest) {
             Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=8.dp,vertical=6.dp),verticalAlignment=Alignment.CenterVertically) {
                     PressIconButton(onClick={scope.launch{drawer.open()}},modifier=Modifier.testTag("network-menu")){AppIcon(Icons.Default.Menu,"Меню кабинета")}
