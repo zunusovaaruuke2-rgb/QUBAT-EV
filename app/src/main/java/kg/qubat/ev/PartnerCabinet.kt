@@ -30,6 +30,9 @@ import java.math.RoundingMode
 import java.time.*
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 
 private enum class NativePage(val label:String) { MONITOR("Мониторинг"),POINTS("Точки"),REPORTS("Отчёты"),FINANCE("Финансы"),ACCESS("Доступы"),BRANDS("Бренды"),JOURNAL("Журнал и уведомления"),PROFILE("Профиль партнёра") }
 private val nativeTime=DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withZone(PARTNER_ZONE)
@@ -66,6 +69,14 @@ private fun knownSum(values:List<BigDecimal?>):BigDecimal?=if(values.isEmpty()||
     var initialPoint by remember{mutableStateOf<String?>(null)}
     val drawer=rememberDrawerState(DrawerValue.Closed)
     val scope=rememberCoroutineScope()
+    val lifecycle=LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(page,account.id,lifecycle) {
+        if(page in setOf(NativePage.MONITOR,NativePage.POINTS,NativePage.JOURNAL)) {
+            lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                while(isActive) {delay(30_000);revision++}
+            }
+        }
+    }
     if(!repo.can(NativePermission.VIEW)) {
         Surface(Modifier.fillMaxSize().testTag("partner-screen").semantics{stateDescription="Доступ отозван"},color=Forest) {
             Column(Modifier.safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
@@ -134,7 +145,13 @@ private fun knownSum(values:List<BigDecimal?>):BigDecimal?=if(values.isEmpty()||
     var focus by remember{mutableIntStateOf(0)}
     val mapStations=remember(stations,revision){stations.map{s->
         val stale=repo.isStale(s)
-        Station(s.id,s.city,s.title,GeoPoint(s.latitude.toDouble(),s.longitude.toDouble()),listOf(Charger("${s.id}-apparatus",1,s.ports.map{p->Connector(p.id,p.number,if(stale||repo.isPortStale(s.id,p.id))ConnectorState.OFFLINE else when(p.status){NativePortStatus.FREE->ConnectorState.FREE;NativePortStatus.BUSY->ConnectorState.CHARGING;NativePortStatus.FAULT->ConnectorState.ERROR;NativePortStatus.UNAVAILABLE->ConnectorState.OFFLINE})})),powerKw=s.powerKw.toInt())
+        val apparatus=List(s.apparatusCount){index->
+            val ports=s.ports.filterIndexed{portIndex,_->portIndex%s.apparatusCount==index}.map{p->
+                Connector(p.id,p.number,if(stale||repo.isPortStale(s.id,p.id))ConnectorState.OFFLINE else when(p.status){NativePortStatus.FREE->ConnectorState.FREE;NativePortStatus.BUSY->ConnectorState.CHARGING;NativePortStatus.FAULT->ConnectorState.ERROR;NativePortStatus.UNAVAILABLE->ConnectorState.OFFLINE})
+            }
+            Charger("${s.id}-apparatus-$index",index+1,ports)
+        }
+        Station(s.id,s.city,s.title,GeoPoint(s.latitude.toDouble(),s.longitude.toDouble()),apparatus,powerKw=s.powerKw.toInt())
     }}
     LazyColumn(Modifier.fillMaxSize().testTag("network-monitor-scroll"),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         item(key="notice"){NativeNotice()}
