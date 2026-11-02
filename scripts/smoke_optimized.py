@@ -133,8 +133,17 @@ tap(find_id("network-point-tab-parameters"))
 tap(find_id("network-tariff-edit"))
 fill("network-tariff-customer", "15.25")
 fill("network-tariff-reason", "DEMO-release-persistence")
-tap(find_id("network-tariff-editor-save"))
-time.sleep(.7)
+# The emulator can leave the keyboard composing after injected text. Activate
+# the focused form action with hardware traversal, independent of IME geometry.
+for _ in range(8):
+    action = find_id("network-tariff-editor-save")
+    if action.get("focused") == "true":
+        adb("shell", "input", "keyevent", "66")
+        break
+    adb("shell", "input", "keyevent", "61")
+else:
+    raise AssertionError("Cannot focus release tariff Save action")
+time.sleep(1)
 saved_tree = tree()
 if any(n.get("resource-id") == "network-tariff-editor" for n in saved_tree.iter("node")):
     print(ET.tostring(saved_tree, encoding="unicode"), flush=True)
