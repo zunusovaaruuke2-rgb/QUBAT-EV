@@ -93,7 +93,7 @@ def find_label(label, exact=False, scroll=True):
     for attempt in range(10 if scroll else 1):
         matches = []
         for node in tree().iter("node"):
-            value = node.get("text", "")
+            value = " ".join((node.get("text", "") or node.get("content-desc", "")).split())
             x1, y1, x2, y2 = bounds(node)
             if (value == label if exact else label in value) and x2 > x1 and y2 > y1 and 0 <= y1 < h:
                 matches.append(node)
@@ -101,6 +101,7 @@ def find_label(label, exact=False, scroll=True):
             return min(matches, key=lambda n: len(n.get("text", "")))
         if scroll:
             adb("shell", "input", "swipe", str(w // 2), str(int(h * .78)), str(w // 2), str(int(h * .3)), "180")
+    print(ET.tostring(tree(), encoding="unicode"))
     raise AssertionError("Optimized native partner label missing: " + label)
 
 navigation("Профиль")
@@ -115,7 +116,7 @@ if not menu:
     raise AssertionError("Optimized native partner menu missing")
 tap(menu[0])
 tap(find_label("Точки", exact=True, scroll=False))
-tap(find_label("Бишкек · Учебная 1"))
+tap(find_label("QUBAT 1 · ДЕМО"))
 tap(find_label("Параметры", exact=True))
 find_label("14,75")  # UI test saved a future tariff: serialization must survive R8 and app restart.
 capture("native-partner-release-persistence")
