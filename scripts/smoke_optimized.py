@@ -84,7 +84,8 @@ def drag_up():
 
 def find_id(tag):
     for _ in range(35):
-        nodes = [n for n in tree().iter("node") if n.get("resource-id") == tag and bounds(n)[2] > bounds(n)[0] and bounds(n)[3] > bounds(n)[1]]
+        nodes = [n for n in tree().iter("node") if n.get("resource-id") == tag and bounds(n)[2] > bounds(n)[0] and bounds(n)[3] > bounds(n)[1]
+                 and (n.get("class") != "android.widget.EditText" or bounds(n)[3] - bounds(n)[1] >= 56)]
         if nodes:
             return nodes[0]
         drag_up()
@@ -92,15 +93,25 @@ def find_id(tag):
 
 
 def fill(tag, value):
-    field = find_id(tag)
-    previous = field.get("text", "")
-    tap(field)
-    # Compose decimal fields do not consistently handle injected Ctrl+A on API 35.
-    # Move to the end and delete the known value using ordinary editing keys.
-    adb("shell", "input", "keyevent", "123")
-    adb("shell", "input", "keyevent", *(["67"] * (len(previous) + 2)))
-    adb("shell", "input", "text", value)
-    assert find_id(tag).get("text") == value, "Field replacement failed: " + tag
+    actual = ""
+    for _ in range(3):
+        field = find_id(tag)
+        previous = field.get("text", "")
+        tap(field)
+        time.sleep(.4)
+        if find_id(tag).get("focused") != "true":
+            drag_up()
+            continue
+        # Ordinary editing keys work with both decimal and text Compose fields.
+        adb("shell", "input", "keyevent", "123")
+        adb("shell", "input", "keyevent", *(["67"] * (len(previous) + 2)))
+        adb("shell", "input", "text", value)
+        time.sleep(.5)
+        actual = find_id(tag).get("text")
+        if actual == value:
+            return
+    print(ET.tostring(tree(), encoding="unicode"), flush=True)
+    raise AssertionError("Field replacement failed: " + tag + "; actual=" + repr(actual))
 
 
 navigation("Профиль")
