@@ -88,6 +88,39 @@ for label, name in (("Кошелёк", "wallet"), ("Профиль", "profile"))
     capture(name + "-alternate-theme")
     nodes = [n for n in tree().iter("node") if n.get("content-desc") in ("Дневная тема", "Ночная тема")]
     tap(nodes[0])
+# Verify the new native cabinet in the optimized APK, including persisted debug-to-release data.
+def find_label(label, exact=False, scroll=True):
+    for attempt in range(10 if scroll else 1):
+        matches = []
+        for node in tree().iter("node"):
+            value = node.get("text", "")
+            x1, y1, x2, y2 = bounds(node)
+            if (value == label if exact else label in value) and x2 > x1 and y2 > y1 and 0 <= y1 < h:
+                matches.append(node)
+        if matches:
+            return min(matches, key=lambda n: len(n.get("text", "")))
+        if scroll:
+            adb("shell", "input", "swipe", str(w // 2), str(int(h * .78)), str(w // 2), str(int(h * .3)), "180")
+    raise AssertionError("Optimized native partner label missing: " + label)
+
+navigation("Профиль")
+tap(find_label("О приложении", exact=True))
+title = find_label("QUBAT EV", exact=True, scroll=False)
+x1, y1, x2, y2 = bounds(title)
+adb("shell", "input", "swipe", str((x1+x2)//2), str((y1+y2)//2), str((x1+x2)//2), str((y1+y2)//2), "900")
+tap(find_label("Кубат Север", scroll=False))
+find_label("Мониторинг", exact=True, scroll=False)
+menu = [n for n in tree().iter("node") if n.get("content-desc") == "Меню кабинета"]
+if not menu:
+    raise AssertionError("Optimized native partner menu missing")
+tap(menu[0])
+tap(find_label("Точки", exact=True, scroll=False))
+tap(find_label("Бишкек · Учебная 1"))
+tap(find_label("Параметры", exact=True))
+find_label("14,75")  # UI test saved a future tariff: serialization must survive R8 and app restart.
+capture("native-partner-release-persistence")
+print("Optimized native partner cabinet opened; persisted tariff 14.75 survived app restart and release optimization.")
+
 logs = adb("logcat", "-d", "-s", "AndroidRuntime:E")
 (OUT / "runtime.txt").write_text(logs)
 if "FATAL EXCEPTION" in logs and PKG in logs:

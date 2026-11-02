@@ -21,7 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 @Composable fun QubatApp(vm:ChargingViewModel=viewModel()) {
     val context=LocalContext.current
     val preferences=remember {context.getSharedPreferences("qubat_partner_demo_access",0)}
-    val accounts=remember {PartnerDemoRepository().accounts}
+    val accounts=remember {NativePartnerRepository.accounts}
     var accountId by rememberSaveable {mutableStateOf(preferences.getString("account",null))}
     val account=accounts.firstOrNull {it.id==accountId && it.role!=PartnerRole.DRIVER}
     var cabinet by rememberSaveable {mutableStateOf(false)}
@@ -58,7 +58,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
                     },modifier=Modifier.fillMaxWidth().testTag("partner-demo-${item.id}"),shape=RoundedCornerShape(16.dp)) {
                         Column(Modifier.fillMaxWidth().padding(14.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
                             AppText(item.name,fontWeight=FontWeight.SemiBold)
-                            AppText(when(item.role) {PartnerRole.DRIVER->"Водитель";PartnerRole.OWNER->"Владелец станции";PartnerRole.ADMIN->"Администратор · только просмотр"},color=Muted)
+                            AppText(item.role.label,color=Muted)
                         }
                     }
                 }
