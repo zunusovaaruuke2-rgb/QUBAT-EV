@@ -92,9 +92,15 @@ def find_id(tag):
 
 
 def fill(tag, value):
-    tap(find_id(tag))
-    adb("shell", "input", "keycombination", "113", "29")
+    field = find_id(tag)
+    previous = field.get("text", "")
+    tap(field)
+    # Compose decimal fields do not consistently handle injected Ctrl+A on API 35.
+    # Move to the end and delete the known value using ordinary editing keys.
+    adb("shell", "input", "keyevent", "123")
+    adb("shell", "input", "keyevent", *(["67"] * (len(previous) + 2)))
     adb("shell", "input", "text", value)
+    assert find_id(tag).get("text") == value, "Field replacement failed: " + tag
 
 
 navigation("Профиль")
@@ -116,6 +122,7 @@ tap(find_id("network-point-tab-parameters"))
 tap(find_id("network-tariff-edit"))
 fill("network-tariff-customer", "15.25")
 fill("network-tariff-reason", "DEMO-release-persistence")
+adb("shell", "input", "keyevent", "4")  # Hide the IME before tapping the dialog action.
 tap(find_id("network-tariff-editor-save"))
 find_label("15,25")
 capture("native-partner-release-edited")
