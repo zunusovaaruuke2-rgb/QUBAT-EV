@@ -60,7 +60,7 @@ val LocalTranslate=staticCompositionLocalOf<(String)->String> {{it}}
 }
 
 private data class Translation(val ru:String,val en:String,val ky:String) {
-    val pattern=Regex("(?<![\\p{L}])"+Regex.escape(ru)+"(?![\\p{L}])")
+    val pattern by lazy {Regex("(?<![\\p{L}])"+Regex.escape(ru)+"(?![\\p{L}])")}
 }
 internal fun translate(text:String,language:AppLanguage):String {
     if(language==AppLanguage.RU || text.isBlank() || text.none {it in 'А'..'я' || it=='ё' || it=='Ё'}) return text
@@ -87,7 +87,7 @@ private fun translateUncached(text:String,language:AppLanguage):String {
     return result
 }
 
-private val translations=listOf(
+private val translations by lazy {listOf(
     Translation("Карта","Map","Карта"),
     Translation("Список","List","Тизме"),
     Translation("Зарядка","Charging","Кубаттоо"),
@@ -292,12 +292,12 @@ private val translations=listOf(
     Translation("Масштаб","Zoom","Масштаб"),
     Translation("карта загружена","map loaded","карта жүктөлдү"),
     Translation("ожидание сети","waiting for network","тармак күтүлүүдө"),
-)
-private val translationByKey=translations.associateBy {it.ru}
-private val translationsByLength=translations.sortedByDescending {it.ru.length}
+)}
+private val translationByKey by lazy {translations.associateBy {it.ru}}
+private val translationsByLength by lazy {translations.sortedByDescending {it.ru.length}}
 
-private val summaryPattern=Regex("^(\\d+) (?:аппарата|аппаратов) · свободно (\\d+) из (\\d+) разъёмов$")
-private val availablePattern=Regex("^Свободно (\\d+) из (\\d+) разъёмов · (.+)$")
+private val summaryPattern by lazy {Regex("^(\\d+) (?:аппарата|аппаратов) · свободно (\\d+) из (\\d+) разъёмов$")}
+private val availablePattern by lazy {Regex("^Свободно (\\d+) из (\\d+) разъёмов · (.+)$")}
 private val translationCaches=AppLanguage.entries.associateWith {
     object:LinkedHashMap<String,String>(128,.75f,true) {
         override fun removeEldestEntry(eldest:MutableMap.MutableEntry<String,String>?)=size>512

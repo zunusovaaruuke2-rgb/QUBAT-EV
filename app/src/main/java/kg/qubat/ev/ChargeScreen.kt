@@ -2,8 +2,6 @@ package kg.qubat.ev
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
@@ -19,7 +17,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription

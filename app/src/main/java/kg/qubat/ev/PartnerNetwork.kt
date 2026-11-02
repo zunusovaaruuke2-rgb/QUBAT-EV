@@ -205,7 +205,7 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
         }
     }
     fun tariffAt(stationId:String,date:LocalDate):NativeTariff? {requirePermission(NativePermission.EDIT_TARIFF,stationId);return rawTariffAt(stationId,date)}
-    private fun rawTariffAt(stationId:String,date:LocalDate)=state.tariffs.filter{it.stationId==stationId && it.effectiveFrom<=date && (it.effectiveTo==null || date<=it.effectiveTo)}.maxByOrNull{it.effectiveFrom}
+    private fun rawTariffAt(stationId:String,date:LocalDate)=state.tariffs.asSequence().filter{it.stationId==stationId && it.effectiveFrom<=date && (it.effectiveTo==null || date<=it.effectiveTo)}.maxByOrNull{it.effectiveFrom}
     private fun orgCheck(org:String) {if(organizations().none{it.id==org})throw SecurityException("Организация недоступна")}
     private fun reasonCheck(reason:String) {require(reason.isNotBlank()){"Укажите причину изменения"}}
     private fun log(org:String,ids:Set<String>,action:String,before:Any?,after:Any?,reason:String) {state.audit.add(NativeAudit("audit-${now.toEpochMilli()}-${state.audit.size}",org,ids,now,account.id,action,before?.toString().orEmpty(),after?.toString().orEmpty(),reason))}
@@ -292,10 +292,12 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
     private fun stationMatches(station:NativeStation,query:String):Boolean=listOf(station.id,station.title,station.address,station.city,station.serialNumber,station.ocppId).any{it.contains(query,ignoreCase=true)}
     private fun selectedSessions(stations:List<NativeStation>,filter:NativeReportFilter):List<NativeSession> {
         val ids=stations.map{it.id}.toSet();val query=filter.query.trim()
-        val rows=state.sessions.filter{it.stationId in ids && it.accountingAt in filter.period && (filter.portId==null || it.portId==filter.portId) &&
+        val start=filter.period.start;val end=filter.period.endExclusive
+        val matchingStations=if(query.isBlank())emptySet() else stations.filter{stationMatches(it,query)}.mapTo(hashSetOf()){it.id}
+        val rows=state.sessions.filter{it.stationId in ids && it.accountingAt>=start && it.accountingAt<end && (filter.portId==null || it.portId==filter.portId) &&
             (filter.customerId==null || it.customerId==filter.customerId) && (filter.operation==null || it.operation==filter.operation) &&
             (filter.paymentStatus==null || it.paymentStatus==filter.paymentStatus) && (filter.status==null || it.status==filter.status) &&
-            (query.isBlank() || listOf(it.id,it.customerId).any{v->v.contains(query,ignoreCase=true)} || stations.any{s->s.id==it.stationId && stationMatches(s,query)})}
+            (query.isBlank() || it.id.contains(query,ignoreCase=true) || it.customerId.contains(query,ignoreCase=true) || it.stationId in matchingStations)}
         return when(filter.sort){
             PartnerSort.NEWEST->rows.sortedWith(compareByDescending<NativeSession>{it.startedAt}.thenBy{it.id})
             PartnerSort.OLDEST->rows.sortedWith(compareBy<NativeSession>{it.startedAt}.thenBy{it.id})
@@ -303,7 +305,7 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
             PartnerSort.REVENUE_DESC->{requirePermission(NativePermission.FINANCE);rows.sortedWith(compareByDescending<NativeSession>{it.revenueKgs?:N_ZERO}.thenBy{it.id})}
         }
     }
-    private fun redact(session:NativeSession):NativeSession=if(can(NativePermission.FINANCE))session else session.copy(rates=null,chargedKgs=null,paidKgs=null,refundKgs=null,paymentMethod="Скрыто ролью")
+    private fun redact(session:NativeSession,financeVisible:Boolean=can(NativePermission.FINANCE)):NativeSession=if(financeVisible)session else session.copy(rates=null,chargedKgs=null,paidKgs=null,refundKgs=null,paymentMethod="Скрыто ролью")
     fun session(id:String):NativeSession {
         requirePermission(NativePermission.VIEW)
         val session=state.sessions.firstOrNull{it.id==id}?:throw SecurityException("Сессия недоступна")
@@ -340,7 +342,8 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
         val chargesComplete=completed.all{it.chargedKgs!=null}
         val unpaid=completed.filter{it.paidKgs!=null}.nSum{((it.chargedKgs?:N_ZERO)-(it.paidKgs?:N_ZERO)).max(N_ZERO)}
         val sessionIds=rows.map{it.id}.toSet()
-        val payments=if(finance)state.payments.filter{it.stationId in ids && it.at in filter.period && (!sessionFiltered(filter) || it.sessionId in sessionIds)}.sortedByDescending{it.at} else emptyList()
+        val start=filter.period.start;val end=filter.period.endExclusive
+        val payments=if(finance)state.payments.filter{it.stationId in ids && it.at>=start && it.at<end && (!sessionFiltered(filter) || it.sessionId in sessionIds)}.sortedByDescending{it.at} else emptyList()
         val expenses=if(finance && !sessionFiltered(filter))state.expenses.filter{it.stationId in ids && it.date>=filter.period.from && it.date<=filter.period.to}.sortedByDescending{it.date} else emptyList()
         val ledgerKnown=stations.all{it.organizationId in state.ledgerOrganizationIds}
         val ledger=if(finance && ledgerKnown)payments.nSum{it.amountKgs-it.refundKgs} else null
@@ -353,8 +356,9 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
             energy,completed.sumOf{it.durationSeconds},completed.map{it.customerId}.toSet().size,
             if(finance && chargesComplete)charged else null,if(finance && completed.all{it.paidKgs!=null})paid else null,if(finance && completed.all{it.refundKgs!=null})refunds else null,if(finance && paymentsComplete)revenue else null,if(finance && paymentsComplete && chargesComplete)unpaid else null,
             if(finance && chargesComplete && energy.signum()>0)charged.divide(energy,6,RoundingMode.HALF_UP) else null,ledger,ledger?.let{if(paymentsComplete)revenue-it else null},completed.count{it.paidKgs==null || it.refundKgs==null})
-        val stationRows=stations.map{s->val sessions=completed.filter{it.stationId==s.id};NativeStationReport(s,sessions.size,sessions.nSum{it.energyKwh},if(finance && sessions.all{it.revenueKgs!=null})sessions.nSum{it.revenueKgs?:N_ZERO} else null)}
-        return NativeNetworkReport(account,filter,generatedAt,stationRows,rows.map{redact(it)},payments,expenses,summary,
+        val completedByStation=completed.groupBy{it.stationId}
+        val stationRows=stations.map{s->val sessions=completedByStation[s.id].orEmpty();NativeStationReport(s,sessions.size,sessions.nSum{it.energyKwh},if(finance && sessions.all{it.revenueKgs!=null})sessions.nSum{it.revenueKgs?:N_ZERO} else null)}
+        return NativeNetworkReport(account,filter,generatedAt,stationRows,rows.map{redact(it,finance)},payments,expenses,summary,
             if(finance && includeFinance)calculateMonthly(filter,stations,rows,selectedDeductions) else emptyList(),ids,can(NativePermission.EXPORT),finance,
             if(finance && !sessionFiltered(filter))state.monthBills.filter{it.stationId in ids && it.month.atDay(1)>=filter.period.from && it.month.atEndOfMonth()<=filter.period.to} else emptyList())
     }
@@ -367,11 +371,14 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
         if(stations.isEmpty())return emptyList()
         val ids=stations.map{it.id}.toSet()
         val months=generateSequence(YearMonth.from(filter.period.from)){it.plusMonths(1)}.takeWhile{it<=YearMonth.from(filter.period.to)}.toList()
+        val completedByMonth=sessions.asSequence().filter{it.status==NativeSessionStatus.COMPLETED}.groupBy{YearMonth.from(it.accountingAt.atZone(PARTNER_ZONE))}
+        val billsByMonth=state.monthBills.filter{it.stationId in ids}.groupBy{it.month}
+        val expensesByMonth=state.expenses.filter{it.stationId in ids}.groupBy{YearMonth.from(it.date)}
+        val subset=sessionFiltered(filter)
         return months.map{month->
             val from=maxOf(month.atDay(1),filter.period.from);val to=minOf(month.atEndOfMonth(),filter.period.to)
-            val subset=sessionFiltered(filter)
             val full=from==month.atDay(1) && to==month.atEndOfMonth() && !subset
-            val rows=sessions.filter{it.status==NativeSessionStatus.COMPLETED && YearMonth.from(it.accountingAt.atZone(PARTNER_ZONE).toLocalDate())==month}
+            val rows=completedByMonth[month].orEmpty()
             val unknownPayments=rows.count{it.paidKgs==null || it.refundKgs==null}
             val paymentComplete=unknownPayments==0
             val chargesComplete=rows.all{it.chargedKgs!=null}
@@ -387,17 +394,18 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
             val partnerPercent=if(ratesComplete && paymentComplete)rows.nSum{it.partnerShareKgs!!} else null
             val reserve=if(ratesComplete && paymentComplete)rows.nSum{it.reserveKgs!!} else null
             val days=generateSequence(from){it.plusDays(1)}.takeWhile{it<=to}.toList()
+            val dailyRates=if(subset)emptyList() else stations.flatMap{s->days.map{rawTariffAt(s.id,it)}}
+            val dailyRatesKnown=dailyRates.all{it!=null}
+            val daysInMonth=BigDecimal(month.lengthOfMonth())
             // This daily allocation is explicitly an estimate. A receipt is never prorated.
-            val fixedPartner=if(subset){if(rows.all{it.rates?.partnerFixedMonthly?.signum()==0})N_ZERO else null} else if(stations.any{s->days.any{rawTariffAt(s.id,it)==null}})null else stations.nSum{s->days.nSum{day->rawTariffAt(s.id,day)!!.partnerFixedMonthly.divide(BigDecimal(month.lengthOfMonth()),10,RoundingMode.HALF_UP)}}.nMoney()
+            val fixedPartner=if(subset){if(rows.all{it.rates?.partnerFixedMonthly?.signum()==0})N_ZERO else null} else if(!dailyRatesKnown)null else dailyRates.nSum{it!!.partnerFixedMonthly.divide(daysInMonth,10,RoundingMode.HALF_UP)}.nMoney()
             val partner=if(partnerPercent!=null && fixedPartner!=null)partnerPercent+fixedPartner else null
-            val rentEstimate=if(subset || stations.any{s->days.any{rawTariffAt(s.id,it)==null}})null else stations.nSum{s->
-                days.nSum{day->rawTariffAt(s.id,day)!!.rentMonthly.divide(BigDecimal(month.lengthOfMonth()),10,RoundingMode.HALF_UP)}
-            }.nMoney()
-            val bills=if(full)state.monthBills.filter{it.stationId in ids && it.month==month} else emptyList()
+            val rentEstimate=if(subset || !dailyRatesKnown)null else dailyRates.nSum{it!!.rentMonthly.divide(daysInMonth,10,RoundingMode.HALF_UP)}.nMoney()
+            val bills=if(full)billsByMonth[month].orEmpty() else emptyList()
             val allBills=full && bills.map{it.stationId}.toSet()==ids
             val fact=if(allBills)bills.nSum{it.electricityKgs} else null
             val meter=if(allBills && bills.all{it.meterEnergyKwh!=null})bills.nSum{it.meterEnergyKwh!!} else null
-            val costs=if(!subset)state.expenses.filter{it.stationId in ids && it.date>=from && it.date<=to} else emptyList()
+            val costs=if(!subset)expensesByMonth[month].orEmpty().filter{it.date>=from && it.date<=to} else emptyList()
             val rentExpenses=costs.filter{it.kind==NativeExpenseKind.RENT}.nSum{it.amountKgs}
             val rentFact=if(allBills && bills.all{it.actualRentKgs!=null})bills.nSum{it.actualRentKgs!!}+rentExpenses else if(full && rentEstimate?.signum()==0)rentExpenses else null
             val other=if(subset)null else costs.filter{it.kind !in setOf(NativeExpenseKind.RENT,NativeExpenseKind.PAYOUT)}.nSum{it.amountKgs}
