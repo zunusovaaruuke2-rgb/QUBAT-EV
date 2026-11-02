@@ -49,7 +49,11 @@ private fun knownSum(values:List<BigDecimal?>):BigDecimal?=if(values.isEmpty()||
             AppText("Кабинет партнёра",fontSize=26.sp,fontWeight=FontWeight.Bold)
             CircularProgressIndicator();AppText("Загрузка демонстрационного кабинета…")
         }
-    } else NativePartnerContent(account,state!!,disk,onBack,onSignOut,onSwitchDemo)
+    } else {
+        val current=state!!
+        val effective=current.members.firstOrNull{it.id==account.id}?.let{account.copy(name=it.name,role=it.role)}?:account
+        NativePartnerContent(effective,current,disk,onBack,onSignOut,onSwitchDemo)
+    }
 }
 
 @Composable private fun NativePartnerContent(account:PartnerAccount,state:NativePartnerState,disk:NativePartnerDisk,onBack:()->Unit,onSignOut:()->Unit,onSwitchDemo:()->Unit) {
@@ -168,6 +172,7 @@ private data class NativeFilterUi(val filter:NativeReportFilter,val content:@Com
     var to by rememberSaveable(repo.account.id){mutableStateOf(repo.today.toString())}
     var stationId by rememberSaveable{mutableStateOf("")}
     var organizationId by rememberSaveable{mutableStateOf("")}
+    var ownerId by rememberSaveable{mutableStateOf("")}
     var groupId by rememberSaveable{mutableStateOf("")}
     var locationId by rememberSaveable{mutableStateOf("")}
     var portId by rememberSaveable{mutableStateOf("")}
@@ -180,12 +185,13 @@ private data class NativeFilterUi(val filter:NativeReportFilter,val content:@Com
     var edit by remember{mutableStateOf(false)}
     var picker by remember{mutableStateOf<String?>(null)}
     val stations=repo.stations(includeArchived=true)
-    val filter=NativeReportFilter(PartnerPeriod(LocalDate.parse(from),LocalDate.parse(to)),organizationId.takeIf{it.isNotBlank()},null,groupId.takeIf{it.isNotBlank()},locationId.takeIf{it.isNotBlank()},stationId.takeIf{it.isNotBlank()},portId.takeIf{it.isNotBlank()},customerId.takeIf{it.isNotBlank()},operation.takeIf{it.isNotBlank()}?.let(NativeOperation::valueOf),payment.takeIf{it.isNotBlank()}?.let(NativePaymentStatus::valueOf),status.takeIf{it.isNotBlank()}?.let(NativeSessionStatus::valueOf),query,PartnerSort.valueOf(sort))
+    val filter=NativeReportFilter(PartnerPeriod(LocalDate.parse(from),LocalDate.parse(to)),organizationId.takeIf{it.isNotBlank()},ownerId.takeIf{it.isNotBlank()},groupId.takeIf{it.isNotBlank()},locationId.takeIf{it.isNotBlank()},stationId.takeIf{it.isNotBlank()},portId.takeIf{it.isNotBlank()},customerId.takeIf{it.isNotBlank()},operation.takeIf{it.isNotBlank()}?.let(NativeOperation::valueOf),payment.takeIf{it.isNotBlank()}?.let(NativePaymentStatus::valueOf),status.takeIf{it.isNotBlank()}?.let(NativeSessionStatus::valueOf),query,PartnerSort.valueOf(sort))
     if(edit)NativeDateRange(from,to,{edit=false}){a,b->from=a;to=b;edit=false}
     picker?.let{kind->
         val choices=when(kind){
             "station"->stations.map{it.id to it.title}
             "organization"->repo.organizations().map{it.id to it.name}
+            "owner"->repo.organizations().map{it.ownerId to (NativePartnerRepository.accounts.firstOrNull{a->a.id==it.ownerId}?.name?:it.ownerId)}
             "group"->stations.map{it.groupId to it.groupId}.distinct()
             "location"->stations.map{it.locationId to "${it.city} · ${it.locationId}"}.distinct()
             "port"->stations.flatMap{s->s.ports.map{it.id to "${s.title} · №${it.number}"}}
@@ -194,7 +200,7 @@ private data class NativeFilterUi(val filter:NativeReportFilter,val content:@Com
             "operation"->NativeOperation.entries.map{it.name to it.label}
             else->emptyList()
         }
-        AlertDialog(onDismissRequest={picker=null},title={AppText("Фильтр")},text={Column(Modifier.verticalScroll(rememberScrollState())){(listOf("" to "Все")+choices).forEach{(id,label)->PressTextButton(onClick={when(kind){"station"->stationId=id;"organization"->organizationId=id;"group"->groupId=id;"location"->locationId=id;"port"->portId=id;"payment"->payment=id;"status"->status=id;"operation"->operation=id};picker=null},modifier=Modifier.testTag("network-select-$kind-$id")){AppText(label)}}}},confirmButton={PressTextButton(onClick={picker=null}){AppText("Закрыть")}})
+        AlertDialog(onDismissRequest={picker=null},title={AppText("Фильтр")},text={Column(Modifier.verticalScroll(rememberScrollState())){(listOf("" to "Все")+choices).forEach{(id,label)->PressTextButton(onClick={when(kind){"station"->stationId=id;"organization"->organizationId=id;"owner"->ownerId=id;"group"->groupId=id;"location"->locationId=id;"port"->portId=id;"payment"->payment=id;"status"->status=id;"operation"->operation=id};picker=null},modifier=Modifier.testTag("network-select-$kind-$id")){AppText(label)}}}},confirmButton={PressTextButton(onClick={picker=null}){AppText("Закрыть")}})
     }
     val content:@Composable ()->Unit={
         Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
@@ -210,10 +216,10 @@ private data class NativeFilterUi(val filter:NativeReportFilter,val content:@Com
             var advanced by rememberSaveable{mutableStateOf(false)}
             PressTextButton(onClick={advanced=!advanced}){AppText(if(advanced)"Скрыть фильтры" else "Дополнительные фильтры")}
             if(advanced){
-                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("organization" to "Организация","group" to "Группа","location" to "Локация","port" to "Разъём","payment" to "Оплата","status" to "Сессия","operation" to "Операция").forEach{(id,label)->DepthOutlinedButton(onClick={picker=id}){AppText(label)}}}
+                Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf("organization" to "Организация","owner" to "Владелец","group" to "Группа","location" to "Локация","port" to "Разъём","payment" to "Оплата","status" to "Сессия","operation" to "Операция").forEach{(id,label)->DepthOutlinedButton(onClick={picker=id}){AppText(label)}}}
                 PressOutlinedTextField(customerId,{customerId=it.take(80)},label={AppText("ID демо-клиента")},singleLine=true,modifier=Modifier.fillMaxWidth())
                 PartnerSort.entries.forEach{s->DepthChip(sort==s.name,{sort=s.name},label={AppText(s.label)})}
-                PressTextButton(onClick={stationId="";organizationId="";groupId="";locationId="";portId="";customerId="";payment="";status="";operation="";query=""}){AppText("Сбросить фильтры")}
+                PressTextButton(onClick={stationId="";organizationId="";ownerId="";groupId="";locationId="";portId="";customerId="";payment="";status="";operation="";query=""}){AppText("Сбросить фильтры")}
             }
         }
     }
@@ -265,7 +271,7 @@ private data class NativeFilterUi(val filter:NativeReportFilter,val content:@Com
             AppText("Порт: ${s.portId} · клиент: ${s.customerId}",fontSize=11.sp)
             AppText("Начало: ${nativeTime.format(s.startedAt)}\nКонец: ${s.endedAt?.let(nativeTime::format)?:"Не завершена"}",fontSize=11.sp,color=Muted)
             AppText("${s.durationSeconds/60} мин · ${nativeEnergy(s.energyKwh)}")
-            if(repo.can(NativePermission.FINANCE)){AppText("Тариф: ${nativeMoney(s.rates?.customerRate)} / кВт·ч");AppText("Начислено: ${nativeMoney(s.chargedKgs)} · оплачено: ${nativeMoney(s.paidKgs)}");AppText("Возврат: ${nativeMoney(s.refundKgs)} · ${s.paymentStatus.label}",fontSize=12.sp)}
+            if(repo.can(NativePermission.FINANCE)){AppText("Тариф: ${nativeMoney(s.rates?.customerRate)} / кВт·ч");AppText("Начислено: ${nativeMoney(s.chargedKgs)} · оплачено: ${nativeMoney(s.paidKgs)}");AppText("Возврат: ${nativeMoney(s.refundKgs)} · ${s.paymentStatus.label}",fontSize=12.sp);AppText("Платформа: ${nativeMoney(s.platformFeeKgs)} · эквайринг: ${nativeMoney(s.acquiringFeeKgs)}",fontSize=11.sp,color=Muted)}
             s.errorReason?.let{AppText(it,color=MaterialTheme.colorScheme.error)}
             AppText("${s.source} · обновлено ${nativeTime.format(s.updatedAt)}",fontSize=10.sp,color=Muted)
         }}
