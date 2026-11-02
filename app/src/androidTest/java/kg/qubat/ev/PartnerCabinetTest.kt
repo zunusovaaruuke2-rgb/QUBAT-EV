@@ -107,6 +107,9 @@ class PartnerCabinetTest {
             section("profile");scroll("partner-sign-out").performClick()
             compose.onNodeWithTag("partner-screen").assertDoesNotExist()
             compose.onNodeWithTag("partner-entry").assertDoesNotExist()
+            stage="on-disk snapshot round trip"
+            val restored=NativeStateCodec.decode(File(compose.activity.filesDir,"qubat-partner-network-v2.bin").readBytes())
+            check(restored.tariffs.any{it.stationId=="partner-demo-a-1" && it.customerRate.compareTo(java.math.BigDecimal("14.75"))==0})
         }catch(failure:Throwable){throw AssertionError("Native partner stage $stage: ${failure.message}",failure)}
     }
 }

@@ -54,40 +54,6 @@ adb("shell", "am", "start", "-W", "-n", PKG + "/.MainActivity")
 time.sleep(2.5)
 sizes = re.findall(r"(\d+)x(\d+)", adb("shell", "wm", "size"))
 w, h = map(int, sizes[-1])
-for label, name in (("Список", "list"), ("Зарядка", "charging"), ("Кошелёк", "wallet"), ("Профиль", "profile"), ("Карта", "map")):
-    navigation(label)
-    tree()  # Wait for the destination to settle before resetting frame counters.
-    adb("shell", "dumpsys", "gfxinfo", PKG, "reset")
-    for start, end in ((.78, .28), (.28, .78)):
-        for _ in range(6):
-            adb("shell", "input", "swipe", str(w // 2), str(int(h * start)), str(w // 2), str(int(h * end)), "180")
-    root = tree()
-    if not any(n.get("text") == label for n in root.iter("node")):
-        raise AssertionError("Navigation disappeared on " + name)
-    frames = adb("shell", "dumpsys", "gfxinfo", PKG, "framestats")
-    (OUT / (name + "-frames.txt")).write_text(frames)
-    (OUT / (name + "-screen.xml")).write_text(ET.tostring(root, encoding="unicode"))
-    capture(name)
-    print("Optimized screen " + name + ": completed 12 swipes.")
-    seen = set()
-    for line in frames.splitlines():
-        value = line.strip()
-        if value not in seen and any(key in value for key in ("Total frames rendered", "Janky frames:", "50th percentile", "90th percentile")):
-            print(name + ": " + value)
-            seen.add(value)
-# Retain a second-theme preview for the main framed screens.
-for label, name in (("Кошелёк", "wallet"), ("Профиль", "profile")):
-    navigation(label)
-    for _ in range(5):
-        adb("shell", "input", "swipe", str(w // 2), str(int(h * .3)), str(w // 2), str(int(h * .8)), "160")
-    nodes = [n for n in tree().iter("node") if n.get("content-desc") in ("Дневная тема", "Ночная тема")]
-    if not nodes:
-        raise AssertionError("Theme toggle missing on " + name)
-    tap(nodes[0])
-    tree()
-    capture(name + "-alternate-theme")
-    nodes = [n for n in tree().iter("node") if n.get("content-desc") in ("Дневная тема", "Ночная тема")]
-    tap(nodes[0])
 # Verify the new native cabinet in the optimized APK, including persisted debug-to-release data.
 def find_label(label, exact=False, scroll=True):
     for attempt in range(30 if scroll else 1):
@@ -123,6 +89,46 @@ tap(find_label("Параметры", exact=True))
 find_label("14,75")  # UI test saved a future tariff: serialization must survive R8 and app restart.
 capture("native-partner-release-persistence")
 print("Optimized native partner cabinet opened; persisted tariff 14.75 survived app restart and release optimization.")
+
+back = [n for n in tree().iter("node") if n.get("content-desc") == "Назад в приложение"]
+assert back, "Native cabinet return missing"
+tap(back[0])
+tree()
+
+for label, name in (("Список", "list"), ("Зарядка", "charging"), ("Кошелёк", "wallet"), ("Профиль", "profile"), ("Карта", "map")):
+    navigation(label)
+    tree()  # Wait for the destination to settle before resetting frame counters.
+    adb("shell", "dumpsys", "gfxinfo", PKG, "reset")
+    for start, end in ((.78, .28), (.28, .78)):
+        for _ in range(6):
+            adb("shell", "input", "swipe", str(w // 2), str(int(h * start)), str(w // 2), str(int(h * end)), "180")
+    root = tree()
+    if not any(n.get("text") == label for n in root.iter("node")):
+        raise AssertionError("Navigation disappeared on " + name)
+    frames = adb("shell", "dumpsys", "gfxinfo", PKG, "framestats")
+    (OUT / (name + "-frames.txt")).write_text(frames)
+    (OUT / (name + "-screen.xml")).write_text(ET.tostring(root, encoding="unicode"))
+    capture(name)
+    print("Optimized screen " + name + ": completed 12 swipes.")
+    seen = set()
+    for line in frames.splitlines():
+        value = line.strip()
+        if value not in seen and any(key in value for key in ("Total frames rendered", "Janky frames:", "50th percentile", "90th percentile")):
+            print(name + ": " + value)
+            seen.add(value)
+# Retain a second-theme preview for the main framed screens.
+for label, name in (("Кошелёк", "wallet"), ("Профиль", "profile")):
+    navigation(label)
+    for _ in range(5):
+        adb("shell", "input", "swipe", str(w // 2), str(int(h * .3)), str(w // 2), str(int(h * .8)), "160")
+    nodes = [n for n in tree().iter("node") if n.get("content-desc") in ("Дневная тема", "Ночная тема")]
+    if not nodes:
+        raise AssertionError("Theme toggle missing on " + name)
+    tap(nodes[0])
+    tree()
+    capture(name + "-alternate-theme")
+    nodes = [n for n in tree().iter("node") if n.get("content-desc") in ("Дневная тема", "Ночная тема")]
+    tap(nodes[0])
 
 logs = adb("logcat", "-d", "-s", "AndroidRuntime:E")
 (OUT / "runtime.txt").write_text(logs)
