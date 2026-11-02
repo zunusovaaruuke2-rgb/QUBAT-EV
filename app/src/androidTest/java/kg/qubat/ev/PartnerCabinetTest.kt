@@ -44,7 +44,7 @@ class PartnerCabinetTest {
             compose.onNodeWithTag("partner-entry").assertDoesNotExist()
             scroll("profile-about").performClick()
             compose.onNodeWithTag("partner-demo-access").performTouchInput{longClick()}
-            compose.onNodeWithTag("partner-demo-demo-owner-a").performClick();ready()
+            compose.onNodeWithTag("partner-demo-demo-owner-a").performScrollTo().performClick();ready()
             stage="monitoring counts"
             scroll("network-station-count")
             compose.onNode(hasText("3 / 3 / 6") and hasAnyAncestor(hasTestTag("network-station-count"))).assertIsDisplayed()
@@ -91,13 +91,13 @@ class PartnerCabinetTest {
             section("access");scroll("network-access-invite").assertIsEnabled()
             stage="observer cannot change prices"
             section("profile");scroll("partner-switch-demo").performClick()
-            compose.onNodeWithTag("partner-demo-demo-observer").performClick();ready()
+            compose.onNodeWithTag("partner-demo-demo-observer").performScrollTo().performClick();ready()
             section("points");scroll("network-point-partner-demo-a-1").performClick()
             scroll("network-point-tab-parameters").performClick()
             compose.onNodeWithTag("network-tariff-edit").assertDoesNotExist()
             stage="owner B scope and unknown payments"
             section("profile");scroll("partner-switch-demo").performClick()
-            compose.onNodeWithTag("partner-demo-demo-owner-b").performClick();ready()
+            compose.onNodeWithTag("partner-demo-demo-owner-b").performScrollTo().performClick();ready()
             section("reports");scroll("network-station-filter").performClick()
             compose.onNodeWithTag("network-select-station-partner-demo-a-1").assertDoesNotExist()
             compose.onNodeWithTag("network-select-station-").performClick()
