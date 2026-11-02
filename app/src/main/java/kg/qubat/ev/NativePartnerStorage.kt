@@ -40,7 +40,7 @@ internal class NativePartnerDisk(context:Context) {
         cached ?: runCatching {NativeStateCodec.decode(file.readFully())}.getOrElse {
             if(file.baseFile.exists()) android.util.Log.e("QUBAT_PARTNER","Cannot restore private demo snapshot",it)
             NativePartnerRepository.seed()
-        }.also {cached=it}
+        }.also {android.util.Log.i("QUBAT_PARTNER","Demo snapshot loaded: exists=${file.baseFile.exists()}, tariffs=${it.tariffs.size}, audit=${it.audit.size}");cached=it}
     }
     fun saveLater(state:NativePartnerState,onError:(String)->Unit) {
         val snapshot=state.snapshot()

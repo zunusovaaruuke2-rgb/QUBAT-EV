@@ -47,6 +47,9 @@ def capture(name):
     (OUT / (name + ".png")).write_bytes(adb("exec-out", "screencap", "-p", binary=True))
 
 
+snapshot = adb("exec-out", "run-as", PKG, "cat", "files/qubat-partner-network-v2.bin", binary=True)
+assert len(snapshot) > 100, "Persisted debug snapshot missing before APK upgrade"
+print("Private snapshot before release install: " + str(len(snapshot)) + " bytes", flush=True)
 adb("install", "-r", "app/build/outputs/apk/release/app-release.apk")
 adb("logcat", "-c")
 adb("shell", "am", "force-stop", PKG)
@@ -85,6 +88,8 @@ if not menu:
 tap(menu[0])
 tap(find_label("Точки", exact=True, scroll=False))
 tap(find_label("QUBAT 1 · ДЕМО"))
+find_label("‹ Все точки", exact=True, scroll=False)
+find_label("QUBAT 1 · ДЕМО", exact=True, scroll=False)
 tap(find_label("Параметры", exact=True))
 find_label("14,75")  # UI test saved a future tariff: serialization must survive R8 and app restart.
 capture("native-partner-release-persistence")
