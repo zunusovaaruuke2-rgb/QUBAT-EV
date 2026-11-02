@@ -13,9 +13,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.text.LinkAnnotation
 import kotlin.math.log2
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -50,6 +47,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
     modifier:Modifier,focusRequest:Int,zoomRequest:Int,locationFocus:Int,stationFocus:Int,onSelect:(Station)->Unit) {
     val localize=LocalTranslate.current
     val language=LocalAppLanguage.current
+    val currentLanguage by rememberUpdatedState(language)
     val night=LocalNight.current
     val context=LocalContext.current
     val owner=LocalLifecycleOwner.current
@@ -89,10 +87,13 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
             }
         }
     }
-    LaunchedEffect(map,night,language) {
+    LaunchedEffect(map,night) {
         val native=map ?: return@LaunchedEffect
         ready=false;loadError=false
-        native.setStyle(Style.Builder().fromUri(if(night) "https://tiles.openfreemap.org/styles/dark" else WORLD_STYLE)) {style->if(night) improveNightMap(style);improveMapLabelContrast(style,night);localizeMapLabels(style,language);ready=true;loadError=false}
+        native.setStyle(Style.Builder().fromUri(if(night) "https://tiles.openfreemap.org/styles/dark" else WORLD_STYLE)) {style->if(night) improveNightMap(style);improveMapLabelContrast(style,night);localizeMapLabels(style,currentLanguage);ready=true;loadError=false}
+    }
+    LaunchedEffect(map,ready,language) {
+        if(ready) map?.style?.let {localizeMapLabels(it,language)}
     }
     DisposableEffect(mapView,owner) {
         var started=false;var resumed=false
@@ -127,7 +128,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
         val ids=stations.mapTo(hashSetOf()) {it.id}
         markers.keys.filter {it !in ids}.forEach {id->markers.remove(id)?.let {native.removeMarker(it)};markerKeys.remove(id)}
         stations.forEach {station->
-            val iconKey="${station.chargerCount}:${station.connectors.joinToString {it.state.name}}:${station.id==selectedId}"
+            val iconKey=stationMarkerKey(station,station.id==selectedId)
             val key="$iconKey:${station.point}:${station.availableConnectors}:${language.code}"
             if(markerKeys[station.id]!=key) {
                 val icon=icons.getOrPut(iconKey) {IconFactory.getInstance(context).fromBitmap(stationMarker(station,station.id==selectedId))}
@@ -197,6 +198,9 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
         }
     }
 }
+
+internal fun stationMarkerKey(station:Station,selected:Boolean):String =
+    "${station.chargerCount}:${station.connectors.joinToString {it.state.name}}:$selected"
 
 internal fun stationMarker(station:Station,selected:Boolean):Bitmap {
     val bitmap=Bitmap.createBitmap(112,112,Bitmap.Config.ARGB_8888)
