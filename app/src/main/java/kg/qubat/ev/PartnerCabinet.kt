@@ -160,6 +160,7 @@ private fun knownSum(values:List<BigDecimal?>):BigDecimal?=if(values.isEmpty()||
         if(repo.can(NativePermission.FINANCE))item(key="revenue"){NativeMetric("Оплаченная выручка за сегодня",nativeMoney(summary.revenueKgs),"network-daily-revenue")}
         item(key="map"){NativePanel("Назначенные станции на карте"){
             if(mapStations.isNotEmpty())WorldMap(mapStations,null,null,"",Modifier.fillMaxWidth().height(230.dp).testTag("network-map"),focus,zoom,0,0,onSelect={onPoint(it.id)})
+            MapCredits()
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){DepthOutlinedButton(onClick={zoom++}){AppText("+")};DepthOutlinedButton(onClick={zoom--}){AppText("−")};PressTextButton(onClick={focus++}){AppText("Обзор Кыргызстана")}}
             AppText("Демо-координаты; не используйте для поездки к реальной зарядке.",fontSize=10.sp,color=Muted)
         }}

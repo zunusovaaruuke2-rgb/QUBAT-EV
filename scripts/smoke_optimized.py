@@ -90,7 +90,7 @@ for label, name in (("Кошелёк", "wallet"), ("Профиль", "profile"))
     tap(nodes[0])
 # Verify the new native cabinet in the optimized APK, including persisted debug-to-release data.
 def find_label(label, exact=False, scroll=True):
-    for attempt in range(10 if scroll else 1):
+    for attempt in range(30 if scroll else 1):
         matches = []
         for node in tree().iter("node"):
             value = " ".join((node.get("text", "") or node.get("content-desc", "")).split())
@@ -100,7 +100,9 @@ def find_label(label, exact=False, scroll=True):
         if matches:
             return min(matches, key=lambda n: len(n.get("text", "")))
         if scroll:
-            adb("shell", "input", "swipe", str(w // 2), str(int(h * .78)), str(w // 2), str(int(h * .3)), "180")
+            # Short, slow drags keep small titles visible between hierarchy snapshots;
+            # a fast fling can jump past the first card below the tall filter panel.
+            adb("shell", "input", "swipe", str(w // 2), str(int(h * .68)), str(w // 2), str(int(h * .48)), "550")
     print(ET.tostring(tree(), encoding="unicode"))
     raise AssertionError("Optimized native partner label missing: " + label)
 
