@@ -133,8 +133,12 @@ tap(find_id("network-point-tab-parameters"))
 tap(find_id("network-tariff-edit"))
 fill("network-tariff-customer", "15.25")
 fill("network-tariff-reason", "DEMO-release-persistence")
-adb("shell", "input", "keyevent", "4")  # Hide the IME before tapping the dialog action.
 tap(find_id("network-tariff-editor-save"))
+time.sleep(.7)
+saved_tree = tree()
+if any(n.get("resource-id") == "network-tariff-editor" for n in saved_tree.iter("node")):
+    print(ET.tostring(saved_tree, encoding="unicode"), flush=True)
+    raise AssertionError("Release tariff editor did not close after Save")
 find_label("15,25")
 capture("native-partner-release-edited")
 # Wait for the atomic background write, then kill the process rather than recreate an Activity.
