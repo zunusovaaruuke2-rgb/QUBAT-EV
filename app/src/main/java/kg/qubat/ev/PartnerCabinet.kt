@@ -99,8 +99,8 @@ private fun knownSum(values:List<BigDecimal?>):BigDecimal?=if(values.isEmpty()||
             pages.forEach{item->DepthSurface(onClick={pageName=item.name;scope.launch{drawer.close()}},modifier=Modifier.fillMaxWidth().testTag("network-menu-${item.name.lowercase()}"),color=if(item==page)MaterialTheme.colorScheme.primaryContainer else SurfaceGreen){
                 AppText(item.label,Modifier.padding(15.dp),fontWeight=if(item==page)FontWeight.Bold else FontWeight.Normal)
             }}
-            PressTextButton(onClick={scope.launch{drawer.close()};onSwitchDemo()},modifier=Modifier.testTag("partner-switch-demo")){AppText("Сменить демо-аккаунт")}
-            PressTextButton(onClick=onSignOut,modifier=Modifier.testTag("partner-sign-out")){AppText("Выйти из кабинета")}
+            PressTextButton(onClick={scope.launch{drawer.close()};onSwitchDemo()},modifier=Modifier.testTag("network-drawer-switch-demo")){AppText("Сменить демо-аккаунт")}
+            PressTextButton(onClick=onSignOut,modifier=Modifier.testTag("network-drawer-sign-out")){AppText("Выйти из кабинета")}
         }
     }}) {
         Surface(Modifier.fillMaxSize().testTag("partner-screen").semantics{stateDescription="Отчёт загружен"},color=Forest) {

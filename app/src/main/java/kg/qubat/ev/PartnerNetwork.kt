@@ -142,7 +142,7 @@ data class NativeMonthFinance(
     val month:YearMonth,val stationIds:Set<String>,val fullMonth:Boolean,val energyKwh:BigDecimal,val chargedKgs:BigDecimal?,val revenueKgs:BigDecimal?,
     val unpaidKgs:BigDecimal?,val electricityEstimateKgs:BigDecimal?,val electricityFactKgs:BigDecimal?,val meterEnergyKwh:BigDecimal?,val meterDifferenceKwh:BigDecimal?,
     val platformKgs:BigDecimal?,val acquiringKgs:BigDecimal?,val taxKgs:BigDecimal?,val rentEstimateKgs:BigDecimal?,val rentFactKgs:BigDecimal?,val otherKgs:BigDecimal?,
-    val partnerShareKgs:BigDecimal?,val reserveKgs:BigDecimal?,val payoutKgs:BigDecimal,val estimatedProfitKgs:BigDecimal?,val actualProfitKgs:BigDecimal?,
+    val partnerShareKgs:BigDecimal?,val reserveKgs:BigDecimal?,val payoutKgs:BigDecimal?,val estimatedProfitKgs:BigDecimal?,val actualProfitKgs:BigDecimal?,
     val estimatedMarginPercent:BigDecimal?,val actualMarginPercent:BigDecimal?,val outstandingKgs:BigDecimal?,val billCount:Int,val billPaidCount:Int,
     val selectedDeductions:Set<NativeDeduction>,val factUnavailableReason:String?,val paymentDataComplete:Boolean=true,val unknownPaymentCount:Int=0
 ):Serializable
@@ -401,7 +401,7 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
             val rentExpenses=costs.filter{it.kind==NativeExpenseKind.RENT}.nSum{it.amountKgs}
             val rentFact=if(allBills && bills.all{it.actualRentKgs!=null})bills.nSum{it.actualRentKgs!!}+rentExpenses else if(full && rentEstimate?.signum()==0)rentExpenses else null
             val other=if(subset)null else costs.filter{it.kind !in setOf(NativeExpenseKind.RENT,NativeExpenseKind.PAYOUT)}.nSum{it.amountKgs}
-            val payout=costs.filter{it.kind==NativeExpenseKind.PAYOUT && it.paid}.nSum{it.amountKgs}
+            val payout=if(subset || stations.any{it.organizationId !in state.ledgerOrganizationIds})null else costs.filter{it.kind==NativeExpenseKind.PAYOUT && it.paid}.nSum{it.amountKgs}
             val base=mapOf(NativeDeduction.PLATFORM to platform,NativeDeduction.ACQUIRING to acquiring,NativeDeduction.TAX to tax,NativeDeduction.OTHER to other,NativeDeduction.PARTNER_SHARE to partner,NativeDeduction.RESERVE to reserve,NativeDeduction.PAYOUT to payout)
             val selectedBase=deductions.filter{it in base}
             val baseKnown=selectedBase.all{base[it]!=null}

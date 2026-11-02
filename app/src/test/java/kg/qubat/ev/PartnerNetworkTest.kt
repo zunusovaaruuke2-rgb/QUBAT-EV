@@ -295,4 +295,18 @@ class PartnerNetworkTest {
         assertEquals(state,restored)
         assertEquals(5,repo("demo-admin",restored).stations().size)
     }
+    @Test fun missingSettlementLedgerDoesNotInventZeroPayout() {
+        val state=clean()
+        state.ledgerOrganizationIds.clear()
+        state.sessions.add(session())
+        val owner=repo(state=state)
+        val month=owner.monthlyFinance(filter()).single()
+        assertNull(month.payoutKgs)
+        val cashDeductions=NativePartnerRepository.defaultDeductions-NativeDeduction.PARTNER_SHARE+NativeDeduction.PAYOUT
+        assertNull(owner.monthlyFinance(filter(),cashDeductions).single().estimatedProfitKgs)
+        state.ledgerOrganizationIds.add("demo-org-north")
+        money("0.00",owner.monthlyFinance(filter()).single().payoutKgs)
+        assertNull(owner.monthlyFinance(filter().copy(customerId=state.sessions.single().customerId)).single().payoutKgs)
+    }
+
 }
