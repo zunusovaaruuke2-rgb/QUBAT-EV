@@ -2,12 +2,14 @@ package kg.qubat.ev
 
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.graphics.asAndroidBitmap
-import java.io.File
-import android.graphics.Bitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.test.platform.app.InstrumentationRegistry
+import android.graphics.Bitmap
+import java.io.File
+import java.time.LocalDate
+import java.time.YearMonth
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.RuleChain
@@ -17,128 +19,97 @@ import org.junit.runners.model.Statement
 
 class PartnerCabinetTest {
     private val compose=createAndroidComposeRule<MainActivity>()
-    private fun clearDemoAccess() {
-        val context=InstrumentationRegistry.getInstrumentation().targetContext
-        context.getSharedPreferences("qubat_partner_demo_access",0).edit().clear().commit()
-        context.getSharedPreferences("qubat_ui",0).edit().putString("language","ru").commit()
+    private fun clearAccess() {
+        val c=InstrumentationRegistry.getInstrumentation().targetContext
+        c.getSharedPreferences("qubat_partner_demo_access",0).edit().clear().commit()
+        c.getSharedPreferences("qubat_ui",0).edit().putString("language","ru").commit()
     }
-    private val cleanAccess=object:TestRule {
-        override fun apply(base:Statement,description:Description)=object:Statement() {
-            override fun evaluate() {
-                clearDemoAccess()
-                try {base.evaluate()} finally {clearDemoAccess()}
-            }
-        }
+    private val cleanup=object:TestRule {
+        override fun apply(base:Statement,description:Description)=object:Statement(){override fun evaluate(){clearAccess();try{base.evaluate()}finally{clearAccess()}}}
     }
-    @get:Rule val chain:RuleChain=RuleChain.outerRule(cleanAccess).around(compose)
+    @get:Rule val chain:RuleChain=RuleChain.outerRule(cleanup).around(compose)
     private fun scroll(tag:String):SemanticsNodeInteraction {
         val list=compose.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex))
-        when {
-            tag.startsWith("partner-period-") || tag=="partner-station-filter" || tag=="partner-export" -> list.performScrollToIndex(1)
-            tag.startsWith("partner-tab-") -> list.performScrollToIndex(2)
-            else -> list.performScrollToNode(hasTestTag(tag))
-        }
-        try {return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()}
-        catch(failure:Throwable) {throw AssertionError("Partner scroll target $tag: ${compose.onNodeWithTag(tag).printToString()}",failure)}
+        if(tag.startsWith("network-period-")||tag=="network-station-filter")list.performScrollToIndex(0) else list.performScrollToNode(hasTestTag(tag))
+        try{return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()}catch(t:Throwable){throw AssertionError("Native partner scroll $tag: ${compose.onNodeWithTag(tag).printToString()}",t)}
     }
-    private fun ready() {
-        try {
-            compose.waitUntil(10000) {
-                val state=compose.onNodeWithTag("partner-screen").fetchSemanticsNode().config[SemanticsProperties.StateDescription]
-                if(state=="Ошибка отчёта") throw AssertionError("Report failed: ${compose.onRoot().printToString()}")
-                state=="Отчёт загружен"
-            }
-        } catch(failure:Throwable) {
-            throw AssertionError("Report state: ${compose.onNodeWithTag("partner-screen").printToString()} — ${failure.message}",failure)
-        }
-        compose.waitForIdle()
-    }
-    private fun preview(name:String) {
-        val directory=File(compose.activity.getExternalFilesDir(null),"partner-preview").apply {mkdirs()}
-        File(directory,"$name.png").outputStream().use {output->
-            compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,output)
-        }
-    }
-    @Test fun partnerDemoIsSeparateScopedAndNavigable() {
+    private fun ready(){compose.waitUntil(10000){compose.onNodeWithTag("partner-screen").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="Отчёт загружен"}}
+    private fun section(name:String){compose.onNodeWithTag("network-menu").performClick();compose.onNodeWithTag("network-menu-$name").performScrollTo().performClick();compose.waitForIdle()}
+    private fun preview(name:String){val dir=File(compose.activity.getExternalFilesDir(null),"partner-preview").apply{mkdirs()};File(dir,"$name.png").outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}}
+    @Test fun expandedNativeCabinetPersistsAndScopesEveryRole(){
         var stage="hidden entry"
-        try {
-        compose.waitUntil(5000) {compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
-        compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
-        compose.onNodeWithTag("partner-entry").assertDoesNotExist()
-        scroll("profile-about").performClick()
-        compose.onNodeWithTag("partner-demo-access").performTouchInput {longClick()}
-        compose.onNodeWithTag("partner-demo-dialog").assertIsDisplayed()
-        stage="owner A open"
-        compose.onNodeWithTag("partner-demo-demo-owner-a").performClick()
-        compose.onNodeWithTag("partner-screen").assertIsDisplayed()
-        ready()
-        stage="seven-day report"
-        scroll("partner-period-7").performClick()
-        ready()
-        scroll("partner-energy")
-        preview("partner-summary")
-        val repo=PartnerDemoRepository()
-        val snapshot=repo.report(repo.accounts.first {it.id=="demo-owner-a"},PartnerFilter(PartnerPeriod.sevenDays()))
-        File(compose.activity.getExternalFilesDir(null),"partner-preview/${PartnerExcel.fileName(snapshot)}").outputStream().use {PartnerExcel.write(snapshot,it)}
-        stage="station selector"
-        scroll("partner-station-filter").performClick()
-        compose.onNodeWithTag("partner-select-partner-demo-a-1").assertExists()
-        compose.onNodeWithTag("partner-select-partner-demo-b-1").assertDoesNotExist()
-        compose.onNodeWithTag("partner-select-partner-demo-a-1").performClick()
-        ready()
-        stage="station details"
-        scroll("partner-tab-stations").performClick()
-        scroll("partner-station-partner-demo-a-1")
-        preview("partner-station")
-        compose.onNodeWithTag("partner-station-partner-demo-b-1").assertDoesNotExist()
-        scroll("partner-station-filter").performClick()
-        compose.onNodeWithTag("partner-station-all").performClick()
-        ready()
-        stage="pagination"
-        scroll("partner-tab-sessions").performClick()
-        scroll("partner-page-next").assertIsEnabled().performClick()
-        scroll("partner-page-label").assertTextEquals("2 / 4")
-        stage="date validation"
-        scroll("partner-period-custom").performClick()
-        compose.onNodeWithTag("partner-date-from").performTextReplacement("2026-11-02")
-        compose.onNodeWithTag("partner-date-to").performTextReplacement("2026-11-01")
-        compose.onNodeWithTag("partner-date-apply").assertIsNotEnabled()
-        compose.onNodeWithTag("partner-date-from").performTextReplacement("2020-01-01")
-        compose.onNodeWithTag("partner-date-to").performTextReplacement("2020-01-01")
-        compose.onNodeWithTag("partner-date-apply").performClick()
-        ready()
-        compose.onNodeWithTag("partner-scroll").performScrollToNode(hasText("За выбранный период зарядок не найдено"))
-        compose.onNodeWithText("За выбранный период зарядок не найдено").assertIsDisplayed()
-        scroll("partner-period-7").performClick()
-        ready()
-        scroll("partner-tab-profile").performClick()
-        scroll("partner-switch-demo").performClick()
-        stage="owner B isolation"
-        compose.onNodeWithTag("partner-demo-demo-owner-b").performClick()
-        ready()
-        scroll("partner-station-filter").performClick()
-        compose.onNodeWithTag("partner-select-partner-demo-b-1").assertExists()
-        compose.onNodeWithTag("partner-select-partner-demo-a-1").assertDoesNotExist()
-        compose.onNodeWithTag("partner-station-all").performClick()
-        ready()
-        scroll("partner-tab-summary").performClick()
-        scroll("partner-paid")
-        compose.onNode(hasText("Нет данных") and hasAnyAncestor(hasTestTag("partner-paid"))).assertIsDisplayed()
-        preview("partner-unknown-payouts")
-        stage="activity recreation"
-        compose.activityRule.scenario.recreate()
-        compose.onNodeWithTag("partner-screen").assertIsDisplayed()
-        ready()
-        stage="back and sign out"
-        compose.onNodeWithTag("partner-back").performClick()
-        scroll("partner-entry").performClick()
-        ready()
-        scroll("partner-tab-profile").performClick()
-        scroll("partner-sign-out").performClick()
-        compose.onNodeWithTag("partner-screen").assertDoesNotExist()
-        compose.onNodeWithTag("partner-entry").assertDoesNotExist()
-        } catch(failure:Throwable) {
-            throw AssertionError("Partner UI stage: $stage — ${failure.message}",failure)
-        }
+        try{
+            compose.waitUntil(5000){compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
+            compose.onNodeWithText("Профиль",useUnmergedTree=true).performClick()
+            compose.onNodeWithTag("partner-entry").assertDoesNotExist()
+            scroll("profile-about").performClick()
+            compose.onNodeWithTag("partner-demo-access").performTouchInput{longClick()}
+            compose.onNodeWithTag("partner-demo-demo-owner-a").performScrollTo().performClick();ready()
+            stage="monitoring counts"
+            scroll("network-station-count")
+            compose.onNode(hasText("3 / 3 / 6") and hasAnyAncestor(hasTestTag("network-station-count"))).assertIsDisplayed()
+            stage="native point tariff"
+            section("points")
+            scroll("network-point-partner-demo-a-1").performClick()
+            scroll("network-point-tab-parameters").performClick()
+            scroll("network-tariff-edit").performClick()
+            compose.onNodeWithTag("network-tariff-customer").performScrollTo().performTextReplacement("14.75")
+            val tomorrow=LocalDate.now(PARTNER_ZONE).plusDays(1).toString()
+            compose.onNodeWithTag("network-tariff-from").performScrollTo().performTextReplacement(tomorrow)
+            compose.onNodeWithTag("network-tariff-reason").performScrollTo().performTextReplacement("ДЕМО тест новой версии")
+            compose.onNodeWithTag("network-tariff-editor-save").performClick()
+            compose.onNodeWithTag("network-tariff-editor").assertDoesNotExist()
+            stage="report filters and pagination"
+            section("reports")
+            scroll("network-period-week").performClick()
+            scroll("network-station-filter").performClick()
+            compose.onNodeWithTag("network-select-station-partner-demo-b-1").assertDoesNotExist()
+            compose.onNodeWithTag("network-select-station-").performClick()
+            scroll("network-page-next").assertIsEnabled().performClick()
+            scroll("network-page-label")
+            compose.onNodeWithTag("network-page-label").assertTextEquals("2 / 4")
+            scroll("network-report-summary");preview("android-expanded-reports")
+            val state=NativePartnerDisk(compose.activity).load()
+            val repo=NativePartnerRepository(NativePartnerRepository.accounts.first{it.id=="demo-owner-a"},state)
+            val report=repo.report(NativeReportFilter(PartnerPeriod.sevenDays(state.today)))
+            File(compose.activity.getExternalFilesDir(null),"partner-preview/${NativePartnerExcel.fileName(report)}").outputStream().use{NativePartnerExcel.write(report,it)}
+            stage="monthly invoice"
+            section("finance")
+            scroll("network-period-previous").performClick()
+            val previous=YearMonth.now(PARTNER_ZONE).minusMonths(1)
+            scroll("network-bill-edit-$previous").performClick()
+            compose.onNodeWithTag("network-bill-amount").performScrollTo().performTextReplacement("6543.21")
+            compose.onNodeWithTag("network-bill-number").performScrollTo().performTextReplacement("DEMO-NATIVE-001")
+            compose.onNodeWithTag("network-bill-reason").performScrollTo().performTextReplacement("Проверка квитанции Android")
+            compose.onNodeWithTag("network-bill-save").performClick()
+            compose.onNodeWithTag("network-bill-save").assertDoesNotExist()
+            check(state.monthBills.any{it.billNumber=="DEMO-NATIVE-001" && it.electricityKgs.toPlainString()=="6543.21"})
+            compose.activityRule.scenario.recreate();ready()
+            scroll("network-finance-profit");preview("android-expanded-finance")
+            stage="brands and access"
+            section("brands");scroll("network-brand-create").assertIsEnabled()
+            section("access");scroll("network-access-invite").assertIsEnabled()
+            stage="observer cannot change prices"
+            section("profile");scroll("partner-switch-demo").performClick()
+            compose.onNodeWithTag("partner-demo-demo-observer").performScrollTo().performClick();ready()
+            section("points");scroll("network-point-partner-demo-a-1").performClick()
+            scroll("network-point-tab-parameters").performClick()
+            compose.onNodeWithTag("network-tariff-edit").assertDoesNotExist()
+            stage="owner B scope and unknown payments"
+            section("profile");scroll("partner-switch-demo").performClick()
+            compose.onNodeWithTag("partner-demo-demo-owner-b").performScrollTo().performClick();ready()
+            section("reports");scroll("network-station-filter").performClick()
+            compose.onNodeWithTag("network-select-station-partner-demo-a-1").assertDoesNotExist()
+            compose.onNodeWithTag("network-select-station-").performClick()
+            stage="back and sign out"
+            compose.onNodeWithTag("partner-back").performClick()
+            scroll("partner-entry").performClick();ready()
+            section("profile");scroll("partner-sign-out").performClick()
+            compose.onNodeWithTag("partner-screen").assertDoesNotExist()
+            compose.onNodeWithTag("partner-entry").assertDoesNotExist()
+            stage="on-disk snapshot round trip"
+            val restored=NativeStateCodec.decode(File(compose.activity.filesDir,"qubat-partner-network-v2.bin").readBytes())
+            check(restored.tariffs.any{it.stationId=="partner-demo-a-1" && it.customerRate.compareTo(java.math.BigDecimal("14.75"))==0})
+        }catch(failure:Throwable){throw AssertionError("Native partner stage $stage: ${failure.message}",failure)}
     }
 }

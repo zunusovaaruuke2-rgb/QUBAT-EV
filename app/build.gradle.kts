@@ -7,8 +7,8 @@ android {
         applicationId = "kg.qubat.ev"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "1.8.0-demo"
+        versionCode = 22
+        versionName = "1.9.0-demo"
         manifestPlaceholders["mapsApiKey"] = mapsKey.get()
         buildConfigField("boolean", "MAPS_CONFIGURED", mapsKey.get().isNotBlank().toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -18,7 +18,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             signingConfig = signingConfigs.getByName("debug")
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"),"proguard-rules.pro")
         }
     }
     buildFeatures { compose = true; buildConfig = true }

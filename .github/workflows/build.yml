@@ -81,3 +81,4 @@ jobs:
           path: |
             app/build/reports/androidTests/
             app/build/reports/partner-preview/
+            app/build/reports/optimized-scroll/

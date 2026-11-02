@@ -8,9 +8,9 @@ import java.time.ZoneId
 val PARTNER_ZONE:ZoneId = ZoneId.of("Asia/Bishkek")
 private val ZERO=BigDecimal.ZERO
 
-enum class PartnerRole(val label:String) {DRIVER("Водитель"),OWNER("Владелец станции"),ADMIN("Администратор Qubat EV")}
-data class PartnerAccount(val id:String,val name:String,val role:PartnerRole)
-data class PartnerPeriod(val from:LocalDate,val to:LocalDate) {
+enum class PartnerRole(val label:String) {DRIVER("Водитель"),OWNER("Владелец сети"),ADMIN("Суперадминистратор QUBAT"),EMPLOYEE("Сотрудник партнёра"),ACCOUNTANT("Бухгалтер"),OBSERVER("Наблюдатель")}
+data class PartnerAccount(val id:String,val name:String,val role:PartnerRole):java.io.Serializable
+data class PartnerPeriod(val from:LocalDate,val to:LocalDate):java.io.Serializable {
     init {require(!to.isBefore(from)) {"Дата «По» должна быть не раньше даты «С»"}}
     val start:Instant get()=from.atStartOfDay(PARTNER_ZONE).toInstant()
     val endExclusive:Instant get()=to.plusDays(1).atStartOfDay(PARTNER_ZONE).toInstant()

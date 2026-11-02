@@ -54,6 +54,122 @@ adb("shell", "am", "start", "-W", "-n", PKG + "/.MainActivity")
 time.sleep(2.5)
 sizes = re.findall(r"(\d+)x(\d+)", adb("shell", "wm", "size"))
 w, h = map(int, sizes[-1])
+# Verify editing and persistence in the actual optimized APK.
+# Instrumentation may clean app data after its own tests; seed this scenario in release.
+def find_label(label, exact=False, scroll=True):
+    for attempt in range(30 if scroll else 1):
+        matches = []
+        for node in tree().iter("node"):
+            value = " ".join((node.get("text", "") or node.get("content-desc", "")).split())
+            x1, y1, x2, y2 = bounds(node)
+            if (value == label if exact else label in value) and x2 > x1 and y2 > y1 and 0 <= y1 < h:
+                matches.append(node)
+        if matches:
+            return min(matches, key=lambda n: len(n.get("text", "")))
+        if scroll:
+            # Short, slow drags keep small titles visible between hierarchy snapshots;
+            # a fast fling can jump past the first card below the tall filter panel.
+            drag_up()
+    print(ET.tostring(tree(), encoding="unicode"))
+    raise AssertionError("Optimized native partner label missing: " + label)
+
+def drag_up():
+    scrolls = [n for n in tree().iter("node") if n.get("scrollable") == "true"]
+    if not scrolls:
+        raise AssertionError("No visible scroll container")
+    node = max(scrolls, key=lambda n: (bounds(n)[2]-bounds(n)[0]) * (bounds(n)[3]-bounds(n)[1]))
+    x1, y1, x2, y2 = bounds(node)
+    adb("shell", "input", "swipe", str((x1+x2)//2), str(int(y1+(y2-y1)*.75)), str((x1+x2)//2), str(int(y1+(y2-y1)*.45)), "550")
+
+
+def find_id(tag):
+    for _ in range(35):
+        nodes = [n for n in tree().iter("node") if n.get("resource-id") == tag and bounds(n)[2] > bounds(n)[0] and bounds(n)[3] > bounds(n)[1]
+                 and (n.get("class") != "android.widget.EditText" or bounds(n)[3] - bounds(n)[1] >= 56)]
+        if nodes:
+            return nodes[0]
+        drag_up()
+    raise AssertionError("Optimized native tag missing: " + tag)
+
+
+def fill(tag, value):
+    actual = ""
+    for _ in range(3):
+        field = find_id(tag)
+        previous = field.get("text", "")
+        tap(field)
+        time.sleep(.4)
+        if find_id(tag).get("focused") != "true":
+            drag_up()
+            continue
+        # Ordinary editing keys work with both decimal and text Compose fields.
+        adb("shell", "input", "keyevent", "123")
+        adb("shell", "input", "keyevent", *(["67"] * (len(previous) + 2)))
+        adb("shell", "input", "text", value)
+        time.sleep(.5)
+        actual = find_id(tag).get("text")
+        if actual == value:
+            return
+    print(ET.tostring(tree(), encoding="unicode"), flush=True)
+    raise AssertionError("Field replacement failed: " + tag + "; actual=" + repr(actual))
+
+
+navigation("Профиль")
+tap(find_label("О приложении", exact=True))
+title = find_label("QUBAT EV", exact=True, scroll=False)
+x1, y1, x2, y2 = bounds(title)
+adb("shell", "input", "swipe", str((x1+x2)//2), str((y1+y2)//2), str((x1+x2)//2), str((y1+y2)//2), "900")
+tap(find_label("Кубат Север", scroll=False))
+find_label("Мониторинг", exact=True, scroll=False)
+menu = [n for n in tree().iter("node") if n.get("content-desc") == "Меню кабинета"]
+if not menu:
+    raise AssertionError("Optimized native partner menu missing")
+tap(menu[0])
+tap(find_label("Точки", exact=True, scroll=False))
+tap(find_id("network-point-partner-demo-a-1"))
+find_label("‹ Все точки", exact=True, scroll=False)
+find_label("QUBAT 1 · ДЕМО", exact=True, scroll=False)
+tap(find_id("network-point-tab-parameters"))
+tap(find_id("network-tariff-edit"))
+fill("network-tariff-customer", "15.25")
+fill("network-tariff-reason", "DEMO-release-persistence")
+# The emulator can leave the keyboard composing after injected text. Activate
+# the focused form action with hardware traversal, independent of IME geometry.
+for _ in range(8):
+    action = find_id("network-tariff-editor-save")
+    if action.get("focused") == "true":
+        adb("shell", "input", "keyevent", "66")
+        break
+    adb("shell", "input", "keyevent", "61")
+else:
+    raise AssertionError("Cannot focus release tariff Save action")
+time.sleep(1)
+saved_tree = tree()
+if any(n.get("resource-id") == "network-tariff-editor" for n in saved_tree.iter("node")):
+    print(ET.tostring(saved_tree, encoding="unicode"), flush=True)
+    raise AssertionError("Release tariff editor did not close after Save")
+find_label("15,25")
+capture("native-partner-release-edited")
+# Wait for the atomic background write, then kill the process rather than recreate an Activity.
+time.sleep(2)
+adb("shell", "am", "force-stop", PKG)
+adb("shell", "am", "start", "-W", "-n", PKG + "/.MainActivity")
+time.sleep(2.5)
+navigation("Профиль")
+tap(find_label("Кабинет партнёра", exact=True))
+tap(find_id("network-menu"))
+tap(find_label("Точки", exact=True, scroll=False))
+tap(find_id("network-point-partner-demo-a-1"))
+tap(find_id("network-point-tab-parameters"))
+find_label("15,25")
+capture("native-partner-release-persistence")
+print("Optimized native partner tariff 15.25 saved and survived process restart.", flush=True)
+
+back = [n for n in tree().iter("node") if n.get("content-desc") == "Назад в приложение"]
+assert back, "Native cabinet return missing"
+tap(back[0])
+tree()
+
 for label, name in (("Список", "list"), ("Зарядка", "charging"), ("Кошелёк", "wallet"), ("Профиль", "profile"), ("Карта", "map")):
     navigation(label)
     tree()  # Wait for the destination to settle before resetting frame counters.
@@ -88,6 +204,7 @@ for label, name in (("Кошелёк", "wallet"), ("Профиль", "profile"))
     capture(name + "-alternate-theme")
     nodes = [n for n in tree().iter("node") if n.get("content-desc") in ("Дневная тема", "Ночная тема")]
     tap(nodes[0])
+
 logs = adb("logcat", "-d", "-s", "AndroidRuntime:E")
 (OUT / "runtime.txt").write_text(logs)
 if "FATAL EXCEPTION" in logs and PKG in logs:
