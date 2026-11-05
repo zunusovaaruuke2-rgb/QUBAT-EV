@@ -41,9 +41,9 @@ import androidx.compose.ui.unit.sp
             }
             if(selected!=null) {
                 if(state.charges.size>1)PressTextButton(onClick={detail=null}){AppIcon(Icons.Default.ArrowBack,null);AppText(" Активные зарядки")}
-                ChargeDetail(selected,state,onStop,if(state.charges.size==1) ({detail=null;onAddVehicle()}) else null)
+                key(selected.session.connectorId){ChargeDetail(selected,state,onStop,if(state.charges.size==1) ({detail=null;onAddVehicle()}) else null)}
             } else state.charges.forEach{charge->
-                ChargeSessionCard(charge,state,{detail=charge.session.connectorId}){onStop(charge.session.connectorId)}
+                key(charge.session.connectorId){ChargeSessionCard(charge,state,{detail=charge.session.connectorId}){onStop(charge.session.connectorId)}}
             }
             AppText("Учебный баланс: ${money(state.availableBalanceMinor)}",fontSize=12.sp,color=Muted)
             AppText("ДЕМО · реальное оборудование не подключено",fontSize=10.sp,color=Muted)

@@ -33,8 +33,10 @@ class MultiChargeTest {
         file.outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
         // AGP may uninstall the target after instrumentation; keep previews in shell-owned storage.
         if(android.os.Build.VERSION.SDK_INT>=31) {
-            val pipes=InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommandRw("sh")
-            android.os.ParcelFileDescriptor.AutoCloseOutputStream(pipes[1]).use{it.write(("mkdir -p /data/local/tmp/qubat-charging\nrun-as kg.qubat.ev cat ${file.absolutePath} > /data/local/tmp/qubat-charging/$name.png\nexit\n").toByteArray())}
+            val automation=InstrumentationRegistry.getInstrumentation().uiAutomation
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand("mkdir -p /data/local/tmp/qubat-charging")).use{it.readBytes()}
+            val pipes=automation.executeShellCommandRw("dd of=/data/local/tmp/qubat-charging/$name.png")
+            android.os.ParcelFileDescriptor.AutoCloseOutputStream(pipes[1]).use{it.write(file.readBytes())}
             android.os.ParcelFileDescriptor.AutoCloseInputStream(pipes[0]).use{it.readBytes()}
         }
     }

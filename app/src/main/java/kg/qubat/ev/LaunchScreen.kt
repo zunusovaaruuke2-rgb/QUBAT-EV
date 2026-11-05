@@ -46,9 +46,9 @@ import kotlinx.coroutines.launch
             }
             Box(Modifier.fillMaxSize().testTag("launch-splash").pointerInput(Unit){awaitPointerEventScope{while(true){awaitPointerEvent().changes.forEach{it.consume()}}}}
                 .graphicsLayer{this.alpha=alpha.value}.background(Brush.radialGradient(listOf(Color(0xFF07563E),Color(0xFF002C27),Color(0xFF03131E))))) {
-                Column(Modifier.align(Alignment.Center).graphicsLayer{scaleX=scale.value;scaleY=scale.value;this.alpha=hero.value},horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(20.dp)) {
-                    Image(painterResource(R.drawable.qubat_logo),"QUBAT EV",Modifier.size(208.dp).clip(CircleShape).testTag("launch-emblem"),contentScale=ContentScale.Fit)
-                    AppText("QUBAT EV",color=Color.White,fontSize=27.sp,fontWeight=FontWeight.Bold,letterSpacing=3.sp)
+                Box(Modifier.fillMaxSize().graphicsLayer{scaleX=scale.value;scaleY=scale.value;this.alpha=hero.value}) {
+                    Image(painterResource(R.drawable.qubat_logo),"QUBAT EV",Modifier.size(208.dp).align(Alignment.Center).clip(CircleShape).testTag("launch-emblem"),contentScale=ContentScale.Fit)
+                    AppText("QUBAT EV",Modifier.align(Alignment.Center).offset(y=140.dp),color=Color.White,fontSize=27.sp,fontWeight=FontWeight.Bold,letterSpacing=3.sp)
                 }
             }
         }

@@ -146,8 +146,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                                 ?: station.connectors.firstOrNull {it.state==ConnectorState.FREE}
                             ChargeContent(station,chosenPort,state,addingVehicle,
                                 onChoose={selectedId=station.id;selectedConnectorId=it.id},
-                                onStart={if(vm.start(station,chosenPort?.id)) {selectedConnectorId=chosenPort?.id;addingVehicle=false;message("Запущена симуляция. Реальная станция не подключена.")} else message("Разъём недоступен или недостаточно учебного баланса")},
-                                onStop={id->vm.stop(id);message("Демо-сеанс завершён. Запись добавлена в кошелёк.")},
+                                onStart={if(vm.start(station,chosenPort?.id)) {selectedConnectorId=chosenPort?.id;addingVehicle=false} else message("Разъём недоступен или недостаточно учебного баланса")},
+                                onStop={id->vm.stop(id)},
                                 onRelease={chosenPort?.let {vm.releaseConnector(it.id)}},
                                 onStations={tabName=Tab.STATIONS.name},
                                 onAddVehicle={addingVehicle=true;selectedConnectorId=null;query="";minPower=0;statusName=StationStatus.AVAILABLE.name;tabName=Tab.STATIONS.name},
