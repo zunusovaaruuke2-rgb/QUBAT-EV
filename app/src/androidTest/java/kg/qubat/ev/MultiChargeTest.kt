@@ -29,7 +29,14 @@ class MultiChargeTest {
     @get:Rule val chain:RuleChain=RuleChain.outerRule(cleanup).around(compose)
     private fun preview(name:String) {
         val dir=File(compose.activity.getExternalFilesDir(null),"partner-preview").apply{mkdirs()}
-        File(dir,"$name.png").outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
+        val file=File(dir,"$name.png")
+        file.outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}
+        // AGP may uninstall the target after instrumentation; keep previews in shell-owned storage.
+        if(android.os.Build.VERSION.SDK_INT>=31) {
+            val pipes=InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommandRw("sh")
+            android.os.ParcelFileDescriptor.AutoCloseOutputStream(pipes[1]).use{it.write(("mkdir -p /data/local/tmp/qubat-charging\nrun-as kg.qubat.ev cat ${file.absolutePath} > /data/local/tmp/qubat-charging/$name.png\nexit\n").toByteArray())}
+            android.os.ParcelFileDescriptor.AutoCloseInputStream(pipes[0]).use{it.readBytes()}
+        }
     }
     @Test fun addSecondVehicleFromPlusAndStopEachIndependently() {
         compose.waitUntil(5000){compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
@@ -65,9 +72,16 @@ class MultiChargeTest {
         compose.onNodeWithTag("stop-charge-$first").performScrollTo().performClick()
         compose.waitUntil(5000){vm.state.value.charges.size==1}
         assertEquals(second,vm.state.value.charges.single().session.connectorId)
+        compose.waitForIdle()
         compose.onNodeWithTag("charge-details-$second").assertExists()
-        compose.onNodeWithTag("stop-charge-$second").performScrollTo().performClick()
-        compose.waitUntil(5000){!vm.state.value.active}
+        compose.onNodeWithTag("stop-charge-$second").performScrollTo().assertIsDisplayed()
+        compose.waitForIdle()
+        compose.onNodeWithTag("stop-charge-$second").performClick()
+        try{compose.waitUntil(5000){!vm.state.value.active}}catch(failure:Throwable){
+            preview("charging-stop-failure")
+            val ui=runCatching{compose.onRoot().printToString()}.getOrElse{it.toString()}
+            throw AssertionError("Second stop: ${vm.state.value}; UI: $ui",failure)
+        }
         assertEquals(2,vm.state.value.history.size)
         assertTrue(vm.state.value.balanceMinor>=0)
         assertEquals(setOf(first,second),vm.state.value.completedConnectorIds)

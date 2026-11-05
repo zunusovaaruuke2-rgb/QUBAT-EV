@@ -68,7 +68,7 @@ jobs:
           api-level: 35
           arch: x86_64
           disable-animations: true
-          script: bash -c './gradlew connectedDebugAndroidTest && ./gradlew assembleRelease && python3 scripts/smoke_optimized.py; qubat_ui_exit=$?; adb pull /sdcard/Android/data/kg.qubat.ev/files/partner-preview app/build/reports/partner-preview >/dev/null 2>&1 || true; if [ "$qubat_ui_exit" -ne 0 ]; then python3 scripts/print_android_failures.py; adb logcat -d -s QUBAT_MAP:E QUBAT_PARTNER:V AndroidRuntime:E; fi; exit "$qubat_ui_exit"'
+          script: bash -c './gradlew connectedDebugAndroidTest && ./gradlew assembleRelease && python3 scripts/smoke_optimized.py; qubat_ui_exit=$?; adb pull /sdcard/Android/data/kg.qubat.ev/files/partner-preview app/build/reports/partner-preview >/dev/null 2>&1 || true; adb pull /data/local/tmp/qubat-charging app/build/reports/charging-preview >/dev/null 2>&1 || true; if [ "$qubat_ui_exit" -ne 0 ]; then python3 scripts/print_android_failures.py; adb logcat -d -s QUBAT_MAP:E QUBAT_PARTNER:V AndroidRuntime:E; fi; exit "$qubat_ui_exit"'
       - uses: actions/upload-artifact@v4
         if: success()
         with:
@@ -81,4 +81,5 @@ jobs:
           path: |
             app/build/reports/androidTests/
             app/build/reports/partner-preview/
+            app/build/reports/charging-preview/
             app/build/reports/optimized-scroll/

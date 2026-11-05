@@ -52,6 +52,13 @@ object ChargingEngine {
     fun advance(state:AppState,now:Long):AppState {
         if(!state.active)return state
         val current=refreshPowers(state)
+        // A battery can finish while the app is closed. Split catch-up at that
+        // event so the other port receives the freed power for the remaining time.
+        val nextFullAt=current.charges.minOf{charge->
+            val seconds=ceil((BATTERY_ENERGY_KWH-charge.progress.energyKwh).coerceAtLeast(0.0)*3600/powerKw(current,charge)).toLong()
+            if(charge.updatedAt>Long.MAX_VALUE-seconds*1000)Long.MAX_VALUE else charge.updatedAt+seconds*1000
+        }
+        if(nextFullAt<now)return advance(advance(current,nextFullAt),now)
         val desired=current.charges.map{charge->
             val elapsed=((now-charge.updatedAt).coerceAtLeast(0)/1000)
             val power=powerKw(current,charge)

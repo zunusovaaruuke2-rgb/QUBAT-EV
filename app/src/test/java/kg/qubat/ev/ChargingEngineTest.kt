@@ -98,6 +98,16 @@ class ChargingEngineTest {
         assertEquals(ConnectorState.COMPLETED,stopped.connectors.first{it.id==a}.state)
         assertEquals(ConnectorState.CHARGING,stopped.connectors.first{it.id==b}.state)
     }
+    @Test fun offlineCatchupReallocatesPowerAfterFirstBatteryFills() {
+        val initial=start(start(AppState(),sameA),sameB,epoch+1_800_000)
+        val catchup=ChargingEngine.advance(initial,epoch+5_000_000)
+        var ticking=initial
+        for(i in 1801..5000)ticking=ChargingEngine.advance(ticking,epoch+i*1000L)
+        assertFalse(catchup.active)
+        assertEquals(20400,catchup.balanceMinor)
+        assertEquals(ticking.balanceMinor,catchup.balanceMinor)
+        assertEquals(ticking.history.map{it.amountMinor}.sorted(),catchup.history.map{it.amountMinor}.sorted())
+    }
     @Test fun replacementVehicleReusesFreeSlotWithoutReusingOccupiedPort() {
         var s=start(start(AppState(),a),b)
         s=ChargingEngine.stop(s,a,epoch+1000)
