@@ -130,7 +130,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 if(tab==Tab.CHARGE) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
                     androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.qubat_logo),"QUBAT",Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape))
-                    Column(Modifier.weight(1f).padding(start=12.dp)) { AppText("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); AppText("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp) }
+                    Column(Modifier.weight(1f).padding(start=12.dp)) { AppText("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); AppText("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp,lineHeight=14.sp,maxLines=2) }
                     ThemeToggle()
                 }
                 HorizontalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.3f))
