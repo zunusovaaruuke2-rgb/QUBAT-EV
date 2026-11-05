@@ -246,7 +246,7 @@ class NavigationTest {
             visible("Зарядка идёт")
             android.os.SystemClock.sleep(1300)
             compose.onNodeWithTag("charge-power-chart").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithText("Остановить симуляцию",substring=true).performScrollTo().performClick()
+            compose.onNodeWithText("Остановить зарядку",substring=true).performScrollTo().performClick()
             visible("Аппарат 1 · разъём 1 · Завершён")
             compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo()
                 .performSemanticsAction(SemanticsActions.OnClick) { it() }

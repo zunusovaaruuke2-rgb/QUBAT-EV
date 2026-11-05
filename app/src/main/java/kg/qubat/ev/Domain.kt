@@ -40,17 +40,20 @@ data class Station(val id:String,val city:String,val title:String,val point:GeoP
 }
 fun demoBatteryPercent(energyKwh:Double):Int = (20 + energyKwh.coerceAtLeast(0.0) / 60.0 * 100).toInt().coerceIn(20,100)
 
-fun Station.withConnectorSession(activeId:String?,completed:Set<String>,activePercent:Int=20):Station {
-    if(connectors.none {it.id==activeId || it.id in completed}) return this
+fun Station.withConnectorSession(activeId:String?,completed:Set<String>,activePercent:Int=20):Station =
+    withConnectorSessions(activeId?.let{mapOf(it to activePercent)} ?: emptyMap(),completed)
+
+fun Station.withConnectorSessions(active:Map<String,Int>,completed:Set<String>):Station {
+    if(connectors.none {it.id in active || it.id in completed})return this
     val updated=chargers.map {unit->
         val ports=unit.connectors.map {port->when {
-            port.id==activeId -> port.copy(state=ConnectorState.CHARGING,percent=activePercent.coerceIn(0,100))
+            port.id in active -> port.copy(state=ConnectorState.CHARGING,percent=active.getValue(port.id).coerceIn(0,100))
             port.id in completed -> port.copy(state=ConnectorState.COMPLETED,percent=null)
             else -> port
         }}
-        if(ports==unit.connectors) unit else unit.copy(connectors=ports)
+        if(ports==unit.connectors)unit else unit.copy(connectors=ports)
     }
-    return if(updated==chargers) this else copy(chargers=updated)
+    return if(updated==chargers)this else copy(chargers=updated)
 }
 
 object DemoData {

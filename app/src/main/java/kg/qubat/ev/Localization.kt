@@ -88,6 +88,20 @@ private fun translateUncached(text:String,language:AppLanguage):String {
 }
 
 private val translations by lazy {listOf(
+    Translation("Активные зарядки","Active charging","Активдүү кубаттоолор"),
+    Translation("Второй автомобиль","Second car","Экинчи унаа"),
+    Translation("Добавить автомобиль","Add car","Унаа кошуу"),
+    Translation("Вернуться к зарядкам","Back to charging","Кубаттоого кайтуу"),
+    Translation("Остановить зарядку","Stop charging","Кубаттоону токтотуу"),
+    Translation("Мощность зарядки (кВт)","Charging power (kW)","Кубаттоо кубаттуулугу (кВт)"),
+    Translation("Демо-график мощности зарядки","Demo charging power chart","Кубаттуулуктун демо-графиги"),
+    Translation("ДЕМО · реальное оборудование не подключено","DEMO · real equipment is not connected","ДЕМО · чыныгы жабдуу туташкан эмес"),
+    Translation("Уже заряжаются два автомобиля","Two cars are already charging","Эки унаа кубатталып жатат"),
+    Translation("Автомобиль","Car","Унаа"),
+    Translation("сеанса","sessions","сеанс"),
+    Translation("сеанс","session","сеанс"),
+    Translation("Сейчас","Now","Азыр"),
+
     Translation("Карта","Map","Карта"),
     Translation("Список","List","Тизме"),
     Translation("Зарядка","Charging","Кубаттоо"),
