@@ -61,6 +61,7 @@ class ChargePhoneLayoutTest {
         compose.waitUntil(5000){compose.onAllNodesWithTag("charge-session-${ids[1]}").fetchSemanticsNodes().isNotEmpty()}
         compose.onAllNodes(hasScrollAction()).assertCountEquals(0)
         noOverflow(compose.onNodeWithTag("charge-heading",useUnmergedTree=true))
+        noOverflow(compose.onNodeWithText("Кошелёк",useUnmergedTree=true))
         ids.forEach {id->
             val card=compose.onNodeWithTag("charge-session-$id").fetchSemanticsNode().boundsInRoot
             val gauge=compose.onNodeWithTag("charge-gauge-$id",useUnmergedTree=true).fetchSemanticsNode().boundsInRoot
