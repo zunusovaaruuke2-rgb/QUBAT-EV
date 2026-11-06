@@ -30,6 +30,13 @@ class PartnerCabinetTest {
     @get:Rule val chain:RuleChain=RuleChain.outerRule(cleanup).around(compose)
     private fun scroll(tag:String):SemanticsNodeInteraction {
         compose.waitForIdle()
+        // This report fixture renders five header items and twenty session rows per page.
+        // Jump to its pagination instead of recursively traversing lazily prefetched semantics.
+        if(tag.startsWith("network-page-")) {
+            compose.onNodeWithTag("network-reports-scroll").performScrollToIndex(5+20)
+            compose.waitForIdle()
+            return compose.onNodeWithTag(tag).assertIsDisplayed()
+        }
         val matcher=hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex)
         // A press animation being idle does not imply that a pending modal action has run.
         compose.waitUntil(5000){compose.onAllNodes(matcher).fetchSemanticsNodes().size==1}

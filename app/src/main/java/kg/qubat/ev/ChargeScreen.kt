@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -42,7 +43,7 @@ import androidx.compose.ui.unit.sp
         Column(Modifier.fillMaxSize().testTag("charging-viewport"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             if(state.charges.size>1)Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 ChargeText(if(selected!=null)"Зарядка" else "Активные зарядки",Modifier.weight(1f).testTag("charge-heading"),fontSize=17.sp,fontWeight=FontWeight.Bold,maxLines=1)
-                ChargePill("${state.charges.size} сеанса")
+                ChargePill("Демо · ${state.charges.size}")
                 if(selected!=null)PressIconButton(onClick={detail=null}){AppIcon(Icons.Default.ArrowBack,"Активные зарядки")}
             }
             if(selected!=null) {
@@ -118,9 +119,10 @@ import androidx.compose.ui.unit.sp
     val power=ChargingEngine.powerKw(state,charge)
     BoxWithConstraints(modifier.fillMaxWidth()) {
     val roomy=maxHeight>=520.dp
+    val metricsHeight=with(LocalDensity.current){(12.sp.toDp()+15.sp.toDp())*5f+36.dp}
     Column(Modifier.fillMaxSize().testTag("charge-details-${port.id}"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         ChargeStationCard(station,port,!roomy)
-        Row(Modifier.fillMaxWidth().height(if(roomy)214.dp else 168.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().height(maxOf(if(roomy)214.dp else 168.dp,metricsHeight)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             BoxWithConstraints(Modifier.weight(.42f).fillMaxHeight(),contentAlignment=Alignment.Center) {
                 val diameter=minOf(maxWidth,maxHeight,164.dp)
                 ChargeGauge(demoBatteryPercent(charge.progress.energyKwh),true,Modifier.size(diameter).testTag("charge-gauge-${port.id}"),false)
@@ -181,9 +183,9 @@ import androidx.compose.ui.unit.sp
     Box(modifier,contentAlignment=Alignment.Center) {
         CircularProgressIndicator(progress={percent/100f},modifier=Modifier.fillMaxSize().padding(5.dp),color=Lime,trackColor=Muted.copy(alpha=.16f),strokeWidth=if(compact)8.dp else 10.dp,strokeCap=StrokeCap.Round)
         Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
-            if(!compact)CarGlyph(Modifier.size(30.dp))
-            ChargeText("$percent%",fontSize=if(compact)26.sp else 31.sp,fontWeight=FontWeight.Bold,color=Lime)
-            if(!compact){ChargeText(if(active)"Зарядка идёт" else "Готово к зарядке",fontSize=12.sp,color=Muted);ChargeText("Демо-режим",fontSize=11.sp,color=Lime)}
+            if(!compact)CarGlyph(Modifier.size(28.dp))
+            ChargeText("$percent%",fontSize=if(compact)26.sp else 30.sp,fontWeight=FontWeight.Bold,color=Lime)
+            if(!compact){ChargeText(if(active)"Зарядка идёт" else "Готово к зарядке",fontSize=12.sp,color=Muted)}
         }
     }
 }
