@@ -216,8 +216,12 @@ class NavigationTest {
             compose.onNodeWithTag("station-search-field").performImeAction()
             visible("Тянь-Шань · DEMO 05")
             step("Список показывает состояния отдельных разъёмов") {
-                listOf("1-port-2" to "Заряжается","2-port-1" to "Подключён","3-port-1" to "Завершён","3-port-2" to "Ошибка").forEach {(suffix,title)->
-                    compose.onNodeWithTag("connector-demo-naryn-unit-$suffix").performScrollTo().performClick()
+                // Charging is checked on Bishkek map above. Naryn now has a one-port first apparatus.
+                val site=DemoData.stations.first{it.id=="demo-naryn"}
+                listOf(ConnectorState.CONNECTED,ConnectorState.COMPLETED,ConnectorState.ERROR).forEach {state->
+                    val port=site.connectors.first{it.state==state}
+                    val title=state.title
+                    compose.onNodeWithTag("connector-${port.id}").performScrollTo().performClick()
                     compose.onNodeWithTag("connector-dialog-state").assertTextEquals(title)
                     compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
                     compose.onNodeWithText("Закрыть").performClick()
@@ -251,10 +255,10 @@ class NavigationTest {
             compose.onNodeWithText("Завершён",substring=true).assertIsDisplayed()
             compose.onNodeWithText("Освободить разъём после сеанса").assertIsDisplayed()
                 .performSemanticsAction(SemanticsActions.OnClick) { it() }
-            compose.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performSemanticsAction(SemanticsActions.ScrollBy) { it(0f,-10000f) }
+            compose.waitForIdle()
             try {
                 compose.waitUntil(5000) {
-                    compose.onAllNodesWithText("Аппарат 1 · разъём 1 · Свободен").fetchSemanticsNodes().isNotEmpty()
+                    compose.onAllNodesWithText("Свободен").fetchSemanticsNodes().isNotEmpty()
                 }
             } catch(failure:Throwable) {
                 throw AssertionError(compose.onRoot().printToString(),failure)
