@@ -153,7 +153,9 @@ import androidx.compose.ui.unit.sp
                 ChargePill("Заряжается")
             }
             Row(Modifier.weight(1f),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-                ChargeGauge(demoBatteryPercent(charge.progress.energyKwh),true,Modifier.weight(.38f).aspectRatio(1f),true)
+                Box(Modifier.weight(.38f).fillMaxHeight(),contentAlignment=Alignment.Center) {
+                    ChargeGauge(demoBatteryPercent(charge.progress.energyKwh),true,Modifier.fillMaxHeight().aspectRatio(1f,matchHeightConstraintsFirst=true),true)
+                }
                 Column(Modifier.weight(.62f),verticalArrangement=Arrangement.spacedBy(if(roomy)4.dp else 0.dp)) {
                     ChargeMetric(0,"Мощность","${String.format(Ru,"%.1f",ChargingEngine.powerKw(state,charge))} кВт",false,roomy=roomy)
                     ChargeMetric(1,"Получено","${energy(charge.progress.energyKwh)} кВт·ч",false,roomy=roomy)
