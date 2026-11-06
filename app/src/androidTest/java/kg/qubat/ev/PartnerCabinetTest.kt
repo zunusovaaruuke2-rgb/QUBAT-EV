@@ -34,7 +34,7 @@ class PartnerCabinetTest {
         if(tag.startsWith("network-period-")||tag=="network-station-filter")list.performScrollToIndex(0) else list.performScrollToNode(hasTestTag(tag))
         try{return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()}catch(t:Throwable){throw AssertionError("Native partner scroll $tag: ${compose.onNodeWithTag(tag).printToString()}",t)}
     }
-    private fun ready(){compose.waitUntil(10000){compose.onNodeWithTag("partner-screen").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="Отчёт загружен"}}
+    private fun ready(){compose.waitUntil(10000){compose.onNodeWithTag("partner-screen").stateDescriptionOnMain()=="Отчёт загружен"}}
     private fun section(name:String){compose.onNodeWithTag("network-menu").performClick();compose.onNodeWithTag("network-menu-$name").performScrollTo().performClick();compose.waitForIdle()}
     private fun preview(name:String){val dir=File(compose.activity.getExternalFilesDir(null),"partner-preview").apply{mkdirs()};File(dir,"$name.png").outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}}
     @Test fun expandedNativeCabinetPersistsAndScopesEveryRole(){

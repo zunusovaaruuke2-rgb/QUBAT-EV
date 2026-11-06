@@ -60,7 +60,7 @@ class NavigationTest {
             compose.onNodeWithText("Источники карты").assertIsDisplayed()
             compose.onNodeWithText("Закрыть").performClick()
             val map=compose.onNodeWithTag("world-map")
-            compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+            compose.waitUntil(45000) {map.stateDescriptionOnMain().contains("карта загружена")}
             var nativeMap:MapLibreMap?=null
             lateinit var nativeView:MapView
             compose.runOnIdle {nativeView=findMapView(compose.activity.window.decorView)!!;nativeView.getMapAsync {nativeMap=it}}
@@ -84,11 +84,11 @@ class NavigationTest {
                 val switch=if(compose.onAllNodesWithContentDescription("Ночная тема").fetchSemanticsNodes().isNotEmpty()) "Ночная тема" else "Дневная тема"
                 compose.onNodeWithContentDescription(switch).performClick()
                 compose.waitForIdle()
-                compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+                compose.waitUntil(45000) {map.stateDescriptionOnMain().contains("карта загружена")}
                 verifyMapContrast()
                 compose.onNodeWithContentDescription(if(switch=="Ночная тема") "Дневная тема" else "Ночная тема").assertIsDisplayed().performClick()
                 compose.waitForIdle()
-                compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+                compose.waitUntil(45000) {map.stateDescriptionOnMain().contains("карта загружена")}
                 verifyMapContrast()
             }
             verifyMapContrast()
@@ -133,7 +133,7 @@ class NavigationTest {
             step("Увеличение масштаба карты") {
                 compose.onNodeWithContentDescription("Увеличить карту").performClick()
                 try {compose.waitUntil(10000) {zoom()>initial+0.5}}
-                catch(failure:Throwable) {throw AssertionError("Масштаб до: $initial; после: ${zoom()}; ${map.fetchSemanticsNode().config[SemanticsProperties.StateDescription]}",failure)}
+                catch(failure:Throwable) {throw AssertionError("Масштаб до: $initial; после: ${zoom()}; ${map.stateDescriptionOnMain()}",failure)}
             }
             val initialLongitude=centre().longitude
             step("Перемещение нативной карты") {
@@ -345,7 +345,7 @@ class NavigationTest {
                 compose.waitUntil(10000) {nearMe()}
                 android.os.SystemClock.sleep(2100)
                 fix(42.876,74.571)
-                compose.waitUntil(10000) {compose.onNodeWithTag("user-location").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="42.876,74.571"}
+                compose.waitUntil(10000) {compose.onNodeWithTag("user-location").stateDescriptionOnMain()=="42.876,74.571"}
             } finally {manager.removeTestProvider(android.location.LocationManager.GPS_PROVIDER)}
         }
     }
