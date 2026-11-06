@@ -119,10 +119,10 @@ import androidx.compose.ui.unit.sp
     val power=ChargingEngine.powerKw(state,charge)
     BoxWithConstraints(modifier.fillMaxWidth()) {
     val roomy=maxHeight>=520.dp
-    val metricsHeight=with(LocalDensity.current){(12.sp.toDp()+15.sp.toDp())*5f+36.dp}
+    val metricsHeight=with(LocalDensity.current){(12.sp.toDp()+15.sp.toDp())*5f+20.dp}
     Column(Modifier.fillMaxSize().testTag("charge-details-${port.id}"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
         ChargeStationCard(station,port,!roomy)
-        Row(Modifier.fillMaxWidth().height(maxOf(if(roomy)214.dp else 168.dp,metricsHeight)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
+        Row(Modifier.fillMaxWidth().height(maxOf(if(roomy)214.dp else 156.dp,metricsHeight)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             BoxWithConstraints(Modifier.weight(.42f).fillMaxHeight(),contentAlignment=Alignment.Center) {
                 val diameter=minOf(maxWidth,maxHeight,164.dp)
                 ChargeGauge(demoBatteryPercent(charge.progress.energyKwh),true,Modifier.size(diameter).testTag("charge-gauge-${port.id}"),false)
@@ -191,7 +191,7 @@ import androidx.compose.ui.unit.sp
 }
 @Composable private fun ChargeMetric(kind:Int,label:String,value:String,panel:Boolean,modifier:Modifier=Modifier,roomy:Boolean=false,id:String="") {
     val body:@Composable ()->Unit={
-        Row(Modifier.fillMaxSize().padding(horizontal=if(roomy)10.dp else 6.dp,vertical=2.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(if(roomy)10.dp else 6.dp)) {
+        Row(Modifier.fillMaxSize().padding(horizontal=if(roomy)10.dp else 6.dp,vertical=0.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(if(roomy)10.dp else 6.dp)) {
             ChargeSymbol(kind,Modifier.size(18.dp).testTag("metric-icon-$kind"))
             Column(Modifier.weight(1f)) {
                 ChargeText(label,Modifier.testTag("metric-label-$kind"),fontSize=12.sp,color=Muted,maxLines=1)

@@ -73,7 +73,10 @@ class MultiChargeTest {
             assertChargeTextFits(value)
         }
         compose.onNodeWithText("Стоимость").assertIsDisplayed()
-        compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed();preview("charging-one-car-light")
+        compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed()
+        assertChargeTextFits(compose.onNodeWithTag("chart-y-100",useUnmergedTree=true))
+        assertChargeTextFits(compose.onNodeWithTag("chart-y-0",useUnmergedTree=true))
+        preview("charging-one-car-light")
         compose.onNodeWithTag("add-charge").assertIsDisplayed().performClick()
         compose.onNodeWithTag("stations-list").performScrollToIndex(0)
         compose.onNodeWithTag("connector-$second").performScrollTo().performClick()
