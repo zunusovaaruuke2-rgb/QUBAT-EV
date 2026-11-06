@@ -33,12 +33,7 @@ import androidx.compose.ui.unit.Dp
         val fillBrush=Brush.linearGradient(listOf(lerp(color,Color.White,if(night).07f else .02f),color,lerp(color,Color.Black,if(night).11f else .045f)),Offset.Zero,Offset(size.width,size.height))
         val edge=Brush.linearGradient(listOf(Color.White.copy(alpha=if(night).28f else .96f),Color.White.copy(alpha=if(night).07f else .4f),Color.Black.copy(alpha=if(night).3f else .18f)),Offset.Zero,Offset(size.width,size.height))
         val rim=Stroke(1.dp.toPx())
-        val offset=depth.toPx()
         onDrawWithContent {
-            if(offset>0f) {
-                translate(top=offset) {drawOutline(outline,Color.Black.copy(alpha=if(night).23f else .10f),style=if(fill)androidx.compose.ui.graphics.drawscope.Fill else rim)}
-                translate(top=offset*.5f) {drawOutline(outline,Color.Black.copy(alpha=if(night).12f else .05f),style=if(fill)androidx.compose.ui.graphics.drawscope.Fill else rim)}
-            }
             if(fill) drawOutline(outline,fillBrush)
             drawContent()
             drawOutline(outline,edge,style=rim)
@@ -87,7 +82,7 @@ import androidx.compose.ui.unit.Dp
             scope.launch {
                 try {
                     pause.snapTo(0f)
-                    pause.animateTo(1f,tween(240))
+                    pause.animateTo(1f,tween(100))
                     if(allowed)action()
                 } finally {pending=false}
             }
@@ -95,21 +90,11 @@ import androidx.compose.ui.unit.Dp
     }}
 }
 
-// Animate only the incoming page; no duplicate map or list is composed.
+// Brief opacity change avoids rotating a full-screen map texture on the GPU.
 @Composable fun Modifier.pageOpening(page:Any):Modifier {
     val progress=remember {androidx.compose.animation.core.Animatable(1f)}
-    LaunchedEffect(page) {
-        progress.snapTo(0f)
-        progress.animateTo(1f,tween(280))
-    }
-    return graphicsLayer {
-        val remaining=1f-progress.value
-        transformOrigin=TransformOrigin(0f,.5f)
-        cameraDistance=18f*density
-        rotationY=-12f*remaining
-        translationX=size.width*.035f*remaining
-        alpha=1f-.25f*remaining
-    }
+    LaunchedEffect(page) {progress.snapTo(.94f);progress.animateTo(1f,tween(100))}
+    return graphicsLayer {alpha=progress.value}
 }
 
 // Only the drawing layer animates; layout and scroll positions do not change.
@@ -122,12 +107,12 @@ import androidx.compose.ui.unit.Dp
             val active=mutableSetOf<PressInteraction.Press>()
             source.interactions.collect {interaction->when(interaction) {
                 is PressInteraction.Press -> {release?.cancel();active.add(interaction);pressed=true}
-                is PressInteraction.Release -> {active.remove(interaction.press);if(active.isEmpty())release=launch {delay(180);pressed=false}}
+                is PressInteraction.Release -> {active.remove(interaction.press);if(active.isEmpty())release=launch {delay(90);pressed=false}}
                 is PressInteraction.Cancel -> {active.remove(interaction.press);release?.cancel();if(active.isEmpty())pressed=false}
             }}
         }
     }
-    val fraction=animateFloatAsState(if(pressed && enabled)1f else 0f,tween(if(pressed)60 else 180),label="press-compression")
+    val fraction=animateFloatAsState(if(pressed && enabled)1f else 0f,tween(if(pressed)50 else 90),label="press-compression")
     return graphicsLayer {
         val value=fraction.value
         scaleX=1f-(1f-pressedScale)*value

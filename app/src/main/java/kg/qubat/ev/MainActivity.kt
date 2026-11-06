@@ -109,7 +109,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     }
     run {
         Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) {data->Snackbar {AppText(data.visuals.message)}} },bottomBar={
-            NavigationBar(modifier=Modifier.depthFrame(RoundedCornerShape(topStart=18.dp,topEnd=18.dp),SurfaceGreen,0.dp,fill=false),containerColor=SurfaceGreen) { Tab.entries.forEach { item -> PressNavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={AppIcon(item.icon,item.label)},label={AppText(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
+            NavigationBar(modifier=Modifier.depthFrame(RoundedCornerShape(topStart=18.dp,topEnd=18.dp),SurfaceGreen,0.dp,fill=false),containerColor=SurfaceGreen) { Tab.entries.forEach { item -> PressNavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={AppIcon(item.icon,item.label)},label={AppText(item.label,fontSize=12.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).pageOpening(tab)) {
                 if(tab==Tab.HOME) {
@@ -128,7 +128,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 } else {
                 if(tab==Tab.CHARGE) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
-                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.qubat_logo),"QUBAT",Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape))
+                    BrandMark(44.dp)
                     Column(Modifier.weight(1f).padding(start=12.dp)) { AppText("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); AppText("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp,lineHeight=14.sp,maxLines=2) }
                     ThemeToggle()
                 }

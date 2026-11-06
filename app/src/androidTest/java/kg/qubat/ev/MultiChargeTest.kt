@@ -50,7 +50,7 @@ class MultiChargeTest {
         compose.onNodeWithText("Выберите разъём и начните зарядку").assertDoesNotExist()
         compose.onNodeWithTag("charge-unit-${station.chargers[3].id}").performScrollTo().performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("charge-choice-${station.chargers[3].connectors[3].id}").assertIsDisplayed()
+        compose.onNodeWithTag("charge-choice-${station.chargers[3].connectors[3].id}").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("start-charge").assertIsDisplayed()
         preview("charging-selection")
         compose.onNodeWithTag("charge-unit-${station.chargers[0].id}").performScrollTo().performClick()
@@ -61,6 +61,15 @@ class MultiChargeTest {
         compose.onAllNodes(hasScrollAction()).assertCountEquals(0)
         compose.onNodeWithText("Заряд батареи (%)").assertIsDisplayed()
         compose.onNodeWithTag("charge-details-$first").assertExists()
+        for(kind in 0..3) {
+            val icon=compose.onNodeWithTag("metric-icon-$kind").assertIsDisplayed()
+            val label=compose.onNodeWithTag("metric-label-$kind").assertIsDisplayed()
+            val value=compose.onNodeWithTag("metric-value-$kind").assertIsDisplayed()
+            assertTrue(label.fetchSemanticsNode().boundsInRoot.left>icon.fetchSemanticsNode().boundsInRoot.right)
+            val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            value.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){it(layouts)}
+            assertTrue(layouts.single().layoutInput.style.fontSize.value>=16f)
+        }
         compose.onNodeWithText("Стоимость").assertIsDisplayed()
         compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed();preview("charging-one-car-light")
         compose.onNodeWithTag("add-charge").assertIsDisplayed().performClick()

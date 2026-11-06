@@ -47,7 +47,7 @@ import kotlinx.coroutines.launch
             Box(Modifier.fillMaxSize().testTag("launch-splash").pointerInput(Unit){awaitPointerEventScope{while(true){awaitPointerEvent().changes.forEach{it.consume()}}}}
                 .graphicsLayer{this.alpha=alpha.value}.background(Brush.radialGradient(listOf(Color(0xFF07563E),Color(0xFF002C27),Color(0xFF03131E))))) {
                 Box(Modifier.fillMaxSize().graphicsLayer{scaleX=scale.value;scaleY=scale.value;this.alpha=hero.value}) {
-                    Image(painterResource(R.drawable.qubat_logo),"QUBAT EV",Modifier.size(208.dp).align(Alignment.Center).clip(CircleShape).testTag("launch-emblem"),contentScale=ContentScale.Fit)
+                    BrandMark(192.dp,Modifier.align(Alignment.Center).testTag("launch-emblem"),"QUBAT EV")
                     AppText("QUBAT EV",Modifier.align(Alignment.Center).offset(y=140.dp),color=Color.White,fontSize=27.sp,fontWeight=FontWeight.Bold,letterSpacing=3.sp)
                 }
             }
