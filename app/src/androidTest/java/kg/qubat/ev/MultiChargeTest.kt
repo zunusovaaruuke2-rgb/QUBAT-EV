@@ -70,7 +70,7 @@ class MultiChargeTest {
             val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             value.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){it(layouts)}
             assertTrue(layouts.single().layoutInput.style.fontSize.value in 14f..16f)
-            assertFalse("Clipped value ${layouts.single().layoutInput.text}; size=${layouts.single().size}; constraints=${layouts.single().layoutInput.constraints}; width=${layouts.single().didOverflowWidth}; height=${layouts.single().didOverflowHeight}; paragraph=${layouts.single().multiParagraph.width}x${layouts.single().multiParagraph.height}",layouts.single().hasVisualOverflow)
+            assertChargeTextFits(value)
         }
         compose.onNodeWithText("Стоимость").assertIsDisplayed()
         compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed();preview("charging-one-car-light")

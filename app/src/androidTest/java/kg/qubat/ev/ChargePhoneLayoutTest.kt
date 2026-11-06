@@ -47,13 +47,7 @@ class ChargePhoneLayoutTest {
         }}
     }
     @get:Rule val chain:RuleChain=RuleChain.outerRule(display).around(compose)
-    private fun noOverflow(node:SemanticsNodeInteraction) {
-        node.assertIsDisplayed()
-        val results=mutableListOf<TextLayoutResult>()
-        node.performSemanticsAction(SemanticsActions.GetTextLayoutResult){it(results)}
-        assertFalse("Text is clipped: ${results.single().layoutInput.text}; size=${results.single().size}, constraints=${results.single().layoutInput.constraints}, width=${results.single().didOverflowWidth}, height=${results.single().didOverflowHeight}; paragraph=${results.single().multiParagraph.width}x${results.single().multiParagraph.height}",results.single().hasVisualOverflow)
-        assertEquals(1,results.single().lineCount)
-    }
+    private fun noOverflow(node:SemanticsNodeInteraction)=assertChargeTextFits(node)
     @Test fun twoCarsAndDetailFitWithEnlargedPhoneFont() {
         compose.waitUntil(10000){compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
         compose.onNodeWithText("Зарядка",useUnmergedTree=true).performClick()
