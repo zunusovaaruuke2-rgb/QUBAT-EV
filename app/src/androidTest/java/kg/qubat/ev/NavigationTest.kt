@@ -222,7 +222,7 @@ class NavigationTest {
                     val source=if(site.connectors.any{it.state==state})site else DemoData.stations.first{it.connectors.any{port->port.state==state}}
                     if(source.id!=site.id) {
                         compose.onNodeWithTag("station-search-field").performTextClearance()
-                        compose.onNodeWithTag("station-search-field").performTextInput(source.title)
+                        compose.onNodeWithTag("station-search-field").performTextInput(source.title.substringBefore(" ·"))
                         compose.onNodeWithTag("station-search-field").performImeAction()
                         visible(source.title)
                     }

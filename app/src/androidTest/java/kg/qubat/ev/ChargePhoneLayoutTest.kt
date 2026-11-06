@@ -51,7 +51,7 @@ class ChargePhoneLayoutTest {
         node.assertIsDisplayed()
         val results=mutableListOf<TextLayoutResult>()
         node.performSemanticsAction(SemanticsActions.GetTextLayoutResult){it(results)}
-        assertFalse("Text is clipped: ${results.single().layoutInput.text}",results.single().hasVisualOverflow)
+        assertFalse("Text is clipped: ${results.single().layoutInput.text}; size=${results.single().size}, constraints=${results.single().layoutInput.constraints}, width=${results.single().didOverflowWidth}, height=${results.single().didOverflowHeight}; paragraph=${results.single().multiParagraph.width}x${results.single().multiParagraph.height}",results.single().hasVisualOverflow)
         assertEquals(1,results.single().lineCount)
     }
     @Test fun twoCarsAndDetailFitWithEnlargedPhoneFont() {
@@ -59,9 +59,11 @@ class ChargePhoneLayoutTest {
         compose.onNodeWithText("Зарядка",useUnmergedTree=true).performClick()
         val ids=listOf(DemoData.stations[0].freeConnector()!!.id,DemoData.stations[1].freeConnector()!!.id)
         compose.waitUntil(5000){compose.onAllNodesWithTag("charge-session-${ids[1]}").fetchSemanticsNodes().isNotEmpty()}
+        compose.waitForIdle()
         compose.onAllNodes(hasScrollAction()).assertCountEquals(0)
         noOverflow(compose.onNodeWithTag("charge-heading",useUnmergedTree=true))
         noOverflow(compose.onNodeWithText("Кошелёк",useUnmergedTree=true))
+        saveChargePreview(compose,"charging-phone-two-cars")
         ids.forEach {id->
             val card=compose.onNodeWithTag("charge-session-$id").fetchSemanticsNode().boundsInRoot
             val gauge=compose.onNodeWithTag("charge-gauge-$id",useUnmergedTree=true).fetchSemanticsNode().boundsInRoot
@@ -75,6 +77,7 @@ class ChargePhoneLayoutTest {
         compose.onNodeWithTag("charge-session-${ids[1]}").performClick()
         compose.waitUntil(5000){compose.onAllNodesWithTag("charge-percent-chart").fetchSemanticsNodes().isNotEmpty()}
         noOverflow(compose.onNodeWithTag("charge-heading",useUnmergedTree=true))
+        saveChargePreview(compose,"charging-phone-detail")
         noOverflow(compose.onNodeWithTag("chart-y-100",useUnmergedTree=true))
         (0..3).forEach{noOverflow(compose.onNodeWithTag("metric-value-$it",useUnmergedTree=true))}
         val ticks=(0..2).map{index->

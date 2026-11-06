@@ -61,6 +61,7 @@ class MultiChargeTest {
         compose.onAllNodes(hasScrollAction()).assertCountEquals(0)
         compose.onNodeWithText("Заряд батареи (%)").assertIsDisplayed()
         compose.onNodeWithTag("charge-details-$first").assertExists()
+        preview("charging-one-car-light")
         for(kind in 0..3) {
             val icon=compose.onNodeWithTag("metric-icon-$kind").assertIsDisplayed()
             val label=compose.onNodeWithTag("metric-label-$kind").assertIsDisplayed()
@@ -69,7 +70,7 @@ class MultiChargeTest {
             val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             value.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){it(layouts)}
             assertTrue(layouts.single().layoutInput.style.fontSize.value in 14f..16f)
-            assertFalse(layouts.single().hasVisualOverflow)
+            assertFalse("Clipped value ${layouts.single().layoutInput.text}; size=${layouts.single().size}; constraints=${layouts.single().layoutInput.constraints}; width=${layouts.single().didOverflowWidth}; height=${layouts.single().didOverflowHeight}; paragraph=${layouts.single().multiParagraph.width}x${layouts.single().multiParagraph.height}",layouts.single().hasVisualOverflow)
         }
         compose.onNodeWithText("Стоимость").assertIsDisplayed()
         compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed();preview("charging-one-car-light")
