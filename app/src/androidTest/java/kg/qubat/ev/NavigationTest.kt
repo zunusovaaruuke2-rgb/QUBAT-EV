@@ -196,7 +196,8 @@ class NavigationTest {
             compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-1").performClick()
             compose.onNodeWithTag("start-charge").assertExists()
             compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
-            visible("Аппарат 1 · разъём 1 · Свободен")
+            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-1-port-1").assertIsDisplayed()
+            compose.onNodeWithText("Свободен").assertIsDisplayed()
         }
         step("Поиск только по названию станции и пустое состояние") {
             compose.onNodeWithText("Список",useUnmergedTree=true).performClick()
@@ -258,7 +259,8 @@ class NavigationTest {
             } catch(failure:Throwable) {
                 throw AssertionError(compose.onRoot().printToString(),failure)
             }
-            visible("Аппарат 1 · разъём 1 · Свободен")
+            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-1-port-1").assertIsDisplayed()
+            compose.onNodeWithText("Свободен").assertIsDisplayed()
         }
         step("История и профиль") {
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()

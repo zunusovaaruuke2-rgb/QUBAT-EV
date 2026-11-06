@@ -29,6 +29,7 @@ class PartnerCabinetTest {
     }
     @get:Rule val chain:RuleChain=RuleChain.outerRule(cleanup).around(compose)
     private fun scroll(tag:String):SemanticsNodeInteraction {
+        compose.waitForIdle()
         val list=compose.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex))
         if(tag.startsWith("network-period-")||tag=="network-station-filter")list.performScrollToIndex(0) else list.performScrollToNode(hasTestTag(tag))
         try{return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()}catch(t:Throwable){throw AssertionError("Native partner scroll $tag: ${compose.onNodeWithTag(tag).printToString()}",t)}
@@ -65,6 +66,7 @@ class PartnerCabinetTest {
             scroll("network-station-filter").performClick()
             compose.onNodeWithTag("network-select-station-partner-demo-b-1").assertDoesNotExist()
             compose.onNodeWithTag("network-select-station-").performClick()
+            compose.waitForIdle()
             scroll("network-page-next").assertIsEnabled().performClick()
             scroll("network-page-label")
             compose.onNodeWithTag("network-page-label").assertTextEquals("2 / 4")
@@ -101,6 +103,7 @@ class PartnerCabinetTest {
             section("reports");scroll("network-station-filter").performClick()
             compose.onNodeWithTag("network-select-station-partner-demo-a-1").assertDoesNotExist()
             compose.onNodeWithTag("network-select-station-").performClick()
+            compose.waitForIdle()
             stage="back and sign out"
             compose.onNodeWithTag("partner-back").performClick()
             scroll("partner-entry").performClick();ready()

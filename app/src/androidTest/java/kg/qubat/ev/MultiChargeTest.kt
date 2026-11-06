@@ -61,6 +61,7 @@ class MultiChargeTest {
         compose.onAllNodes(hasScrollAction()).assertCountEquals(0)
         compose.onNodeWithText("Заряд батареи (%)").assertIsDisplayed()
         compose.onNodeWithTag("charge-details-$first").assertExists()
+        compose.onNodeWithText("Стоимость").assertIsDisplayed()
         compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed();preview("charging-one-car-light")
         compose.onNodeWithTag("add-charge").assertIsDisplayed().performClick()
         compose.onNodeWithTag("stations-list").performScrollToIndex(0)
@@ -73,11 +74,17 @@ class MultiChargeTest {
         compose.onNodeWithTag("add-charge").assertDoesNotExist()
         compose.onNodeWithText("Зарядить ещё автомобиль",substring=true).assertDoesNotExist()
         compose.onNodeWithTag("stop-charge-$first").assertIsDisplayed()
-        compose.onNodeWithTag("stop-charge-$second").assertIsDisplayed();preview("charging-two-cars-light")
+        compose.onNodeWithTag("stop-charge-$second").assertIsDisplayed()
+        compose.onAllNodesWithText("Стоимость").assertCountEquals(2)
+        compose.onAllNodesWithText("Стоимость")[0].assertIsDisplayed()
+        compose.onAllNodesWithText("Стоимость")[1].assertIsDisplayed();preview("charging-two-cars-light")
         val theme=if(compose.onAllNodesWithContentDescription("Ночная тема").fetchSemanticsNodes().isNotEmpty())"Ночная тема" else "Дневная тема"
         compose.onNodeWithContentDescription(theme).performClick()
         compose.onNodeWithTag("stop-charge-$first").assertIsDisplayed()
-        compose.onNodeWithTag("stop-charge-$second").assertIsDisplayed();preview("charging-two-cars-dark")
+        compose.onNodeWithTag("stop-charge-$second").assertIsDisplayed()
+        compose.onAllNodesWithText("Стоимость").assertCountEquals(2)
+        compose.onAllNodesWithText("Стоимость")[0].assertIsDisplayed()
+        compose.onAllNodesWithText("Стоимость")[1].assertIsDisplayed();preview("charging-two-cars-dark")
         compose.waitUntil(5000){vm.state.value.charges.all{it.progress.seconds>=1}}
         val context=compose.activity.application
         val saved=compose.runOnIdle{ChargingViewModel(context)}

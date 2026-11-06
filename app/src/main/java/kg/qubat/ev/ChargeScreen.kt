@@ -115,7 +115,7 @@ import androidx.compose.ui.unit.sp
         ChargeStationCard(station,port)
         Row(Modifier.fillMaxWidth().weight(1.15f),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             Box(Modifier.weight(.48f),contentAlignment=Alignment.Center){ChargeGauge(demoBatteryPercent(charge.progress.energyKwh),true,Modifier.fillMaxWidth().aspectRatio(1f),false)}
-            Column(Modifier.weight(.52f),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.weight(.52f),verticalArrangement=Arrangement.spacedBy(2.dp)) {
                 ChargeMetric(0,"Мощность","${String.format(Ru,"%.1f",power)} кВт",true)
                 ChargeMetric(1,"Получено","${energy(charge.progress.energyKwh)} кВт·ч",true)
                 ChargeMetric(2,"Время",chargeTime(charge.progress.seconds),true)
@@ -133,18 +133,18 @@ import androidx.compose.ui.unit.sp
     val station=DemoData.stations.first{it.id==charge.session.stationId}
     val port=station.connectors.first{it.id==charge.session.connectorId}
     DepthSurface(onClick=onDetails,modifier=modifier.fillMaxWidth().testTag("charge-session-${port.id}"),shape=RoundedCornerShape(24.dp),color=SurfaceGreen) {
-        Column(Modifier.fillMaxSize().padding(10.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.fillMaxSize().padding(8.dp),verticalArrangement=Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(7.dp)) {
                 CarGlyph(Modifier.size(28.dp))
                 Column(Modifier.weight(1f)) {
-                    ChargeText("Автомобиль ${charge.session.vehicleNumber}",fontSize=17.sp,fontWeight=FontWeight.Bold,maxLines=1)
-                    ChargeText("${station.city} · Аппарат ${station.chargerNumber(port.id)} · GB/T ${port.number}",fontSize=10.sp,color=Muted,maxLines=2)
+                    ChargeText("Автомобиль ${charge.session.vehicleNumber}",fontSize=16.sp,fontWeight=FontWeight.Bold,maxLines=1)
+                    ChargeText("${station.city} · ${station.chargerNumber(port.id)}/${port.number}",fontSize=9.sp,color=Muted,maxLines=1)
                 }
                 ChargePill("Заряжается")
             }
             Row(Modifier.weight(1f),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
                 ChargeGauge(demoBatteryPercent(charge.progress.energyKwh),true,Modifier.weight(.38f).aspectRatio(1f),true)
-                Column(Modifier.weight(.62f),verticalArrangement=Arrangement.spacedBy(5.dp)) {
+                Column(Modifier.weight(.62f),verticalArrangement=Arrangement.spacedBy(2.dp)) {
                     ChargeMetric(0,"Мощность","${String.format(Ru,"%.1f",ChargingEngine.powerKw(state,charge))} кВт",false)
                     ChargeMetric(1,"Получено","${energy(charge.progress.energyKwh)} кВт·ч",false)
                     ChargeMetric(2,"Время",chargeTime(charge.progress.seconds),false)
@@ -172,8 +172,8 @@ import androidx.compose.ui.unit.sp
 }
 @Composable private fun ChargeMetric(kind:Int,label:String,value:String,panel:Boolean) {
     val body:@Composable ()->Unit={
-        Column(Modifier.padding(3.dp),verticalArrangement=Arrangement.spacedBy(1.dp)) {
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){ChargeSymbol(kind,Modifier.size(12.dp));ChargeText(label,fontSize=9.sp,color=Muted)}
+        Column(Modifier.padding(2.dp),verticalArrangement=Arrangement.spacedBy(0.dp)) {
+            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(6.dp)){ChargeSymbol(kind,Modifier.size(10.dp));ChargeText(label,fontSize=8.sp,color=Muted)}
             ChargeText(value,fontSize=12.sp,fontWeight=FontWeight.Bold,color=if(panel)Lime else MaterialTheme.colorScheme.onSurface)
         }
     }
