@@ -30,9 +30,12 @@ class PartnerCabinetTest {
     @get:Rule val chain:RuleChain=RuleChain.outerRule(cleanup).around(compose)
     private fun scroll(tag:String):SemanticsNodeInteraction {
         compose.waitForIdle()
-        val list=compose.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex))
+        val matcher=hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex)
+        // A press animation being idle does not imply that a pending modal action has run.
+        compose.waitUntil(5000){compose.onAllNodes(matcher).fetchSemanticsNodes().size==1}
+        val list=compose.onNode(matcher)
         if(tag.startsWith("network-period-")||tag=="network-station-filter")list.performScrollToIndex(0) else list.performScrollToNode(hasTestTag(tag))
-        try{return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()}catch(t:Throwable){throw AssertionError("Native partner scroll $tag: ${compose.onNodeWithTag(tag).printToString()}",t)}
+        try{return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()}catch(t:Throwable){throw AssertionError("Native partner scroll $tag failed",t)}
     }
     private fun ready(){compose.waitUntil(10000){compose.onNodeWithTag("partner-screen").stateDescriptionOnMain()=="Отчёт загружен"}}
     private fun section(name:String){compose.onNodeWithTag("network-menu").performClick();compose.onNodeWithTag("network-menu-$name").performScrollTo().performClick();compose.waitForIdle()}
@@ -66,6 +69,7 @@ class PartnerCabinetTest {
             scroll("network-station-filter").performClick()
             compose.onNodeWithTag("network-select-station-partner-demo-b-1").assertDoesNotExist()
             compose.onNodeWithTag("network-select-station-").performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithTag("network-select-station-").fetchSemanticsNodes().isEmpty()}
             compose.waitForIdle()
             scroll("network-page-next").assertIsEnabled().performClick()
             scroll("network-page-label")
@@ -103,6 +107,7 @@ class PartnerCabinetTest {
             section("reports");scroll("network-station-filter").performClick()
             compose.onNodeWithTag("network-select-station-partner-demo-a-1").assertDoesNotExist()
             compose.onNodeWithTag("network-select-station-").performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithTag("network-select-station-").fetchSemanticsNodes().isEmpty()}
             compose.waitForIdle()
             stage="back and sign out"
             compose.onNodeWithTag("partner-back").performClick()
