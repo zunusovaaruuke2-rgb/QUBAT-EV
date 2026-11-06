@@ -78,7 +78,7 @@ object DemoData {
                 listOf(ConnectorState.CONNECTED,ConnectorState.FREE),
                 listOf(ConnectorState.COMPLETED,ConnectorState.ERROR),
                 listOf(ConnectorState.FREE,ConnectorState.FREE))[(number-1+index)%4]
-            val portCount=if(index==0 && number<=2) 2 else 1+(number-1+index)%4
+            val portCount=if(index==0 && number<=2) 2 else 1+(number-1+index)%2
             Charger("$id-unit-$number",number,(1..portCount).map {portNumber->
                 val state=when {
                     index==3 || index==13 -> ConnectorState.OFFLINE

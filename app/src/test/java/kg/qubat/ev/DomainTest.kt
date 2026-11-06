@@ -8,16 +8,16 @@ class DomainTest {
         assertEquals(16,DemoData.stations.size)
         assertEquals(16,DemoData.stations.map {it.id}.distinct().size)
         assertEquals(96,DemoData.stations.sumOf {it.chargerCount})
-        assertTrue(DemoData.stations.sumOf {it.connectorCount}>192)
+        assertTrue(DemoData.stations.sumOf {it.connectorCount} in 96..192)
         assertTrue(DemoData.stations.all {it.chargerCount in listOf(4,8) && it.availableConnectors in 0..it.connectorCount})
         assertTrue(DemoData.stations.all {(it.status==StationStatus.AVAILABLE)==(it.availableConnectors>0)})
         assertTrue(DemoData.stations.all {it.id.startsWith("demo-") && it.powerKw==80 && it.tariffMinor==1350L && it.connector=="GB/T DC"})
     }
-    @Test fun `apparatus supports one through four uniquely identified ports`() {
+    @Test fun `apparatus supports only one or two uniquely identified ports`() {
         val ports=DemoData.stations.flatMap {it.connectors}
         assertEquals(ports.size,ports.map {it.id}.distinct().size)
         val chargers=DemoData.stations.flatMap {it.chargers}
-        assertEquals(setOf(1,2,3,4),chargers.map{it.connectors.size}.toSet())
+        assertEquals(setOf(1,2),chargers.map{it.connectors.size}.toSet())
         assertTrue(chargers.all {it.connectors.map {p->p.number}==(1..it.connectors.size).toList()})
         assertEquals(ConnectorState.entries.toSet(),ports.map {it.state}.toSet())
         assertTrue(ports.all {it.percent==null || (it.state==ConnectorState.CHARGING && it.percent in 0..100)})

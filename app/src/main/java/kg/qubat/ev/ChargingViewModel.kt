@@ -15,9 +15,11 @@ import org.json.JSONObject
 
 class ChargingViewModel(app:Application):AndroidViewModel(app) {
     private val prefs=app.getSharedPreferences("qubat_demo_v1",0)
+    private var migrated=false
     private val _state=MutableStateFlow(restore())
     val state=_state.asStateFlow()
     init {
+        if(migrated)persist()
         tick()
         viewModelScope.launch {state.map{it.active}.distinctUntilChanged().collectLatest{active->if(active)while(true){delay(1000);tick()}}}
     }
@@ -25,7 +27,9 @@ class ChargingViewModel(app:Application):AndroidViewModel(app) {
         val json=JSONObject(prefs.getString("state","{}")!!)
         val items=json.optJSONArray("history") ?: JSONArray()
         val history=(0 until minOf(items.length(),100)).map{val item=items.getJSONObject(it);HistoryEntry(item.getString("title"),item.getLong("amount"),item.getLong("date"),item.getString("detail"))}
-        val balance=json.optLong("balance",150000).coerceAtLeast(0)
+        var balance=json.optLong("balance",150000).coerceAtLeast(0)
+        val retiredHistory=mutableListOf<HistoryEntry>()
+        val retiredIds=mutableSetOf<String>()
         val known=DemoData.stations.flatMap{it.connectors}.map{it.id}.toSet()
         val completedJson=json.optJSONArray("completed") ?: JSONArray()
         val completed=(0 until minOf(completedJson.length(),known.size)).map{completedJson.optString(it)}.filter{it in known}.toSet()
@@ -37,7 +41,19 @@ class ChargingViewModel(app:Application):AndroidViewModel(app) {
             val savedId=item.optString("connector","")
             val port=if(savedId.isNotBlank())station.connectors.firstOrNull{it.id==savedId && it.state==ConnectorState.FREE}
                 else station.connectors.firstOrNull{it.state==ConnectorState.FREE && it.id !in completed && charges.none{c->c.session.connectorId==it.id}}
-            if(port==null)return@runCatching
+            if(port==null) {
+                val retired=retiredConnector(station,savedId)
+                if(json.optInt("schema")>=2 && retired!=null && savedId !in retiredIds) {
+                    val energy=item.optDouble("energy",0.0)
+                    val cost=item.optLong("cost",-1)
+                    val seconds=item.optLong("seconds",-1)
+                    if(energy.isFinite() && energy in 0.0..ChargingEngine.BATTERY_ENERGY_KWH && seconds>=0 && cost>=0 && cost<=balance-charges.sumOf{it.progress.costMinor}) {
+                        balance-=cost;retiredIds+=savedId;migrated=true
+                        retiredHistory+=HistoryEntry("Демо-зарядка · ${station.city}",-cost,System.currentTimeMillis(),"Аппарат ${retired.first} · GB/T ${retired.second} · Завершено при обновлении · "+String.format(Ru,"%.2f кВт·ч",energy))
+                    }
+                }
+                return@runCatching
+            }
             if(charges.any{it.session.connectorId==port.id})return@runCatching
             val start=item.getLong("start").coerceAtLeast(0)
             val energy=item.optDouble("energy",0.0).takeIf{it.isFinite() && it in 0.0..ChargingEngine.BATTERY_ENERGY_KWH} ?: return@runCatching
@@ -47,8 +63,18 @@ class ChargingViewModel(app:Application):AndroidViewModel(app) {
             val power=(0 until minOf(samples.length(),120)).mapNotNull{index->val p=samples.optJSONObject(index) ?: return@mapNotNull null;val kw=p.optDouble("kw",0.0);val sec=p.optLong("sec",0);if(kw.isFinite() && kw in 0.0..80.0 && sec>=0)PowerSample(sec,kw) else null}
             charges+=RunningCharge(ChargeSession(station.id,start,item.optLong("budget",balance).coerceAtLeast(0),port.id,vehicle),ChargeResult(item.optLong("seconds",0).coerceAtLeast(0),energy,cost,false),item.optLong("updated",start).coerceAtLeast(start),power)
         }
-        AppState(balance,charges,history,completed-charges.map{it.session.connectorId}.toSet())
+        AppState(balance,charges,(retiredHistory+history).take(100),completed-charges.map{it.session.connectorId}.toSet())
     }.getOrDefault(AppState())
+    // Only retire canonical ports that existed in 1.11/1.12. Unknown IDs stay rejected.
+    private fun retiredConnector(station:Station,id:String):Pair<Int,Int>? {
+        val index=DemoData.stations.indexOf(station)
+        if(index<0)return null
+        station.chargers.forEach {unit->
+            val oldCount=if(index==0 && unit.number<=2)2 else 1+(unit.number-1+index)%4
+            for(number in (unit.connectors.size+1)..oldCount)if(id=="${unit.id}-port-$number")return unit.number to number
+        }
+        return null
+    }
     private fun persist() {
         val s=_state.value;val json=JSONObject().put("schema",2).put("balance",s.balanceMinor)
         json.put("charges",JSONArray().also{array->s.charges.forEach{c->array.put(JSONObject().put("id",c.session.stationId).put("connector",c.session.connectorId).put("start",c.session.startedAt).put("budget",c.session.budgetMinor).put("vehicle",c.session.vehicleNumber)

@@ -219,7 +219,14 @@ class NavigationTest {
                 // Charging is checked on Bishkek map above. Naryn now has a one-port first apparatus.
                 val site=DemoData.stations.first{it.id=="demo-naryn"}
                 listOf(ConnectorState.CONNECTED,ConnectorState.COMPLETED,ConnectorState.ERROR).forEach {state->
-                    val port=site.connectors.first{it.state==state}
+                    val source=if(site.connectors.any{it.state==state})site else DemoData.stations.first{it.connectors.any{port->port.state==state}}
+                    if(source.id!=site.id) {
+                        compose.onNodeWithTag("station-search-field").performTextClearance()
+                        compose.onNodeWithTag("station-search-field").performTextInput(source.title)
+                        compose.onNodeWithTag("station-search-field").performImeAction()
+                        visible(source.title)
+                    }
+                    val port=source.connectors.first{it.state==state}
                     val title=state.title
                     compose.onNodeWithTag("connector-${port.id}").performScrollTo().performClick()
                     compose.onNodeWithTag("connector-dialog-state").assertTextEquals(title)

@@ -50,7 +50,7 @@ class MultiChargeTest {
         compose.onNodeWithText("Выберите разъём и начните зарядку").assertDoesNotExist()
         compose.onNodeWithTag("charge-unit-${station.chargers[3].id}").performScrollTo().performClick()
         compose.waitForIdle()
-        compose.onNodeWithTag("charge-choice-${station.chargers[3].connectors[3].id}").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("charge-choice-${station.chargers[3].connectors[1].id}").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("start-charge").assertIsDisplayed()
         preview("charging-selection")
         compose.onNodeWithTag("charge-unit-${station.chargers[0].id}").performScrollTo().performClick()
@@ -68,7 +68,8 @@ class MultiChargeTest {
             assertTrue(label.fetchSemanticsNode().boundsInRoot.left>icon.fetchSemanticsNode().boundsInRoot.right)
             val layouts=mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             value.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult){it(layouts)}
-            assertTrue(layouts.single().layoutInput.style.fontSize.value>=16f)
+            assertTrue(layouts.single().layoutInput.style.fontSize.value in 14f..16f)
+            assertFalse(layouts.single().hasVisualOverflow)
         }
         compose.onNodeWithText("Стоимость").assertIsDisplayed()
         compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed();preview("charging-one-car-light")
@@ -118,6 +119,26 @@ class MultiChargeTest {
         assertTrue(vm.state.value.balanceMinor>=0)
         assertEquals(setOf(first,second),vm.state.value.completedConnectorIds)
         compose.runOnIdle{saved.viewModelScope.cancel()}
+    }
+    @Test fun removedFourthPortSettlesOnceAndKeepsTheOtherCar() {
+        compose.waitUntil(5000){compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
+        val context=compose.activity.application
+        val station=DemoData.stations.first();val valid=station.freeConnector()!!.id
+        val retired="${station.chargers[3].id}-port-4"
+        val now=System.currentTimeMillis()
+        val json="""{"schema":2,"balance":150000,"charges":[{"id":"${station.id}","connector":"$retired","start":${now-45000},"updated":$now,"seconds":45,"energy":1.0,"cost":1350,"vehicle":1},{"id":"${station.id}","connector":"$valid","start":${now-9000},"updated":$now,"seconds":9,"energy":0.2,"cost":270,"vehicle":2}],"history":[],"completed":[]}"""
+        context.getSharedPreferences("qubat_demo_v1",0).edit().putString("state",json).commit()
+        val restored=compose.runOnIdle{ChargingViewModel(context)}
+        val again=compose.runOnIdle{ChargingViewModel(context)}
+        compose.runOnIdle {
+            listOf(restored,again).forEach{vm->
+                assertEquals(148650,vm.state.value.balanceMinor)
+                assertEquals(valid,vm.state.value.charges.single().session.connectorId)
+                assertEquals(-1350,vm.state.value.history.single().amountMinor)
+                assertFalse(vm.state.value.completedConnectorIds.contains(retired))
+                vm.viewModelScope.cancel()
+            }
+        }
     }
     @Test fun previousSingleSessionFormatMigratesWithoutLosingWallet() {
         compose.waitUntil(5000){compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}

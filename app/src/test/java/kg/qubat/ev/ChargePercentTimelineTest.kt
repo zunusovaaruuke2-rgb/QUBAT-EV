@@ -16,9 +16,9 @@ class ChargePercentTimelineTest {
         val samples=chargePercentTimeline(ChargeResult(600,10.0,0,false),emptyList())
         assertEquals(20+10.0/60*100,samples.last().percent,0.00001)
     }
-    @Test fun `fourth connector can start and updates its map station status`() {
+    @Test fun `second connector can start and updates its map station status`() {
         val station=DemoData.stations.first()
-        val port=station.chargers.first{it.connectors.size==4}.connectors[3]
+        val port=station.chargers.last{it.connectors.size==2}.connectors[1]
         val result=ChargingEngine.start(AppState(),station.id,port.id,1000)
         assertTrue(result.started)
         val marker=station.withConnectorSessions(mapOf(port.id to 25),emptySet())
