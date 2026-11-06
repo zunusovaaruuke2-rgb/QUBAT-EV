@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.sp
         Column(Modifier.fillMaxSize().testTag("charging-viewport"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             if(state.charges.size>1)Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
                 ChargeText("Активные зарядки",Modifier.weight(1f),fontSize=19.sp,fontWeight=FontWeight.Bold)
-                ChargePill("${state.charges.size} сеанса")
+                ChargePill("Демо · ${state.charges.size} сеанса")
                 if(selected!=null)PressIconButton(onClick={detail=null}){AppIcon(Icons.Default.ArrowBack,"Активные зарядки")}
             }
             if(selected!=null) {
@@ -53,29 +53,29 @@ import androidx.compose.ui.unit.sp
         return
     }
     val unit=station.chargers.firstOrNull{c->c.connectors.any{it.id==port?.id}} ?: station.chargers.first()
-    Column(Modifier.fillMaxSize().testTag("charge-selection"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.fillMaxSize().testTag("charge-selection"),verticalArrangement=Arrangement.spacedBy(5.dp)) {
         Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)){ChargeStationCard(station,port)}
+            DepthSurface(onClick=onStations,modifier=Modifier.weight(1f),shape=RoundedCornerShape(18.dp)){ChargeStationCard(station,port,true)}
             if(state.active)PressIconButton(onClick=onCancel){AppIcon(Icons.Default.Close,"Вернуться к зарядкам")}
         }
-        ChargeText("1 · Выберите аппарат",fontSize=13.sp,fontWeight=FontWeight.Bold)
+        ChargeText("1 · Выберите аппарат",fontSize=11.sp,fontWeight=FontWeight.Bold)
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp)) {
             station.chargers.forEach{charger->val selected=charger.id==unit.id
                 DepthSurface(onClick={onChoose(charger.connectors.firstOrNull{it.state==ConnectorState.FREE} ?: charger.connectors.first())},modifier=Modifier.width(76.dp).testTag("charge-unit-${charger.id}"),shape=RoundedCornerShape(15.dp),color=if(selected)Lime.copy(alpha=.1f) else SurfaceGreen,border=BorderStroke(if(selected)2.dp else 1.dp,if(selected)Lime else MaterialTheme.colorScheme.outline)) {
-                    Column(Modifier.padding(6.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(2.dp)) {
-                        ChargerCabinet(charger.connectors.size,Modifier.size(width=50.dp,height=58.dp))
-                        ChargeText("${charger.number} · ${charger.powerKw} кВт",fontSize=10.sp,fontWeight=FontWeight.Bold,color=if(selected)Lime else Color.Unspecified)
-                        ChargeText("${charger.connectors.size} разъём",fontSize=9.sp,color=Muted)
+                    Column(Modifier.padding(4.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(2.dp)) {
+                        ChargerCabinet(charger.connectors.size,Modifier.size(width=44.dp,height=36.dp))
+                        ChargeText("${charger.number} · ${charger.powerKw} кВт",fontSize=9.sp,fontWeight=FontWeight.Bold,color=if(selected)Lime else Color.Unspecified)
+                        ChargeText("${charger.connectors.size} ${if(charger.connectors.size==1)"разъём" else "разъёма"}",fontSize=8.sp,color=Muted)
                     }
                 }
             }
         }
-        ChargeText("2 · Выберите разъём",fontSize=13.sp,fontWeight=FontWeight.Bold)
+        ChargeText("2 · Выберите разъём",fontSize=11.sp,fontWeight=FontWeight.Bold)
         unit.connectors.chunked(2).forEach{ports->Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             ports.forEach{item->val selected=item.id==port?.id
                 DepthSurface(onClick={onChoose(item)},modifier=Modifier.weight(1f).testTag("charge-choice-${item.id}"),shape=RoundedCornerShape(16.dp),color=if(selected)Lime.copy(alpha=.1f) else SurfaceGreen,border=BorderStroke(if(selected)2.dp else 1.dp,if(selected)Lime else MaterialTheme.colorScheme.outline)) {
-                    Row(Modifier.padding(6.dp),verticalAlignment=Alignment.CenterVertically) {
-                        Box(Modifier.width(40.dp)){ConnectorBadge(unit,item){onChoose(item)}}
+                    Row(Modifier.padding(4.dp),verticalAlignment=Alignment.CenterVertically) {
+                        Box(Modifier.width(40.dp)){ConnectorBadge(unit,item,compact=true){onChoose(item)}}
                         Column(Modifier.weight(1f)){ChargeText("GB/T ${item.number}",fontWeight=FontWeight.Bold,fontSize=13.sp);ChargeText(item.state.title,fontSize=10.sp,color=Color(item.state.argb))}
                     }
                 }
@@ -86,22 +86,21 @@ import androidx.compose.ui.unit.sp
         DepthButton(onClick=onStart,enabled=port?.state==ConnectorState.FREE && state.availableBalanceMinor>0 && state.charges.size<ChargingEngine.MAX_CARS,modifier=Modifier.fillMaxWidth().height(50.dp).testTag("start-charge")) {
             AppIcon(Icons.Default.PlayArrow,null);ChargeText("Начать зарядку",fontWeight=FontWeight.Bold)
         }
-        if(port?.id in state.completedConnectorIds)PressTextButton(onClick=onRelease){ChargeText("Освободить разъём после сеанса",fontSize=11.sp)}
-        PressTextButton(onClick=onStations,modifier=Modifier.fillMaxWidth().height(40.dp)){ChargeText("Выбрать другую станцию",fontSize=12.sp)}
+        if(port?.id in state.completedConnectorIds)PressTextButton(onClick=onRelease,modifier=Modifier.height(32.dp)){ChargeText("Освободить разъём после сеанса",fontSize=10.sp)}
     }
 }
 @Composable private fun ChargePill(text:String) {
     Surface(shape=CircleShape,color=Lime.copy(alpha=.13f)){ChargeText(text,Modifier.padding(horizontal=10.dp,vertical=6.dp),fontSize=11.sp,fontWeight=FontWeight.SemiBold,color=Lime)}
 }
-@Composable private fun ChargeStationCard(station:Station,port:Connector?) {
+@Composable private fun ChargeStationCard(station:Station,port:Connector?,compact:Boolean=false) {
     DepthSurface(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp),color=SurfaceGreen) {
-        Column(Modifier.padding(12.dp)) {
+        Column(Modifier.padding(if(compact)6.dp else 10.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(11.dp)) {
-                Box(Modifier.size(48.dp).depthFrame(RoundedCornerShape(14.dp),Lime.copy(alpha=.08f),0.dp),contentAlignment=Alignment.Center){ChargeSymbol(0,Modifier.size(29.dp))}
+                Box(Modifier.size(if(compact)36.dp else 44.dp).depthFrame(RoundedCornerShape(14.dp),Lime.copy(alpha=.08f),0.dp),contentAlignment=Alignment.Center){ChargeSymbol(0,Modifier.size(29.dp))}
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
-                    ChargeText(station.title,fontSize=16.sp,fontWeight=FontWeight.Bold,maxLines=1)
-                    ChargeText("${station.city} · Аппарат ${port?.let{station.chargerNumber(it.id)} ?: 1}",fontSize=11.sp,color=Muted,maxLines=1)
-                    ChargeText("${station.powerKw} кВт · 13,5 сом/кВт·ч · GB/T DC",fontSize=10.sp,color=Lime,maxLines=1)
+                    ChargeText(station.title,fontSize=if(compact)13.sp else 16.sp,fontWeight=FontWeight.Bold,maxLines=1)
+                    ChargeText("${station.city} · Аппарат ${port?.let{station.chargerNumber(it.id)} ?: 1}",fontSize=if(compact)9.sp else 11.sp,color=Muted,maxLines=1)
+                    ChargeText("${station.powerKw} кВт · 13,5 сом/кВт·ч · GB/T DC",fontSize=if(compact)8.sp else 10.sp,color=Lime,maxLines=1)
                 }
                 ChargePill("Демо")
             }

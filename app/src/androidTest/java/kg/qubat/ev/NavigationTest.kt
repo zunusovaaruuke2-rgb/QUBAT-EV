@@ -242,13 +242,13 @@ class NavigationTest {
         }
         step("Старт и остановка симуляции") {
             compose.onNodeWithText("Зарядка",useUnmergedTree=true).performClick()
-            compose.onNodeWithTag("start-charge").performScrollTo().performClick()
+            compose.onNodeWithTag("start-charge").assertIsDisplayed().performClick()
             visible("Зарядка идёт")
             android.os.SystemClock.sleep(1300)
             compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed()
             compose.onNodeWithText("Остановить зарядку",substring=true).assertIsDisplayed().performClick()
-            visible("Аппарат 1 · разъём 1 · Завершён")
-            compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo()
+            compose.onNodeWithText("Завершён",substring=true).assertIsDisplayed()
+            compose.onNodeWithText("Освободить разъём после сеанса").assertIsDisplayed()
                 .performSemanticsAction(SemanticsActions.OnClick) { it() }
             compose.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performSemanticsAction(SemanticsActions.ScrollBy) { it(0f,-10000f) }
             try {

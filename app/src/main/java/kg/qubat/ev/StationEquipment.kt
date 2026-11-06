@@ -25,15 +25,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-@Composable fun ConnectorBadge(charger:Charger,port:Connector,onClick:()->Unit) {
+@Composable fun ConnectorBadge(charger:Charger,port:Connector,compact:Boolean=false,onClick:()->Unit) {
     val localize=LocalTranslate.current
     val color=Color(port.state.argb)
     val description=remember(charger.number,port,localize) {localize("Аппарат ${charger.number}, разъём ${port.number}, GB/T DC, ${port.state.title}"+(port.percent?.let {", $it процентов, демо"} ?: ""))}
     val status=remember(port.state,localize) {localize(port.state.title)}
-    Box(Modifier.fillMaxWidth().height(56.dp).testTag("connector-${port.id}")
+    Box(Modifier.fillMaxWidth().height(if(compact)40.dp else 56.dp).testTag("connector-${port.id}")
         .pressClickable(role=Role.Button,onClick=onClick)
         .semantics {contentDescription=description;stateDescription=status},contentAlignment=Alignment.Center) {
-        Box(Modifier.size(38.dp).depthFrame(CircleShape,SurfaceGreen,0.dp),contentAlignment=Alignment.Center) {
+        Box(Modifier.size(if(compact)32.dp else 38.dp).depthFrame(CircleShape,SurfaceGreen,0.dp),contentAlignment=Alignment.Center) {
             Canvas(Modifier.fillMaxSize()) {drawCircle(color,style=Stroke(3.dp.toPx()))}
             when(port.state) {
                 ConnectorState.CHARGING -> if(port.percent!=null) AppText("${port.percent}%",color=color,fontSize=12.sp,fontWeight=FontWeight.Bold) else AppIcon(Icons.Default.PlayArrow,null,tint=color,modifier=Modifier.size(18.dp))
