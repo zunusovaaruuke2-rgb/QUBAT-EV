@@ -79,6 +79,7 @@ class PartnerCabinetTest {
             compose.waitUntil(5000){compose.onAllNodesWithTag("network-select-station-").fetchSemanticsNodes().isEmpty()}
             compose.waitForIdle()
             scroll("network-page-next").assertIsEnabled().performClick()
+            compose.waitUntil(5000){compose.onAllNodes(hasTestTag("network-page-label") and hasText("2 / 4")).fetchSemanticsNodes().isNotEmpty()}
             scroll("network-page-label")
             compose.onNodeWithTag("network-page-label").assertTextEquals("2 / 4")
             scroll("network-report-summary");preview("android-expanded-reports")
