@@ -78,11 +78,12 @@ object DemoData {
                 listOf(ConnectorState.CONNECTED,ConnectorState.FREE),
                 listOf(ConnectorState.COMPLETED,ConnectorState.ERROR),
                 listOf(ConnectorState.FREE,ConnectorState.FREE))[(number-1+index)%4]
-            Charger("$id-unit-$number",number,(1..2).map {portNumber->
+            val portCount=if(index==0 && number<=2) 2 else 1+(number-1+index)%4
+            Charger("$id-unit-$number",number,(1..portCount).map {portNumber->
                 val state=when {
                     index==3 || index==13 -> ConnectorState.OFFLINE
                     index==2 || index==10 -> listOf(ConnectorState.CHARGING,ConnectorState.CONNECTED,ConnectorState.COMPLETED,ConnectorState.ERROR)[(number+portNumber)%4]
-                    else -> pattern[portNumber-1]
+                    else -> pattern[(portNumber-1)%pattern.size]
                 }
                 Connector("$id-unit-$number-port-$portNumber",portNumber,state,
                     if(state==ConnectorState.CHARGING) 25+(index*7+number*13+portNumber*11)%65 else null)

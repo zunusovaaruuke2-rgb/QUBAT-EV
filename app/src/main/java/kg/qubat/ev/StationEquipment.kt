@@ -78,8 +78,10 @@ import androidx.compose.ui.unit.sp
                                     AppText("${charger.powerKw} кВт",color=Lime,fontSize=10.sp,fontWeight=FontWeight.SemiBold)
                                     Canvas(Modifier.size(6.dp)) {drawCircle(Color(charger.state.argb))}
                                 }
-                                Row(Modifier.fillMaxWidth()) {charger.connectors.forEach {port->
-                                    Box(Modifier.weight(1f)) {ConnectorBadge(charger,port) {onConnector(port)}}
+                                Column {charger.connectors.chunked(2).forEach {ports->
+                                    Row(Modifier.fillMaxWidth()) {ports.forEach {port->
+                                        Box(Modifier.weight(1f)) {ConnectorBadge(charger,port) {onConnector(port)}}
+                                    }; if(ports.size==1 && charger.connectors.size>1)Spacer(Modifier.weight(1f))}
                                 }}
                             }
                         }

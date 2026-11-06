@@ -2,7 +2,7 @@
     <background android:drawable="@color/icon_background"/>
     <foreground>
         <inset android:inset="12%">
-            <bitmap android:src="@drawable/qubat_launcher" android:gravity="fill" android:filter="true"/>
+            <bitmap android:src="@drawable/qubat_logo" android:gravity="fill" android:filter="true"/>
         </inset>
     </foreground>
 </adaptive-icon>

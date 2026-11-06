@@ -245,8 +245,8 @@ class NavigationTest {
             compose.onNodeWithTag("start-charge").performScrollTo().performClick()
             visible("Зарядка идёт")
             android.os.SystemClock.sleep(1300)
-            compose.onNodeWithTag("charge-power-chart").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithText("Остановить зарядку",substring=true).performScrollTo().performClick()
+            compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed()
+            compose.onNodeWithText("Остановить зарядку",substring=true).assertIsDisplayed().performClick()
             visible("Аппарат 1 · разъём 1 · Завершён")
             compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo()
                 .performSemanticsAction(SemanticsActions.OnClick) { it() }

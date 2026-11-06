@@ -32,11 +32,11 @@ import kotlinx.coroutines.launch
     Box(Modifier.fillMaxSize()) {
         QubatApp()
         if(!finished) {
-            val alpha=remember{Animatable(1f)};val hero=remember{Animatable(0f)};val scale=remember{Animatable(.88f)}
+            val alpha=remember{Animatable(1f)};val hero=remember{Animatable(0f)};val scale=remember{Animatable(1f)}
             LaunchedEffect(Unit){
                 delay(150)
-                coroutineScope{launch{hero.animateTo(1f,tween(400))};launch{scale.animateTo(1f,spring(dampingRatio=.85f,stiffness=180f))}}
-                delay(180);alpha.animateTo(0f,tween(300));finished=true
+                hero.animateTo(1f,tween(400))
+                delay(650);alpha.animateTo(0f,tween(300));finished=true
             }
             val view=LocalView.current;val context=LocalContext.current;val night by rememberUpdatedState(LocalNight.current)
             DisposableEffect(Unit){

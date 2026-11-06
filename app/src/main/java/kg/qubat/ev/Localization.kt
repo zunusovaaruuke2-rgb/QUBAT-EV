@@ -88,6 +88,10 @@ private fun translateUncached(text:String,language:AppLanguage):String {
 }
 
 private val translations by lazy {listOf(
+    Translation("Заряд батареи (%)","Battery charge (%)","Батарея заряды (%)"),
+    Translation("Процент заряда по времени","Battery percentage over time","Кубат пайызы убакыт боюнча"),
+    Translation("1 · Выберите аппарат","1 · Select charger","1 · Түзмөктү тандаңыз"),
+    Translation("2 · Выберите разъём","2 · Select connector","2 · Туташтыргычты тандаңыз"),
     Translation("Активные зарядки","Active charging","Активдүү кубаттоолор"),
     Translation("Второй автомобиль","Second car","Экинчи унаа"),
     Translation("Добавить автомобиль","Add car","Унаа кошуу"),

@@ -67,7 +67,6 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     var refiningLocation by remember {mutableStateOf(false)}
     val context=LocalContext.current
     val keyboard=LocalSoftwareKeyboardController.current
-    val contentScroll=key(tab) { rememberScrollState() }
     LaunchedEffect(tab) { keyboard?.hide() }
     val scope=rememberCoroutineScope()
     val snackbar=remember { SnackbarHostState() }
@@ -135,7 +134,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 }
                 HorizontalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.3f))
                 }
-                Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal=14.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     when(tab) {
                         Tab.HOME -> Unit
                         Tab.STATIONS -> Unit
@@ -156,7 +155,6 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                         Tab.WALLET -> Unit
                         Tab.PROFILE -> Unit
                     }
-                    Spacer(Modifier.height(8.dp))
                 }
                 }
             }

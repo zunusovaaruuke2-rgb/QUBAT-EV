@@ -102,3 +102,19 @@ object ChargingEngine {
             history=(entries+state.history).take(100),completedConnectorIds=state.completedConnectorIds+ids,lastProgress=finished.lastOrNull()?.progress ?: state.lastProgress))
     }
 }
+
+@Immutable data class ChargePercentSample(val seconds:Long,val percent:Double)
+/** Integrate each historical power interval; anchor the endpoint to the billed energy. */
+fun chargePercentTimeline(progress:ChargeResult,history:List<PowerSample>):List<ChargePercentSample> {
+    val samples=history.filter{it.seconds in 0..progress.seconds}.sortedBy{it.seconds}
+    val result=mutableListOf(ChargePercentSample(0,20.0))
+    var seconds=0L;var energy=0.0;var power=samples.firstOrNull()?.powerKw ?: 0.0
+    samples.forEach {sample->
+        energy+=(sample.seconds-seconds)*power/3600
+        if(sample.seconds>0)result+=ChargePercentSample(sample.seconds,(20+energy/60*100).coerceIn(20.0,100.0))
+        seconds=sample.seconds;power=sample.powerKw
+    }
+    val endpoint=ChargePercentSample(progress.seconds,(20+progress.energyKwh/60*100).coerceIn(20.0,100.0))
+    if(result.last().seconds==endpoint.seconds)result[result.lastIndex]=endpoint else result+=endpoint
+    return result
+}

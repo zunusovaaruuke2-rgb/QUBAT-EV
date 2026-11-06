@@ -45,25 +45,39 @@ class MultiChargeTest {
         val vm=compose.runOnIdle{ViewModelProvider(compose.activity)[ChargingViewModel::class.java]}
         val station=DemoData.stations.first();val first=station.chargers[0].connectors[0].id;val second=station.chargers[1].connectors[1].id
         compose.onNodeWithText("Зарядка",useUnmergedTree=true).performClick()
-        compose.onNodeWithTag("start-charge").performScrollTo().performClick()
+        compose.onNodeWithText("1 · Выберите аппарат").assertIsDisplayed()
+        compose.onNodeWithText("Начать зарядку").assertIsDisplayed()
+        compose.onNodeWithText("Выберите разъём и начните зарядку").assertDoesNotExist()
+        compose.onNodeWithTag("charge-unit-${station.chargers[3].id}").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("charge-choice-${station.chargers[3].connectors[3].id}").assertIsDisplayed()
+        compose.onNodeWithTag("start-charge").assertIsDisplayed()
+        preview("charging-selection")
+        compose.onNodeWithTag("charge-unit-${station.chargers[0].id}").performScrollTo().performClick()
+        compose.waitForIdle()
+        compose.onNodeWithTag("start-charge").assertIsDisplayed().performClick()
         compose.waitUntil(5000){vm.state.value.charges.size==1}
         compose.waitForIdle()
+        compose.onAllNodes(hasScrollAction()).assertCountEquals(0)
+        compose.onNodeWithText("Заряд батареи (%)").assertIsDisplayed()
         compose.onNodeWithTag("charge-details-$first").assertExists()
-        compose.onNodeWithTag("charge-power-chart").performScrollTo();preview("charging-one-car-light")
-        compose.onNodeWithTag("add-charge").performScrollTo().performClick()
+        compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed();preview("charging-one-car-light")
+        compose.onNodeWithTag("add-charge").assertIsDisplayed().performClick()
         compose.onNodeWithTag("stations-list").performScrollToIndex(0)
         compose.onNodeWithTag("connector-$second").performScrollTo().performClick()
-        compose.onNodeWithTag("start-charge").performScrollTo().performClick()
+        compose.onNodeWithTag("start-charge").assertIsDisplayed().performClick()
         compose.waitUntil(5000){vm.state.value.charges.size==2}
         compose.waitForIdle()
         compose.onNodeWithTag("charge-session-$first").assertExists()
         compose.onNodeWithTag("charge-session-$second").assertExists()
         compose.onNodeWithTag("add-charge").assertDoesNotExist()
         compose.onNodeWithText("Зарядить ещё автомобиль",substring=true).assertDoesNotExist()
-        compose.onNodeWithTag("charge-session-$first").performScrollTo();preview("charging-two-cars-light")
+        compose.onNodeWithTag("stop-charge-$first").assertIsDisplayed()
+        compose.onNodeWithTag("stop-charge-$second").assertIsDisplayed();preview("charging-two-cars-light")
         val theme=if(compose.onAllNodesWithContentDescription("Ночная тема").fetchSemanticsNodes().isNotEmpty())"Ночная тема" else "Дневная тема"
         compose.onNodeWithContentDescription(theme).performClick()
-        compose.onNodeWithTag("charge-session-$first").performScrollTo();preview("charging-two-cars-dark")
+        compose.onNodeWithTag("stop-charge-$first").assertIsDisplayed()
+        compose.onNodeWithTag("stop-charge-$second").assertIsDisplayed();preview("charging-two-cars-dark")
         compose.waitUntil(5000){vm.state.value.charges.all{it.progress.seconds>=1}}
         val context=compose.activity.application
         val saved=compose.runOnIdle{ChargingViewModel(context)}
@@ -71,12 +85,12 @@ class MultiChargeTest {
             assertEquals(setOf(first,second),saved.state.value.charges.map{it.session.connectorId}.toSet())
             assertTrue(saved.state.value.availableBalanceMinor>=0)
         }
-        compose.onNodeWithTag("stop-charge-$first").performScrollTo().performClick()
+        compose.onNodeWithTag("stop-charge-$first").assertIsDisplayed().performClick()
         compose.waitUntil(5000){vm.state.value.charges.size==1}
         assertEquals(second,vm.state.value.charges.single().session.connectorId)
         compose.waitForIdle()
         compose.onNodeWithTag("charge-details-$second").assertExists()
-        compose.onNodeWithTag("stop-charge-$second").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("stop-charge-$second").assertIsDisplayed()
         compose.waitForIdle()
         compose.onNodeWithTag("stop-charge-$second").performClick()
         try{compose.waitUntil(5000){!vm.state.value.active}}catch(failure:Throwable){

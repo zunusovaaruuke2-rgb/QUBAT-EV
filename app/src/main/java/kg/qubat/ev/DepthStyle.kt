@@ -87,7 +87,7 @@ import androidx.compose.ui.unit.Dp
             scope.launch {
                 try {
                     pause.snapTo(0f)
-                    pause.animateTo(1f,tween(140))
+                    pause.animateTo(1f,tween(240))
                     if(allowed)action()
                 } finally {pending=false}
             }
