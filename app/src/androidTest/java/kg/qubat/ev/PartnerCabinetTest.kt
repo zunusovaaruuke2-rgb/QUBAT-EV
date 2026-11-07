@@ -29,11 +29,22 @@ class PartnerCabinetTest {
     }
     @get:Rule val chain:RuleChain=RuleChain.outerRule(cleanup).around(compose)
     private fun scroll(tag:String):SemanticsNodeInteraction {
-        val list=compose.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex))
+        compose.waitForIdle()
+        // This report fixture renders five header items and twenty session rows per page.
+        // Jump to its pagination instead of recursively traversing lazily prefetched semantics.
+        if(tag.startsWith("network-page-")) {
+            compose.onNodeWithTag("network-reports-scroll").performScrollToIndex(5+20)
+            compose.waitForIdle()
+            return compose.onNodeWithTag(tag).assertIsDisplayed()
+        }
+        val matcher=hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsActions.ScrollToIndex)
+        // A press animation being idle does not imply that a pending modal action has run.
+        compose.waitUntil(5000){compose.onAllNodes(matcher).fetchSemanticsNodes().size==1}
+        val list=compose.onNode(matcher)
         if(tag.startsWith("network-period-")||tag=="network-station-filter")list.performScrollToIndex(0) else list.performScrollToNode(hasTestTag(tag))
-        try{return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()}catch(t:Throwable){throw AssertionError("Native partner scroll $tag: ${compose.onNodeWithTag(tag).printToString()}",t)}
+        try{return compose.onNodeWithTag(tag).performScrollTo().assertIsDisplayed()}catch(t:Throwable){throw AssertionError("Native partner scroll $tag failed",t)}
     }
-    private fun ready(){compose.waitUntil(10000){compose.onNodeWithTag("partner-screen").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="Отчёт загружен"}}
+    private fun ready(){compose.waitUntil(10000){compose.onNodeWithTag("partner-screen").stateDescriptionOnMain()=="Отчёт загружен"}}
     private fun section(name:String){compose.onNodeWithTag("network-menu").performClick();compose.onNodeWithTag("network-menu-$name").performScrollTo().performClick();compose.waitForIdle()}
     private fun preview(name:String){val dir=File(compose.activity.getExternalFilesDir(null),"partner-preview").apply{mkdirs()};File(dir,"$name.png").outputStream().use{compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG,100,it)}}
     @Test fun expandedNativeCabinetPersistsAndScopesEveryRole(){
@@ -55,17 +66,37 @@ class PartnerCabinetTest {
             scroll("network-tariff-edit").performClick()
             compose.onNodeWithTag("network-tariff-customer").performScrollTo().performTextReplacement("14.75")
             val tomorrow=LocalDate.now(PARTNER_ZONE).plusDays(1).toString()
-            compose.onNodeWithTag("network-tariff-from").performScrollTo().performTextReplacement(tomorrow)
+            compose.onNodeWithTag("network-tariff-from").performScrollTo().performClick()
+            assertNativeCalendar("ru")
+            saveNativeCalendarPreview("calendar-tariff")
+            confirmCalendarDate(LocalDate.parse(tomorrow))
             compose.onNodeWithTag("network-tariff-reason").performScrollTo().performTextReplacement("ДЕМО тест новой версии")
             compose.onNodeWithTag("network-tariff-editor-save").performClick()
             compose.onNodeWithTag("network-tariff-editor").assertDoesNotExist()
             stage="report filters and pagination"
             section("reports")
+            scroll("network-period-custom").performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithTag("network-date-from").fetchSemanticsNodes().isNotEmpty()}
+            val calendarToday=LocalDate.now(PARTNER_ZONE)
+            compose.onNodeWithTag("network-date-from").performClick()
+            assertNativeCalendar("ru")
+            saveNativeCalendarPreview("calendar-period")
+            confirmCalendarDate(calendarToday.plusDays(1))
+            compose.onNodeWithTag("network-date-apply").assertIsNotEnabled()
+            compose.onNodeWithTag("network-date-from").performClick()
+            confirmCalendarDate(calendarToday.minusDays(6))
+            compose.onNodeWithTag("network-date-to").performClick()
+            confirmCalendarDate(calendarToday)
+            compose.onNodeWithTag("network-date-apply").assertIsEnabled().performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithTag("network-date-from").fetchSemanticsNodes().isEmpty()}
             scroll("network-period-week").performClick()
             scroll("network-station-filter").performClick()
             compose.onNodeWithTag("network-select-station-partner-demo-b-1").assertDoesNotExist()
             compose.onNodeWithTag("network-select-station-").performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithTag("network-select-station-").fetchSemanticsNodes().isEmpty()}
+            compose.waitForIdle()
             scroll("network-page-next").assertIsEnabled().performClick()
+            compose.waitUntil(5000){compose.onAllNodes(hasTestTag("network-page-label") and hasText("2 / 4")).fetchSemanticsNodes().isNotEmpty()}
             scroll("network-page-label")
             compose.onNodeWithTag("network-page-label").assertTextEquals("2 / 4")
             scroll("network-report-summary");preview("android-expanded-reports")
@@ -77,6 +108,8 @@ class PartnerCabinetTest {
             section("finance")
             scroll("network-period-previous").performClick()
             val previous=YearMonth.now(PARTNER_ZONE).minusMonths(1)
+            val previousCaption=previous.format(java.time.format.DateTimeFormatter.ofPattern("MM.yyyy"))
+            compose.waitUntil(5000){compose.onAllNodes(hasTestTag("network-period-label") and hasText(previousCaption,substring=true)).fetchSemanticsNodes().isNotEmpty()}
             scroll("network-bill-edit-$previous").performClick()
             compose.onNodeWithTag("network-bill-amount").performScrollTo().performTextReplacement("6543.21")
             compose.onNodeWithTag("network-bill-number").performScrollTo().performTextReplacement("DEMO-NATIVE-001")
@@ -101,6 +134,8 @@ class PartnerCabinetTest {
             section("reports");scroll("network-station-filter").performClick()
             compose.onNodeWithTag("network-select-station-partner-demo-a-1").assertDoesNotExist()
             compose.onNodeWithTag("network-select-station-").performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithTag("network-select-station-").fetchSemanticsNodes().isEmpty()}
+            compose.waitForIdle()
             stage="back and sign out"
             compose.onNodeWithTag("partner-back").performClick()
             scroll("partner-entry").performClick();ready()

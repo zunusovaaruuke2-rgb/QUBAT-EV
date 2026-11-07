@@ -52,9 +52,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     var selectedId by rememberSaveable { mutableStateOf(DemoData.stations.first().id) }
     var selectedConnectorId by rememberSaveable {mutableStateOf<String?>(null)}
     var focusedConnectorId by rememberSaveable {mutableStateOf<String?>(null)}
-    LaunchedEffect(state.session?.connectorId) {
-        state.session?.let {selectedId=it.stationId;selectedConnectorId=it.connectorId}
-    }
+    var addingVehicle by rememberSaveable {mutableStateOf(false)}
+    androidx.activity.compose.BackHandler(addingVehicle) {addingVehicle=false;tabName=Tab.CHARGE.name}
     var detailId by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     val city:String?=null
@@ -68,7 +67,6 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     var refiningLocation by remember {mutableStateOf(false)}
     val context=LocalContext.current
     val keyboard=LocalSoftwareKeyboardController.current
-    val contentScroll=key(tab) { rememberScrollState() }
     LaunchedEffect(tab) { keyboard?.hide() }
     val scope=rememberCoroutineScope()
     val snackbar=remember { SnackbarHostState() }
@@ -93,23 +91,25 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     LaunchedEffect(tracker) {
         if(context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION)==PackageManager.PERMISSION_GRANTED) locate()
     }
-    val stations=remember(state.session?.connectorId,state.completedConnectorIds,demoBatteryPercent(state.progress.energyKwh)) {
-        DemoData.stations.map {it.withConnectorSession(state.session?.connectorId,state.completedConnectorIds,demoBatteryPercent(state.progress.energyKwh))}
+    val chargingPercents=state.charges.associate{it.session.connectorId to demoBatteryPercent(it.progress.energyKwh)}
+    val stations=remember(chargingPercents,state.completedConnectorIds) {
+        DemoData.stations.map {it.withConnectorSessions(chargingPercents,state.completedConnectorIds)}
     }
     val filtered=remember(stations,query,city,minPower,statusName) {filterStations(stations,query,city,minPower,statusName?.let { StationStatus.valueOf(it) })}
     val visible=remember(filtered,location) {location?.let { p -> filtered.sortedBy { distanceKm(p,it.point) } } ?: filtered}
     val selected=stations.first { it.id==selectedId }
-    val sessionStation=state.session?.let { s -> stations.first { it.id==s.stationId } }
     fun openConnector(site:Station,port:Connector) {
-        if(port.state==ConnectorState.FREE) {
-            if(state.session==null) {selectedId=site.id;selectedConnectorId=port.id}
-            focusedConnectorId=null
-            tabName=Tab.CHARGE.name
+        if(state.charges.any{it.session.connectorId==port.id}) {
+            addingVehicle=false;focusedConnectorId=null;tabName=Tab.CHARGE.name
+        } else if(port.state==ConnectorState.FREE) {
+            if(state.charges.size>=ChargingEngine.MAX_CARS) {message("Уже заряжаются два автомобиля");return}
+            selectedId=site.id;selectedConnectorId=port.id;addingVehicle=state.active
+            focusedConnectorId=null;tabName=Tab.CHARGE.name
         } else focusedConnectorId=port.id
     }
     run {
         Scaffold(modifier=Modifier.imePadding(),containerColor=Forest,snackbarHost={ SnackbarHost(snackbar) {data->Snackbar {AppText(data.visuals.message)}} },bottomBar={
-            NavigationBar(modifier=Modifier.depthFrame(RoundedCornerShape(topStart=18.dp,topEnd=18.dp),SurfaceGreen,0.dp,fill=false),containerColor=SurfaceGreen) { Tab.entries.forEach { item -> PressNavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={AppIcon(item.icon,item.label)},label={AppText(item.label,fontSize=10.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
+            NavigationBar(modifier=Modifier.depthFrame(RoundedCornerShape(topStart=18.dp,topEnd=18.dp),SurfaceGreen,0.dp,fill=false),containerColor=SurfaceGreen) { Tab.entries.forEach { item -> PressNavigationBarItem(selected=tab==item,onClick={tabName=item.name},icon={AppIcon(item.icon,item.label)},label={AppText(item.label,fontSize=11.sp,maxLines=1)},colors=NavigationBarItemDefaults.colors(indicatorColor=MaterialTheme.colorScheme.primary.copy(alpha=.15f),selectedIconColor=Lime,selectedTextColor=Lime,unselectedIconColor=Muted,unselectedTextColor=Muted)) } }
         }) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).pageOpening(tab)) {
                 if(tab==Tab.HOME) {
@@ -122,38 +122,39 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                         onQuery={query=it},onCity={},onPower={minPower=it},onStatus={statusName=it},
                         onDetail={detailId=it.id},onConnector=::openConnector)
                 } else if(tab==Tab.WALLET) {
-                    WalletContent((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0),state.session!=null,state.history) {amount,method->vm.topUp(amount,method)}
+                    WalletContent(state.availableBalanceMinor,state.active,state.history) {amount,method->vm.topUp(amount,method)}
                 } else if(tab==Tab.PROFILE) {
-                    ProfileContent((state.balanceMinor-(if(state.session!=null)state.progress.costMinor else 0)).coerceAtLeast(0),partnerLabel=partnerLabel,onPartner=onPartner,onPartnerDemo=onPartnerDemo) {tabName=Tab.WALLET.name}
+                    ProfileContent(state.availableBalanceMinor,partnerLabel=partnerLabel,onPartner=onPartner,onPartnerDemo=onPartnerDemo) {tabName=Tab.WALLET.name}
                 } else {
                 if(tab==Tab.CHARGE) {
                 Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=14.dp),verticalAlignment=Alignment.CenterVertically) {
-                    androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(R.drawable.qubat_logo),"QUBAT",Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)))
-                    Column(Modifier.weight(1f).padding(start=12.dp)) { AppText("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); AppText("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp) }
+                    BrandMark(44.dp)
+                    Column(Modifier.weight(1f).padding(start=12.dp)) { AppText("QUBAT EV",fontWeight=FontWeight.Black,fontSize=21.sp,letterSpacing=2.sp); AppText("Энергия для всего Кыргызстана",color=Muted,fontSize=11.sp,lineHeight=14.sp,maxLines=2) }
                     ThemeToggle()
                 }
                 HorizontalDivider(color=MaterialTheme.colorScheme.outline.copy(alpha=.3f))
                 }
-                Column(Modifier.weight(1f).verticalScroll(contentScroll).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.weight(1f).fillMaxWidth().padding(horizontal=14.dp,vertical=8.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
                     when(tab) {
                         Tab.HOME -> Unit
                         Tab.STATIONS -> Unit
                         Tab.CHARGE -> {
-                            val station=sessionStation ?: selected
-                            val chosenId=state.session?.connectorId ?: selectedConnectorId
+                            val station=selected
+                            val chosenId=selectedConnectorId
                             val chosenPort=station.connectors.firstOrNull {it.id==chosenId}
                                 ?: station.connectors.firstOrNull {it.state==ConnectorState.FREE}
-                            ChargeContent(station,chosenPort,state,
+                            ChargeContent(station,chosenPort,state,addingVehicle,
                                 onChoose={selectedId=station.id;selectedConnectorId=it.id},
-                                onStart={if(vm.start(station,chosenPort?.id)) message("Запущена симуляция. Реальная станция не подключена.") else message("Станция недоступна или недостаточно учебного баланса")},
-                                onStop={vm.stop();message("Демо-сеанс завершён. Запись добавлена в кошелёк.")},
+                                onStart={if(vm.start(station,chosenPort?.id)) {selectedConnectorId=chosenPort?.id;addingVehicle=false} else message("Разъём недоступен или недостаточно учебного баланса")},
+                                onStop={id->vm.stop(id)},
                                 onRelease={chosenPort?.let {vm.releaseConnector(it.id)}},
-                                onStations={tabName=Tab.STATIONS.name})
+                                onStations={tabName=Tab.STATIONS.name},
+                                onAddVehicle={addingVehicle=true;selectedConnectorId=null;query="";minPower=0;statusName=StationStatus.AVAILABLE.name;tabName=Tab.STATIONS.name},
+                                onCancel={addingVehicle=false})
                         }
                         Tab.WALLET -> Unit
                         Tab.PROFILE -> Unit
                     }
-                    Spacer(Modifier.height(8.dp))
                 }
                 }
             }
@@ -187,7 +188,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                     AppText("${s.point.lat}, ${s.point.lon}",color=Muted)
                     DepthOutlinedButton(onClick={openRoute(context,s,::message)},modifier=Modifier.fillMaxWidth()) {AppText("Учебный маршрут · 2ГИС")}
                     PressTextButton(onClick={openGoogleRoute(context,s,::message)}) {AppText("Открыть маршрут в Google Maps")}
-                }},confirmButton={PressTextButton(onClick={selectedId=s.id;detailId=null;tabName=Tab.CHARGE.name}) {AppText("К зарядке")}},dismissButton={PressTextButton(onClick={detailId=null}){AppText("Закрыть")}})
+                }},confirmButton={PressTextButton(onClick={selectedId=s.id;selectedConnectorId=null;addingVehicle=state.active && state.charges.size<ChargingEngine.MAX_CARS;detailId=null;tabName=Tab.CHARGE.name}) {AppText("К зарядке")}},dismissButton={PressTextButton(onClick={detailId=null}){AppText("Закрыть")}})
             }
         }
     }

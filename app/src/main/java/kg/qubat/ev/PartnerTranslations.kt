@@ -10,6 +10,15 @@ internal fun partnerTranslation(text:String,language:AppLanguage):String? {
     return text.replace(key,translated)
 }
 private val partnerPhrases=mapOf(
+    "Без даты" to ("No date" to "Күнү жок"),
+    "С даты" to ("From date" to "Башталган күн"),
+    "По дату" to ("To date" to "Аяктаган күн"),
+    "Действует с" to ("Effective from" to "Күчүнө кирет"),
+    "Действует до (необязательно)" to ("Effective until (optional)" to "Аяктаган күн (милдеттүү эмес)"),
+    "Доступ с" to ("Access from" to "Кирүү башталган күн"),
+    "Доступ до (необязательно)" to ("Access until (optional)" to "Кирүү аяктаган күн (милдеттүү эмес)"),
+    "Дата документа" to ("Document date" to "Документтин күнү"),
+    "Дата" to ("Date" to "Күнү"),
     "Кабинет партнёра" to ("Partner cabinet" to "Өнөктөштүн кабинети"),
     "Демо-доступ партнёра" to ("Demo partner access" to "Өнөктөш үчүн демо-кирүү"),
     "Демонстрационный доступ" to ("Demo access" to "Демо-кирүү"),

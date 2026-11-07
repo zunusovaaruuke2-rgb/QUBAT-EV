@@ -327,7 +327,7 @@ private data class NetworkPortDraft(val number: String, val type: String, val po
             val minutes = requireNotNull(reservation.toIntOrNull()?.takeIf { it in 0..1440 }) { "Бронь: от 0 до 1440 минут." }
             val stopEnergy = stop.takeIf { it.isNotBlank() }?.let { requireNotNull(networkDecimal(it)?.takeIf { n -> n > BigDecimal.ZERO }) { "Порог энергии должен быть больше нуля." } }
             repo.updateTariff(base.copy(id = networkId(), effectiveFrom = start, effectiveTo = end, customerRate = price(customer), premiumRate = price(premium), minuteRate = price(minute), idleMinuteRate = price(idle), reservationMinutes = minutes, stopEnergyKwh = stopEnergy), reason.trim())
-        }.onSuccess { onSaved() }.onFailure { error = it.message ?: "Проверьте даты: ГГГГ-ММ-ДД" }
+        }.onSuccess { onSaved() }.onFailure { error = it.message ?: "Проверьте даты" }
     }) {
         NetworkField("Базовый, сом/кВт·ч", customer, "network-tariff-customer", true) { customer = it }
         NetworkField("Премиум, сом/кВт·ч", premium, "network-tariff-premium", true) { premium = it }
@@ -335,8 +335,8 @@ private data class NetworkPortDraft(val number: String, val type: String, val po
         NetworkField("Простой за минуту, сом", idle, "network-tariff-idle", true) { idle = it }
         NetworkField("Бронь, минут", reservation, "network-tariff-reservation", true) { reservation = it }
         NetworkField("Порог окончания, кВт·ч (необязательно)", stop, "network-tariff-stop", true) { stop = it }
-        NetworkField("Действует с · ГГГГ-ММ-ДД", from, "network-tariff-from") { from = it }
-        NetworkField("До · ГГГГ-ММ-ДД (необязательно)", to, "network-tariff-to") { to = it }
+        CalendarDateField("Действует с", from, "network-tariff-from") { from = it }
+        CalendarDateField("Действует до (необязательно)", to, "network-tariff-to",optional=true) { to = it }
         NetworkCard("Предварительный просмотр") {
             AppText("Базовый: ${networkNumber(base.customerRate)} → $customer сом/кВт·ч", fontSize = 13.sp)
             AppText("Премиум: ${networkNumber(base.premiumRate)} → $premium сом/кВт·ч", fontSize = 13.sp)
@@ -444,7 +444,7 @@ private fun networkPermissionLabel(permission: NativePermission): String = when 
             require(to == null || to >= from) { "Окончание доступа раньше начала." }
             require(reason.isNotBlank()) { "Укажите причину назначения прав." }
             repo.inviteMember(NativeMember(original?.id ?: networkId(), organizationId, name.trim(), contact.trim(), role, stationIds, from, to, rights, invitedBy = repo.account.id), reason.trim())
-        }.onSuccess { onSaved() }.onFailure { error = it.message ?: "Проверьте даты: ГГГГ-ММ-ДД" }
+        }.onSuccess { onSaved() }.onFailure { error = it.message ?: "Проверьте даты" }
     }) {
         NetworkNote("Приглашение сохраняется локально. Письма и SMS не отправляются; подтверждение контакта и двухфакторный вход требуют серверной интеграции.")
         if (original == null && organizations.size > 1) NetworkChoice("Организация", organizationId, organizations.map { it.id }, { id -> organizations.first { it.id == id }.name }, "network-member-organization") { organizationId = it; stationIds = emptySet() }
@@ -459,8 +459,8 @@ private fun networkPermissionLabel(permission: NativePermission): String = when 
             }
         }
         NetworkStationSelection(stations, stationIds, "network-member-station") { stationIds = it }
-        NetworkField("Доступ с · ГГГГ-ММ-ДД", starts, "network-member-from") { starts = it }
-        NetworkField("До · ГГГГ-ММ-ДД", ends, "network-member-to") { ends = it }
+        CalendarDateField("Доступ с", starts, "network-member-from") { starts = it }
+        CalendarDateField("Доступ до (необязательно)", ends, "network-member-to",optional=true) { ends = it }
         AppText("Отдельные разрешения", fontWeight = FontWeight.Bold)
         val rolePermissions = when (role) {
             PartnerRole.ACCOUNTANT -> setOf(NativePermission.REPORT, NativePermission.EXPORT, NativePermission.FINANCE, NativePermission.EDIT_FINANCE)
@@ -499,7 +499,7 @@ private fun networkGrantLabel(kind: NativeGrantKind): String = when (kind) { Nat
             val discount = if (kind == NativeGrantKind.FREE) BigDecimal.ZERO else requireNotNull(networkDecimal(value)?.takeIf { it > BigDecimal.ZERO }) { "Введите положительную скидку." }
             require(kind != NativeGrantKind.PERCENT || discount <= BigDecimal("100")) { "Скидка не может превышать 100 %." }
             repo.saveGrant(NativeGrant(networkId(), organizationId, stationIds, customer.trim(), kind, discount, from, to, uses, approvedBy = repo.account.id, reason = reason.trim()), reason.trim())
-        }.onSuccess { onSaved() }.onFailure { error = it.message ?: "Проверьте даты: ГГГГ-ММ-ДД" }
+        }.onSuccess { onSaved() }.onFailure { error = it.message ?: "Проверьте даты" }
     }) {
         if (organizations.size > 1) NetworkChoice("Организация", organizationId, organizations.map { it.id }, { id -> organizations.first { it.id == id }.name }, "network-grant-organization") { organizationId = it; stationIds = emptySet() }
         NetworkField("ID клиента *", customer, "network-grant-customer") { customer = it }
@@ -508,8 +508,8 @@ private fun networkGrantLabel(kind: NativeGrantKind): String = when (kind) { Nat
             NetworkField(if (kind == NativeGrantKind.PERCENT) "Скидка, %" else "Скидка, сом", value, "network-grant-value", true) { value = it }
         }
         NetworkStationSelection(stations, stationIds, "network-grant-station") { stationIds = it }
-        NetworkField("С · ГГГГ-ММ-ДД", starts, "network-grant-from") { starts = it }
-        NetworkField("По · ГГГГ-ММ-ДД", ends, "network-grant-to") { ends = it }
+        CalendarDateField("С даты", starts, "network-grant-from") { starts = it }
+        CalendarDateField("По дату", ends, "network-grant-to") { ends = it }
         NetworkField("Лимит использований *", limit, "network-grant-limit", true) { limit = it }
         NetworkNote("Одобряет: ${repo.account.name}")
         NetworkField("Основание одобрения *", reason, "network-grant-reason") { reason = it }

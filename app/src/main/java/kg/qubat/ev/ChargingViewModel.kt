@@ -9,91 +9,98 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.collectLatest
-import androidx.compose.runtime.Immutable
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-@Immutable
-data class HistoryEntry(val title: String, val amountMinor: Long, val timestamp: Long, val detail: String)
-@Immutable
-data class ChargeSession(val stationId: String, val startedAt: Long, val budgetMinor: Long,val connectorId:String="")
-@Immutable
-data class AppState(val balanceMinor: Long = 150000, val session: ChargeSession? = null,
-    val progress: ChargeResult = ChargeResult(0,0.0,0,false), val history: List<HistoryEntry> = emptyList(),val completedConnectorIds:Set<String> = emptySet())
-class ChargingViewModel(app: Application): AndroidViewModel(app) {
-    private val prefs = app.getSharedPreferences("qubat_demo_v1",0)
-    private val _state = MutableStateFlow(restore())
-    val state = _state.asStateFlow()
+class ChargingViewModel(app:Application):AndroidViewModel(app) {
+    private val prefs=app.getSharedPreferences("qubat_demo_v1",0)
+    private var migrated=false
+    private val _state=MutableStateFlow(restore())
+    val state=_state.asStateFlow()
     init {
+        if(migrated)persist()
         tick()
-        viewModelScope.launch {
-            state.map {it.session?.startedAt}.distinctUntilChanged().collectLatest {startedAt->
-                if(startedAt!=null) while(true) {delay(1000);tick()}
-            }
-        }
+        viewModelScope.launch {state.map{it.active}.distinctUntilChanged().collectLatest{active->if(active)while(true){delay(1000);tick()}}}
     }
-    private fun restore(): AppState = runCatching {
-        val json = JSONObject(prefs.getString("state", "{}")!!)
-        val items = json.optJSONArray("history") ?: JSONArray()
-        val history = (0 until items.length()).map { val item=items.getJSONObject(it)
-            HistoryEntry(item.getString("title"),item.getLong("amount"),item.getLong("date"),item.getString("detail")) }
-        val session=json.optJSONObject("session")?.let { ChargeSession(it.getString("id"),it.getLong("start"),it.getLong("budget"),it.optString("connector","")) }
-            ?.takeIf { s -> DemoData.stations.any { it.id==s.stationId } }
+    private fun restore():AppState=runCatching {
+        val json=JSONObject(prefs.getString("state","{}")!!)
+        val items=json.optJSONArray("history") ?: JSONArray()
+        val history=(0 until minOf(items.length(),100)).map{val item=items.getJSONObject(it);HistoryEntry(item.getString("title"),item.getLong("amount"),item.getLong("date"),item.getString("detail"))}
+        var balance=json.optLong("balance",150000).coerceAtLeast(0)
+        val retiredHistory=mutableListOf<HistoryEntry>()
+        val retiredIds=mutableSetOf<String>()
+        val known=DemoData.stations.flatMap{it.connectors}.map{it.id}.toSet()
         val completedJson=json.optJSONArray("completed") ?: JSONArray()
-        val known=DemoData.stations.flatMap {it.connectors}.map {it.id}.toSet()
-        val completed=(0 until completedJson.length()).map {completedJson.getString(it)}.filter {it in known}.toSet()
-        val restoredSession=session?.let {saved ->
-            val station=DemoData.stations.first {it.id==saved.stationId}
-            val port=station.connectors.firstOrNull {it.id==saved.connectorId}
-                ?: station.connectors.firstOrNull {it.state==ConnectorState.FREE && it.id !in completed}
-            port?.let {saved.copy(connectorId=it.id)}
+        val completed=(0 until minOf(completedJson.length(),known.size)).map{completedJson.optString(it)}.filter{it in known}.toSet()
+        val array=json.optJSONArray("charges") ?: JSONArray().also{a->json.optJSONObject("session")?.let{a.put(it)}}
+        val charges=mutableListOf<RunningCharge>()
+        for(i in 0 until minOf(array.length(),2))runCatching {
+            val item=array.getJSONObject(i)
+            val station=DemoData.stations.firstOrNull{it.id==item.getString("id")} ?: return@runCatching
+            val savedId=item.optString("connector","")
+            val port=if(savedId.isNotBlank())station.connectors.firstOrNull{it.id==savedId && it.state==ConnectorState.FREE}
+                else station.connectors.firstOrNull{it.state==ConnectorState.FREE && it.id !in completed && charges.none{c->c.session.connectorId==it.id}}
+            if(port==null) {
+                val retired=retiredConnector(station,savedId)
+                if(json.optInt("schema")>=2 && retired!=null && savedId !in retiredIds) {
+                    val energy=item.optDouble("energy",0.0)
+                    val cost=item.optLong("cost",-1)
+                    val seconds=item.optLong("seconds",-1)
+                    if(energy.isFinite() && energy in 0.0..ChargingEngine.BATTERY_ENERGY_KWH && seconds>=0 && cost>=0 && cost<=balance-charges.sumOf{it.progress.costMinor}) {
+                        balance-=cost;retiredIds+=savedId;migrated=true
+                        retiredHistory+=HistoryEntry("Демо-зарядка · ${station.city}",-cost,System.currentTimeMillis(),"Аппарат ${retired.first} · GB/T ${retired.second} · Завершено при обновлении · "+String.format(Ru,"%.2f кВт·ч",energy))
+                    }
+                }
+                return@runCatching
+            }
+            if(charges.any{it.session.connectorId==port.id})return@runCatching
+            val start=item.getLong("start").coerceAtLeast(0)
+            val energy=item.optDouble("energy",0.0).takeIf{it.isFinite() && it in 0.0..ChargingEngine.BATTERY_ENERGY_KWH} ?: return@runCatching
+            val cost=item.optLong("cost",0).takeIf{it>=0 && it<=balance-charges.sumOf{c->c.progress.costMinor}} ?: return@runCatching
+            val vehicle=item.optInt("vehicle",i+1).takeIf{it in 1..2 && charges.none{c->c.session.vehicleNumber==it}} ?: (1..2).first{n->charges.none{c->c.session.vehicleNumber==n}}
+            val samples=item.optJSONArray("power") ?: JSONArray()
+            val power=(0 until minOf(samples.length(),120)).mapNotNull{index->val p=samples.optJSONObject(index) ?: return@mapNotNull null;val kw=p.optDouble("kw",0.0);val sec=p.optLong("sec",0);if(kw.isFinite() && kw in 0.0..80.0 && sec>=0)PowerSample(sec,kw) else null}
+            charges+=RunningCharge(ChargeSession(station.id,start,item.optLong("budget",balance).coerceAtLeast(0),port.id,vehicle),ChargeResult(item.optLong("seconds",0).coerceAtLeast(0),energy,cost,false),item.optLong("updated",start).coerceAtLeast(start),power)
         }
-        AppState(json.optLong("balance",150000).coerceAtLeast(0),restoredSession,history=history,completedConnectorIds=completed)
+        AppState(balance,charges,(retiredHistory+history).take(100),completed-charges.map{it.session.connectorId}.toSet())
     }.getOrDefault(AppState())
+    // Only retire canonical ports that existed in 1.11/1.12. Unknown IDs stay rejected.
+    private fun retiredConnector(station:Station,id:String):Pair<Int,Int>? {
+        val index=DemoData.stations.indexOf(station)
+        if(index<0)return null
+        station.chargers.forEach {unit->
+            val oldCount=if(index==0 && unit.number<=2)2 else 1+(unit.number-1+index)%4
+            for(number in (unit.connectors.size+1)..oldCount)if(id=="${unit.id}-port-$number")return unit.number to number
+        }
+        return null
+    }
     private fun persist() {
-        val s=_state.value
-        val json=JSONObject().put("balance",s.balanceMinor)
-        s.session?.let { json.put("session",JSONObject().put("id",it.stationId).put("start",it.startedAt).put("budget",it.budgetMinor).put("connector",it.connectorId)) }
-        json.put("history",JSONArray().also { array -> s.history.take(100).forEach { array.put(JSONObject().put("title",it.title).put("amount",it.amountMinor).put("date",it.timestamp).put("detail",it.detail)) } })
+        val s=_state.value;val json=JSONObject().put("schema",2).put("balance",s.balanceMinor)
+        json.put("charges",JSONArray().also{array->s.charges.forEach{c->array.put(JSONObject().put("id",c.session.stationId).put("connector",c.session.connectorId).put("start",c.session.startedAt).put("budget",c.session.budgetMinor).put("vehicle",c.session.vehicleNumber)
+            .put("seconds",c.progress.seconds).put("energy",c.progress.energyKwh).put("cost",c.progress.costMinor).put("updated",c.updatedAt)
+            .put("power",JSONArray().also{samples->c.powerHistory.forEach{samples.put(JSONObject().put("sec",it.seconds).put("kw",it.powerKw))}}))}})
+        json.put("history",JSONArray().also{array->s.history.take(100).forEach{array.put(JSONObject().put("title",it.title).put("amount",it.amountMinor).put("date",it.timestamp).put("detail",it.detail))}})
         json.put("completed",JSONArray(s.completedConnectorIds.toList()))
         prefs.edit().putString("state",json.toString()).apply()
     }
     fun start(station:Station,connectorId:String?=null):Boolean {
-        val s=_state.value
-        if(s.session!=null || s.balanceMinor<1) return false
-        val current=DemoData.stations.firstOrNull {it.id==station.id}
-            ?.withConnectorSession(null,s.completedConnectorIds) ?: return false
-        val port=current.freeConnector(connectorId) ?: return false
-        _state.value=s.copy(session=ChargeSession(station.id,System.currentTimeMillis(),s.balanceMinor,port.id),progress=ChargeResult(0,0.0,0,false))
-        persist();return true
+        val result=ChargingEngine.start(_state.value,station.id,connectorId,System.currentTimeMillis())
+        _state.value=result.state;persist();return result.started
     }
+    fun stop(connectorId:String) {_state.value=ChargingEngine.stop(_state.value,connectorId,System.currentTimeMillis());persist()}
     fun releaseConnector(id:String) {
         val s=_state.value
-        if(s.session?.connectorId==id || id !in s.completedConnectorIds) return
-        _state.value=s.copy(completedConnectorIds=s.completedConnectorIds-id)
-        persist()
+        if(s.charges.any{it.session.connectorId==id} || id !in s.completedConnectorIds)return
+        _state.value=s.copy(completedConnectorIds=s.completedConnectorIds-id);persist()
     }
     private fun tick() {
-        val s=_state.value; val session=s.session ?: return
-        val station=DemoData.stations.first { it.id==session.stationId }
-        val seconds=((System.currentTimeMillis()-session.startedAt)/1000).coerceAtLeast(0)
-        _state.value=s.copy(progress=calculateCharge(seconds,station.powerKw,station.tariffMinor,session.budgetMinor))
-        if(_state.value.progress.depleted) finish()
-    }
-    fun stop() { tick(); if(_state.value.session!=null) finish() }
-    private fun finish() {
-        val s=_state.value; val session=s.session ?: return
-        val station=DemoData.stations.first { it.id==session.stationId }
-        val entry=HistoryEntry("Демо-зарядка · ${station.city}",-s.progress.costMinor,System.currentTimeMillis(),
-            String.format(java.util.Locale("ru"),"%.3f кВт·ч · %d сек",s.progress.energyKwh,s.progress.seconds))
-        _state.value=s.copy(balanceMinor=(s.balanceMinor-s.progress.costMinor).coerceAtLeast(0),session=null,history=(listOf(entry)+s.history).take(100),completedConnectorIds=s.completedConnectorIds+session.connectorId)
-        persist()
+        val before=_state.value;val next=ChargingEngine.advance(before,System.currentTimeMillis());_state.value=next
+        if(before.charges.map{it.session.connectorId}!=next.charges.map{it.session.connectorId})persist()
     }
     fun topUp(amountMinor:Long=50000,method:String="Демо"):Boolean {
         val s=_state.value
-        if(s.session!=null || amountMinor !in 100..5_000_000L || s.balanceMinor>Long.MAX_VALUE-amountMinor) return false
-        _state.value=s.copy(balanceMinor=s.balanceMinor+amountMinor,history=(listOf(HistoryEntry("Учебное пополнение · $method",amountMinor,System.currentTimeMillis(),"Демо · без банковской операции"))+s.history).take(100))
-        persist();return true
+        if(s.active || amountMinor !in 100..5_000_000L || s.balanceMinor>Long.MAX_VALUE-amountMinor)return false
+        _state.value=s.copy(balanceMinor=s.balanceMinor+amountMinor,history=(listOf(HistoryEntry("Учебное пополнение · $method",amountMinor,System.currentTimeMillis(),"Демо · без банковской операции"))+s.history).take(100));persist();return true
     }
 }
