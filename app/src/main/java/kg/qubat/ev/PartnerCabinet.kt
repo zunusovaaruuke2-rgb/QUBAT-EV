@@ -228,7 +228,7 @@ private data class NativeFilterUi(val filter:NativeReportFilter,val content:@Com
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp)){
                 listOf("Сегодня" to "today","7 дней" to "week","Месяц" to "month","Год" to "year","Прошлый месяц" to "previous").forEach{(label,id)->DepthOutlinedButton(onClick={val end=if(id=="previous")repo.today.withDayOfMonth(1).minusDays(1) else repo.today;to=end.toString();from=when(id){"today"->end;"week"->end.minusDays(6);"year"->end.withDayOfYear(1);else->end.withDayOfMonth(1)}.toString()},modifier=Modifier.testTag("network-period-$id")){AppText(label)}}
             }
-            AppText("${nativeDate.format(filter.period.from)} — ${nativeDate.format(filter.period.to)} · Asia/Bishkek",fontSize=12.sp,color=Muted,modifier=Modifier.testTag("network-period-label"))
+            AppText("${nativeDate.format(filter.period.from)} — ${nativeDate.format(filter.period.to)} · Asia/Bishkek",fontSize=12.sp,color=Muted,modifier=Modifier.testTag("network-period-label").pressClickable{edit=true})
             Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
                 DepthOutlinedButton(onClick={picker="station"},modifier=Modifier.weight(1f).testTag("network-station-filter")){AppText(stations.firstOrNull{it.id==stationId}?.title?:"Все мои станции",maxLines=1)}
                 PressTextButton(onClick={edit=true},modifier=Modifier.testTag("network-period-custom")){AppText("Период")}
@@ -252,8 +252,8 @@ private data class NativeFilterUi(val filter:NativeReportFilter,val content:@Com
     val valid=runCatching{PartnerPeriod(LocalDate.parse(first),LocalDate.parse(last))}.isSuccess
     AlertDialog(onDismissRequest=onDismiss,title={AppText("Период отчёта")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
         AppText("Последний день включается целиком по Asia/Bishkek.",fontSize=12.sp,color=Muted)
-        PressOutlinedTextField(first,{first=it.take(10)},label={AppText("С даты · ГГГГ-ММ-ДД")},singleLine=true,modifier=Modifier.testTag("network-date-from"))
-        PressOutlinedTextField(last,{last=it.take(10)},label={AppText("По дату · ГГГГ-ММ-ДД")},singleLine=true,modifier=Modifier.testTag("network-date-to"))
+        CalendarDateField("С даты",first,"network-date-from"){first=it}
+        CalendarDateField("По дату",last,"network-date-to"){last=it}
         if(!valid)AppText("Проверьте начало и окончание периода",color=MaterialTheme.colorScheme.error)
     }},confirmButton={PressTextButton(onClick={onApply(first,last)},enabled=valid,modifier=Modifier.testTag("network-date-apply")){AppText("Применить")}},dismissButton={PressTextButton(onClick=onDismiss){AppText("Отмена")}})
 }
@@ -404,7 +404,7 @@ private fun nativeDecimal(value:String)=value.trim().replace(',','.').toBigDecim
         stations.forEach{s->DepthChip(stationId==s.id,{stationId=s.id},modifier=Modifier.fillMaxWidth(),label={AppText(s.title)})}
         NativeField("Электричество по квитанции, сом",amount,"network-bill-amount"){amount=it.take(18)}
         NativeField("Номер документа",number,"network-bill-number"){number=it.take(80)}
-        NativeField("Дата документа · ГГГГ-ММ-ДД",date){date=it.take(10)}
+        CalendarDateField("Дата документа",date,"network-bill-date"){date=it}
         NativeField("Внешний счётчик, кВт·ч · необязательно",meter){meter=it.take(18)}
         NativeField("Фактическая аренда, сом · необязательно",rent){rent=it.take(18)}
         DepthChip(paid,{paid=!paid},label={AppText("Квитанция оплачена · ДЕМО")})
@@ -426,7 +426,7 @@ private fun nativeDecimal(value:String)=value.trim().replace(',','.').toBigDecim
         stations.forEach{s->DepthChip(stationId==s.id,{stationId=s.id},label={AppText(s.title)})}
         NativeExpenseKind.entries.forEach{k->DepthChip(kind==k,{kind=k},label={AppText(k.label)})}
         NativeField("Сумма, сом",amount,"network-expense-amount"){amount=it.take(18)}
-        NativeField("Дата · ГГГГ-ММ-ДД",date){date=it.take(10)}
+        CalendarDateField("Дата",date,"network-expense-date"){date=it}
         NativeField("Причина / документ",reason,"network-expense-reason"){reason=it.take(300)}
         DepthChip(paid,{paid=!paid},label={AppText("Оплачено / подтверждено · ДЕМО")})
         error?.let{AppText(it,color=MaterialTheme.colorScheme.error)}
@@ -489,7 +489,7 @@ private fun nativeDecimal(value:String)=value.trim().replace(',','.').toBigDecim
         NativeField("Доля партнёра, %",partner){partner=it.take(8)}
         NativeField("Или фиксированная доля, сом/месяц",fixed){fixed=it.take(18)}
         NativeField("Резерв, %",reserve){reserve=it.take(8)}
-        NativeField("С даты · ГГГГ-ММ-ДД",date){date=it.take(10)}
+        CalendarDateField("Действует с",date,"network-terms-date"){date=it}
         AppText("Предыдущие версии:",fontWeight=FontWeight.Bold)
         history.forEach{t->AppText("${t.effectiveFrom} — ${t.effectiveTo?:"действует"}: электричество ${nativeMoney(t.electricityRate)}, платформа ${t.platformRate.movePointRight(2)}%, налог ${t.taxRate.movePointRight(2)}%",fontSize=10.sp,color=Muted)}
         NativeField("Причина изменения",reason){reason=it.take(300)}

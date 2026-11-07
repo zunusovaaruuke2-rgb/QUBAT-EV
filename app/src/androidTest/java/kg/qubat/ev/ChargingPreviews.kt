@@ -40,3 +40,13 @@ internal fun assertChargeTextFits(node:androidx.compose.ui.test.SemanticsNodeInt
     org.junit.Assert.assertTrue(message,result.getLineTop(0)>=-1f)
     org.junit.Assert.assertTrue(message,result.getLineBottom(0)<=result.size.height+1f)
 }
+
+internal fun saveNativeCalendarPreview(name:String) {
+    val bitmap=InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot()
+    val bytes=ByteArrayOutputStream().use{stream->bitmap.compress(Bitmap.CompressFormat.PNG,100,stream);stream.toByteArray()}
+    bitmap.recycle()
+    chargeShell("mkdir -p /data/local/tmp/qubat-charging")
+    val pipes=InstrumentationRegistry.getInstrumentation().uiAutomation.executeShellCommandRw("dd of=/data/local/tmp/qubat-charging/$name.png")
+    ParcelFileDescriptor.AutoCloseOutputStream(pipes[1]).use{it.write(bytes)}
+    ParcelFileDescriptor.AutoCloseInputStream(pipes[0]).use{it.readBytes()}
+}
