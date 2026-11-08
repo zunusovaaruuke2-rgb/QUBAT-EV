@@ -83,7 +83,6 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                 map=native
                 viewport="Масштаб 5.0; 41.500, 74.700"
 
-
             }
         }
     }
