@@ -1,6 +1,8 @@
 package kg.qubat.ev
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -50,8 +52,10 @@ class ChargeSelectionLayoutTest {
                     LocalAppLanguage provides language,
                     LocalTranslate provides { translate(it, language) },
                 ) {
-                    Box(Modifier.padding(14.dp).width(width.dp).height(550.dp)) {
-                        ChargeSelection(station, port, AppState(), { port = it }, { starts++ }, {}, {}, {})
+                    Surface(color = Forest, contentColor = MaterialTheme.colorScheme.onBackground) {
+                        Box(Modifier.padding(14.dp).width(width.dp).height(550.dp)) {
+                            ChargeSelection(station, port, AppState(), { port = it }, { starts++ }, {}, {}, {})
+                        }
                     }
                 }
             }

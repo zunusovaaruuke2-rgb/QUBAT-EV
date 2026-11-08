@@ -259,19 +259,19 @@ class NavigationTest {
             android.os.SystemClock.sleep(1300)
             compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed()
             compose.onNodeWithText("Остановить зарядку",substring=true).assertIsDisplayed().performClick()
-            compose.onNodeWithText("Завершён",substring=true).assertIsDisplayed()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("Завершён").assertIsDisplayed()
             compose.onNodeWithText("Освободить разъём после сеанса").assertIsDisplayed()
                 .performSemanticsAction(SemanticsActions.OnClick) { it() }
             compose.waitForIdle()
             try {
                 compose.waitUntil(5000) {
-                    compose.onAllNodesWithText("Свободен").fetchSemanticsNodes().isNotEmpty()
+                    compose.onAllNodes(hasTestTag("choice-status-demo-bishkek-unit-1-port-1") and hasText("Свободен"),useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()
                 }
             } catch(failure:Throwable) {
                 throw AssertionError(compose.onRoot().printToString(),failure)
             }
             compose.onNodeWithTag("charge-choice-demo-bishkek-unit-1-port-1").assertIsDisplayed()
-            compose.onNodeWithText("Свободен").assertIsDisplayed()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("Свободен").assertIsDisplayed()
         }
         step("История и профиль") {
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()
