@@ -259,7 +259,7 @@ class NavigationTest {
             android.os.SystemClock.sleep(1300)
             compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed()
             compose.onNodeWithText("Остановить зарядку",substring=true).assertIsDisplayed().performClick()
-            compose.onNodeWithTag("choice-status-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("Завершён").assertIsDisplayed()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-1-port-1",useUnmergedTree=true).performScrollTo().assertTextEquals("Завершён").assertIsDisplayed()
             compose.onNodeWithText("Освободить разъём после сеанса").assertIsDisplayed()
                 .performSemanticsAction(SemanticsActions.OnClick) { it() }
             compose.waitForIdle()
@@ -270,7 +270,7 @@ class NavigationTest {
             } catch(failure:Throwable) {
                 throw AssertionError(compose.onRoot().printToString(),failure)
             }
-            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-1-port-1").assertIsDisplayed()
+            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-1-port-1").performScrollTo().assertIsDisplayed()
             compose.onNodeWithTag("choice-status-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("Свободен").assertIsDisplayed()
         }
         step("История и профиль") {
