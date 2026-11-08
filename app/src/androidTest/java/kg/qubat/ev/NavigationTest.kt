@@ -197,7 +197,7 @@ class NavigationTest {
             compose.onNodeWithTag("start-charge").assertExists()
             compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
             compose.onNodeWithTag("charge-choice-demo-bishkek-unit-1-port-1").assertIsDisplayed()
-            compose.onNodeWithText("Свободен").assertIsDisplayed()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("Свободен").assertIsDisplayed()
         }
         step("Поиск только по названию станции и пустое состояние") {
             compose.onNodeWithText("Список",useUnmergedTree=true).performClick()

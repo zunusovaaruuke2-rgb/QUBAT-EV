@@ -80,7 +80,10 @@ import androidx.compose.ui.unit.sp
         // Four equal cards on a normal phone. Larger accessibility fonts get more space per card.
         val visibleCount = when { maxWidth < 300.dp || fontScale > 1.5f -> 2; fontScale > 1.25f -> 3; else -> 4 }
         val gap = 6.dp
-        val cardWidth = (maxWidth - gap * (visibleCount - 1)) / visibleCount
+        // Round once in pixels: four independently rounded fractional widths can clip the last card.
+        val cardWidth = with(LocalDensity.current) {
+            ((maxWidth.roundToPx() - gap.roundToPx() * (visibleCount - 1)) / visibleCount).toDp()
+        }
         val cardHeight = with(LocalDensity.current) { (if (compact) 76.dp else 92.dp) + 48.sp.toDp() }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(gap)) {
             station.chargers.forEach { charger ->
