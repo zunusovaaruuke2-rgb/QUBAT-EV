@@ -1,0 +1,1 @@
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android"><item android:drawable="@color/icon_background"/><item><inset android:inset="14%"><bitmap android:src="@drawable/qubat_logo" android:gravity="fill"/></inset></item></layer-list>
