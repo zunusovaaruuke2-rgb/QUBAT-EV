@@ -26,7 +26,7 @@ import com.google.maps.android.compose.*
 import kotlinx.coroutines.launch
 
 private enum class Tab(val label: String,val icon: ImageVector) {
-    HOME("Карта",Icons.Default.Home), STATIONS("Список",Icons.Default.Place), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
+    HOME("Карта",Icons.Default.Map), STATIONS("Список",Icons.Default.List), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
 }
 @Composable internal fun QubatDriverApp(vm:ChargingViewModel,partnerLabel:String?,onPartner:()->Unit,onPartnerDemo:()->Unit) {
     val state by vm.state.collectAsStateWithLifecycle()
