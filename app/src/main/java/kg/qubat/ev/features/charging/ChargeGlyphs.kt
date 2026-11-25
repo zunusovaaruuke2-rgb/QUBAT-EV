@@ -43,8 +43,7 @@ import androidx.compose.ui.unit.dp
         }
     }
 }
-@Composable internal fun CarGlyph(modifier:Modifier) {
-    val color=Lime
+@Composable internal fun CarGlyph(modifier:Modifier,color:Color=Lime) {
     Canvas(modifier) {
         val w=size.width;val h=size.height;val stroke=Stroke(w*.06f,cap=StrokeCap.Round)
         val roof=Path().apply{moveTo(w*.2f,h*.43f);lineTo(w*.3f,h*.18f);lineTo(w*.7f,h*.18f);lineTo(w*.8f,h*.43f)}
@@ -55,8 +54,9 @@ import androidx.compose.ui.unit.dp
         val bolt=Path().apply{moveTo(w*.53f,h*.45f);lineTo(w*.43f,h*.62f);lineTo(w*.51f,h*.62f);lineTo(w*.47f,h*.75f);lineTo(w*.60f,h*.57f);lineTo(w*.52f,h*.57f);close()};drawPath(bolt,color)
     }
 }
-@Composable internal fun ChargeSymbol(kind:Int,modifier:Modifier) {
-    val color=Lime
+internal fun metricColor(kind:Int)=when(kind){0->Color(0xFF397DEB);1->Color(0xFF0891B2);2->Color(0xFF9564D8);else->Color(0xFFC28A08)}
+
+@Composable internal fun ChargeSymbol(kind:Int,modifier:Modifier,color:Color=metricColor(kind)) {
     Canvas(modifier){val w=size.width;val h=size.height;val stroke=Stroke(w*.09f,cap=StrokeCap.Round)
         when(kind){
             0->{val bolt=Path().apply{moveTo(w*.6f,0f);lineTo(w*.15f,h*.57f);lineTo(w*.45f,h*.57f);lineTo(w*.36f,h);lineTo(w*.85f,h*.36f);lineTo(w*.57f,h*.36f);close()};drawPath(bolt,color)}
