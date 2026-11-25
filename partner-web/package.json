@@ -1,0 +1,11 @@
+{
+  "name": "qubat-ev-partner-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/core.test.mjs tests/excel.test.mjs",
+    "start": "python3 -m http.server 4173 --directory dist",
+    "check": "node --check dist/app.mjs && node --check dist/core.mjs && node --check dist/views.mjs && node --check dist/excel.mjs"
+  }
+}
