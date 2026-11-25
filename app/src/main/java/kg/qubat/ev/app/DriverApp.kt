@@ -84,7 +84,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     fun openConnector(site:Station,port:Connector) {
         if(state.charges.any{it.session.connectorId==port.id}) {
             addingVehicle=false;focusedConnectorId=null;tabName=Tab.CHARGE.name
-        } else if(port.state==ConnectorState.FREE) {
+        } else if(port.state==ConnectorState.CONNECTED) {
             if(state.charges.size>=ChargingEngine.MAX_CARS) {message("Уже заряжаются два автомобиля");return}
             selectedId=site.id;selectedConnectorId=port.id;addingVehicle=state.active
             focusedConnectorId=null;tabName=Tab.CHARGE.name
@@ -125,14 +125,14 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                             val station=selected
                             val chosenId=selectedConnectorId
                             val chosenPort=station.connectors.firstOrNull {it.id==chosenId}
-                                ?: station.connectors.firstOrNull {it.state==ConnectorState.FREE}
+                                ?: station.connectors.firstOrNull {it.state==ConnectorState.CONNECTED}
                             ChargeContent(station,chosenPort,state,addingVehicle,
                                 onChoose={selectedId=station.id;selectedConnectorId=it.id},
                                 onStart={if(vm.start(station,chosenPort?.id)) {selectedConnectorId=chosenPort?.id;addingVehicle=false} else message("Разъём недоступен или недостаточно учебного баланса")},
                                 onStop={id->vm.stop(id)},
                                 onRelease={chosenPort?.let {vm.releaseConnector(it.id)}},
                                 onStations={tabName=Tab.STATIONS.name},
-                                onAddVehicle={addingVehicle=true;selectedConnectorId=null;query="";minPower=0;statusName=StationStatus.AVAILABLE.name;tabName=Tab.STATIONS.name},
+                                onAddVehicle={addingVehicle=true;selectedConnectorId=null;query="";minPower=0;statusName=null;tabName=Tab.STATIONS.name},
                                 onCancel={addingVehicle=false})
                         }
                         Tab.WALLET -> Unit
@@ -152,8 +152,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                         AppText("GB/T DC · 80 кВт · 13,5 сом/кВт·ч",color=Muted,fontSize=13.sp)
                         port.percent?.let {AppText("Демо-уровень заряда: $it%",color=Color(port.state.argb))}
                         AppText(when(port.state) {
-                            ConnectorState.FREE -> "Разъём свободен. Можно выбрать для учебной зарядки."
-                            ConnectorState.CONNECTED -> "Автомобиль уже подключён и ожидает старта. Разъём занят."
+                            ConnectorState.FREE -> "Разъём свободен. Подключите кабель перед запуском."
+                            ConnectorState.CONNECTED -> "Автомобиль подключён и ожидает запуска зарядки."
                             ConnectorState.CHARGING -> "Идёт демонстрационная зарядка. Разъём занят."
                             ConnectorState.COMPLETED -> "Сеанс завершён. Разъём ещё не освобождён."
                             ConnectorState.ERROR -> "Демонстрационная ошибка разъёма. Запуск недоступен."
