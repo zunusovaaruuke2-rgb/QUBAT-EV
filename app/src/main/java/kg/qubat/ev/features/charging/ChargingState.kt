@@ -42,9 +42,9 @@ object ChargingEngine {
     fun start(state:AppState,stationId:String,connectorId:String?,now:Long):ChargeStartResult {
         val current=advance(state,now)
         val station=DemoData.stations.firstOrNull{it.id==stationId} ?: return ChargeStartResult(current,false)
-        if(current.charges.size>=MAX_CARS || current.availableBalanceMinor<=0)return ChargeStartResult(current,false)
+        if(connectorId==null || current.charges.size>=MAX_CARS || current.availableBalanceMinor<=0)return ChargeStartResult(current,false)
         val occupied=current.charges.map{it.session.connectorId}.toSet()+current.completedConnectorIds
-        val port=station.connectors.firstOrNull{(connectorId==null || it.id==connectorId) && it.state==ConnectorState.FREE && it.id !in occupied} ?: return ChargeStartResult(current,false)
+        val port=station.connectors.firstOrNull{(connectorId==null || it.id==connectorId) && it.state==ConnectorState.CONNECTED && it.id !in occupied} ?: return ChargeStartResult(current,false)
         val number=(1..MAX_CARS).first{n->current.charges.none{it.session.vehicleNumber==n}}
         val charge=RunningCharge(ChargeSession(station.id,now,current.balanceMinor,port.id,number))
         return ChargeStartResult(refreshPowers(current.copy(charges=current.charges+charge)),true)
