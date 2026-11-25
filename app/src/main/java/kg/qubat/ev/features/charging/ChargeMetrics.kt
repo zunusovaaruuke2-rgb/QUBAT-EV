@@ -8,18 +8,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable internal fun ChargeGauge(percent:Int,active:Boolean,modifier:Modifier,compact:Boolean) {
-    Box(modifier,contentAlignment=Alignment.Center) {
-        CircularProgressIndicator(progress={percent/100f},modifier=Modifier.fillMaxSize().padding(5.dp),color=Lime,trackColor=Muted.copy(alpha=.16f),strokeWidth=if(compact)8.dp else 10.dp,strokeCap=StrokeCap.Round)
-        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(4.dp)) {
-            if(!compact)CarGlyph(Modifier.size(28.dp))
-            ChargeText("$percent%",fontSize=if(compact)26.sp else 30.sp,fontWeight=FontWeight.Bold,color=Lime)
-            if(!compact){ChargeText(if(active)"Зарядка идёт" else "Готово к зарядке",fontSize=12.sp,color=Muted)}
+    val accent=when { percent<20 -> Color(0xFFE5484D); percent<50 -> Color(0xFFD6A016); else -> Lime }
+    BoxWithConstraints(modifier,contentAlignment=Alignment.Center) {
+        val scale=(maxWidth.value/150f).coerceIn(.55f,1f)
+        CircularProgressIndicator(progress={percent/100f},modifier=Modifier.fillMaxSize().padding(5.dp),color=accent,trackColor=Muted.copy(alpha=.16f),strokeWidth=if(compact)8.dp else 12.dp,strokeCap=StrokeCap.Round)
+        Column(horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(2.dp)) {
+            if(!compact)CarGlyph(Modifier.size((25*scale).dp),accent)
+            ChargeText("$percent%",fontSize=(if(compact)26*scale else 34*scale).sp,fontWeight=FontWeight.Black,color=accent)
+            if(!compact){ChargeText(if(active)"Зарядка идёт" else "Готово к зарядке",fontSize=(10*scale).sp,color=Muted,maxLines=1)}
         }
     }
 }
@@ -29,7 +32,7 @@ import androidx.compose.ui.unit.sp
             ChargeSymbol(kind,Modifier.size(18.dp).testTag("metric-icon-$kind"))
             Column(Modifier.weight(1f)) {
                 ChargeText(label,Modifier.testTag("metric-label-$kind"),fontSize=12.sp,color=Muted,maxLines=1)
-                ChargeText(value,Modifier.testTag("metric-value-$kind"),fontSize=15.sp,fontWeight=FontWeight.Bold,color=Lime,maxLines=1)
+                ChargeText(value,Modifier.testTag("metric-value-$kind"),fontSize=15.sp,fontWeight=FontWeight.Bold,color=metricColor(kind),maxLines=1)
             }
         }
     }
