@@ -39,8 +39,8 @@ class ChargingViewModel(app:Application):AndroidViewModel(app) {
             val item=array.getJSONObject(i)
             val station=DemoData.stations.firstOrNull{it.id==item.getString("id")} ?: return@runCatching
             val savedId=item.optString("connector","")
-            val port=if(savedId.isNotBlank())station.connectors.firstOrNull{it.id==savedId && it.state==ConnectorState.CONNECTED}
-                else station.connectors.firstOrNull{it.state==ConnectorState.CONNECTED && it.id !in completed && charges.none{c->c.session.connectorId==it.id}}
+            val port=if(savedId.isNotBlank())station.connectors.firstOrNull{it.id==savedId}
+                else station.connectors.firstOrNull{it.state in setOf(ConnectorState.FREE,ConnectorState.CONNECTED) && it.id !in completed && charges.none{c->c.session.connectorId==it.id}}
             if(port==null) {
                 val retired=retiredConnector(station,savedId)
                 if(json.optInt("schema")>=2 && retired!=null && savedId !in retiredIds) {
