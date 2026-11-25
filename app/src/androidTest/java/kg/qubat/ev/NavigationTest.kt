@@ -223,19 +223,29 @@ class NavigationTest {
                 // Charging is checked on Bishkek map above. Naryn now has a one-port first apparatus.
                 val site=DemoData.stations.first{it.id=="demo-naryn"}
                 listOf(ConnectorState.CONNECTED,ConnectorState.COMPLETED,ConnectorState.ERROR).forEach {state->
-                    val source=if(site.connectors.any{it.state==state})site else DemoData.stations.first{it.connectors.any{port->port.state==state}}
-                    if(source.id!=site.id) {
-                        compose.onNodeWithTag("station-search-field").performTextClearance()
-                        compose.onNodeWithTag("station-search-field").performTextInput(source.title.substringBefore(" ·"))
-                        compose.onNodeWithTag("station-search-field").performImeAction()
-                        visible(source.title)
+                    val source=when {
+                        state==ConnectorState.CONNECTED -> DemoData.stations.first()
+                        site.connectors.any{it.state==state} -> site
+                        else -> DemoData.stations.first{it.connectors.any{port->port.state==state}}
                     }
+                    compose.onNodeWithTag("station-search-field").performTextClearance()
+                    compose.onNodeWithTag("station-search-field").performTextInput(source.title.substringBefore(" ·"))
+                    compose.onNodeWithTag("station-search-field").performImeAction()
+                    visible(source.title)
                     val port=source.connectors.first{it.state==state}
                     val title=state.title
                     compose.onNodeWithTag("connector-${port.id}").performScrollTo().performClick()
-                    compose.onNodeWithTag("connector-dialog-state").assertTextEquals(title)
-                    compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
-                    compose.onNodeWithText("Закрыть").performClick()
+                    if(state==ConnectorState.CONNECTED) {
+                        compose.onNodeWithTag("charge-choice-${port.id}").performScrollTo().assertIsDisplayed()
+                        compose.onNodeWithTag("choice-status-${port.id}",useUnmergedTree=true).assertTextEquals(title)
+                        compose.onNodeWithTag("start-charge").assertIsEnabled()
+                        compose.onNodeWithText("Список",useUnmergedTree=true).performClick()
+                        compose.onNodeWithContentDescription("Поиск станции").performClick()
+                    } else {
+                        compose.onNodeWithTag("connector-dialog-state").assertTextEquals(title)
+                        compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
+                        compose.onNodeWithText("Закрыть").performClick()
+                    }
                 }
             }
             compose.onNodeWithTag("station-search-field").performTextClearance()
