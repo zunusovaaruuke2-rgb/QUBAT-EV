@@ -43,7 +43,11 @@ class MultiChargeTest {
     @Test fun addSecondVehicleFromPlusAndStopEachIndependently() {
         compose.waitUntil(5000){compose.onAllNodesWithTag("launch-splash").fetchSemanticsNodes().isEmpty()}
         val vm=compose.runOnIdle{ViewModelProvider(compose.activity)[ChargingViewModel::class.java]}
-        val station=DemoData.stations.first();val first=station.chargers[0].connectors[0].id;val second=station.chargers[1].connectors[1].id
+        val station=DemoData.stations.first()
+        val secondStation=DemoData.stations[1]
+        val first=station.connectors.first{it.state==ConnectorState.CONNECTED}.id
+        val second=secondStation.connectors.first{it.state==ConnectorState.CONNECTED}.id
+        val firstUnit=station.chargers.first{unit->unit.connectors.any{it.id==first}}
         compose.onNodeWithText("Зарядка",useUnmergedTree=true).performClick()
         compose.onNodeWithText("1 · Выберите аппарат").assertIsDisplayed()
         compose.onNodeWithText("Начать зарядку").assertIsDisplayed()
@@ -52,8 +56,9 @@ class MultiChargeTest {
         compose.waitForIdle()
         compose.onNodeWithTag("charge-choice-${station.chargers[3].connectors[1].id}").performScrollTo().assertIsDisplayed()
         compose.onNodeWithTag("start-charge").assertIsDisplayed()
+        compose.onNodeWithTag("start-charge").assertIsNotEnabled()
         preview("charging-selection")
-        compose.onNodeWithTag("charge-unit-${station.chargers[0].id}").performScrollTo().performClick()
+        compose.onNodeWithTag("charge-unit-${firstUnit.id}").performScrollTo().performClick()
         compose.waitForIdle()
         compose.onNodeWithTag("start-charge").assertIsDisplayed().performClick()
         compose.waitUntil(5000){vm.state.value.charges.size==1}
@@ -78,6 +83,9 @@ class MultiChargeTest {
         assertChargeTextFits(compose.onNodeWithTag("chart-y-0",useUnmergedTree=true))
         preview("charging-one-car-light")
         compose.onNodeWithTag("add-charge").assertIsDisplayed().performClick()
+        compose.onNodeWithContentDescription("Поиск станции").performClick()
+        compose.onNodeWithTag("station-search-field").performTextInput(secondStation.title.substringBefore(" ·"))
+        compose.onNodeWithTag("station-search-field").performImeAction()
         compose.onNodeWithTag("stations-list").performScrollToIndex(0)
         compose.onNodeWithTag("connector-$second").performScrollTo().performClick()
         compose.onNodeWithTag("start-charge").assertIsDisplayed().performClick()

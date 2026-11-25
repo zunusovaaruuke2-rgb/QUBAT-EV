@@ -28,7 +28,16 @@ data class ChargeStartResult(val state:AppState,val started:Boolean)
 object ChargingEngine {
     const val MAX_CARS=2
     const val BATTERY_ENERGY_KWH=48.0 // 60 kWh battery, initial charge 20%.
-    private fun site(charge:RunningCharge)=DemoData.stations.first{it.id==charge.session.stationId}
+    private val calculator by lazy { ChargingCalculator(DemoData.stations) }
+    fun powerKw(state:AppState,charge:RunningCharge)=calculator.powerKw(state,charge)
+    fun start(state:AppState,stationId:String,connectorId:String?,now:Long)=calculator.start(state,stationId,connectorId,now)
+    fun advance(state:AppState,now:Long)=calculator.advance(state,now)
+    fun stop(state:AppState,connectorId:String,now:Long)=calculator.stop(state,connectorId,now)
+}
+
+/** Same calculations with an explicit station snapshot, allowing realistic connected-port fixtures. */
+internal class ChargingCalculator(private val stations:List<Station>) {
+    private fun site(charge:RunningCharge)=stations.first{it.id==charge.session.stationId}
     private fun apparatus(charge:RunningCharge)=site(charge).chargers.first{unit->unit.connectors.any{it.id==charge.session.connectorId}}
     fun powerKw(state:AppState,charge:RunningCharge):Double {
         val unit=apparatus(charge)
@@ -41,11 +50,11 @@ object ChargingEngine {
     })
     fun start(state:AppState,stationId:String,connectorId:String?,now:Long):ChargeStartResult {
         val current=advance(state,now)
-        val station=DemoData.stations.firstOrNull{it.id==stationId} ?: return ChargeStartResult(current,false)
-        if(connectorId==null || current.charges.size>=MAX_CARS || current.availableBalanceMinor<=0)return ChargeStartResult(current,false)
+        val station=stations.firstOrNull{it.id==stationId} ?: return ChargeStartResult(current,false)
+        if(connectorId==null || current.charges.size>=ChargingEngine.MAX_CARS || current.availableBalanceMinor<=0)return ChargeStartResult(current,false)
         val occupied=current.charges.map{it.session.connectorId}.toSet()+current.completedConnectorIds
         val port=station.connectors.firstOrNull{(connectorId==null || it.id==connectorId) && it.state==ConnectorState.CONNECTED && it.id !in occupied} ?: return ChargeStartResult(current,false)
-        val number=(1..MAX_CARS).first{n->current.charges.none{it.session.vehicleNumber==n}}
+        val number=(1..ChargingEngine.MAX_CARS).first{n->current.charges.none{it.session.vehicleNumber==n}}
         val charge=RunningCharge(ChargeSession(station.id,now,current.balanceMinor,port.id,number))
         return ChargeStartResult(refreshPowers(current.copy(charges=current.charges+charge)),true)
     }
@@ -55,16 +64,16 @@ object ChargingEngine {
         // A battery can finish while the app is closed. Split catch-up at that
         // event so the other port receives the freed power for the remaining time.
         val nextFullAt=current.charges.minOf{charge->
-            val seconds=ceil((BATTERY_ENERGY_KWH-charge.progress.energyKwh).coerceAtLeast(0.0)*3600/powerKw(current,charge)).toLong()
+            val seconds=ceil((ChargingEngine.BATTERY_ENERGY_KWH-charge.progress.energyKwh).coerceAtLeast(0.0)*3600/powerKw(current,charge)).toLong()
             if(charge.updatedAt>Long.MAX_VALUE-seconds*1000)Long.MAX_VALUE else charge.updatedAt+seconds*1000
         }
         if(nextFullAt<now)return advance(advance(current,nextFullAt),now)
         val desired=current.charges.map{charge->
             val elapsed=((now-charge.updatedAt).coerceAtLeast(0)/1000)
             val power=powerKw(current,charge)
-            val duration=ceil((BATTERY_ENERGY_KWH-charge.progress.energyKwh).coerceAtLeast(0.0)*3600/power).toLong()
+            val duration=ceil((ChargingEngine.BATTERY_ENERGY_KWH-charge.progress.energyKwh).coerceAtLeast(0.0)*3600/power).toLong()
             val seconds=minOf(elapsed,duration)
-            val energy=(charge.progress.energyKwh+power*seconds/3600).coerceAtMost(BATTERY_ENERGY_KWH).let{if(it>=BATTERY_ENERGY_KWH-1e-9)BATTERY_ENERGY_KWH else it}
+            val energy=(charge.progress.energyKwh+power*seconds/3600).coerceAtMost(ChargingEngine.BATTERY_ENERGY_KWH).let{if(it>=ChargingEngine.BATTERY_ENERGY_KWH-1e-9)ChargingEngine.BATTERY_ENERGY_KWH else it}
             val cost=(energy*site(charge).tariffMinor).roundToLong().coerceAtLeast(charge.progress.costMinor)
             charge.copy(progress=ChargeResult(charge.progress.seconds+seconds,energy,cost,false),updatedAt=charge.updatedAt+elapsed*1000)
         }
@@ -80,14 +89,14 @@ object ChargingEngine {
         val updated=desired.mapIndexed{i,charge->
             if(allocations[i]==demands[i])charge else {
                 val previous=current.charges[i];val cost=previous.progress.costMinor+allocations[i]
-                val energy=(cost.toDouble()/site(charge).tariffMinor).coerceIn(previous.progress.energyKwh,BATTERY_ENERGY_KWH)
+                val energy=(cost.toDouble()/site(charge).tariffMinor).coerceIn(previous.progress.energyKwh,ChargingEngine.BATTERY_ENERGY_KWH)
                 val seconds=minOf(charge.progress.seconds,previous.progress.seconds+ceil((energy-previous.progress.energyKwh)*3600/powerKw(current,previous)).toLong())
                 charge.copy(progress=ChargeResult(seconds,energy,cost,true))
             }
         }
         val next=current.copy(charges=updated)
         val exhausted=next.availableBalanceMinor==0L
-        val finished=updated.filter{exhausted || it.progress.depleted || it.progress.energyKwh>=BATTERY_ENERGY_KWH-1e-9}.map{it.session.connectorId}.toSet()
+        val finished=updated.filter{exhausted || it.progress.depleted || it.progress.energyKwh>=ChargingEngine.BATTERY_ENERGY_KWH-1e-9}.map{it.session.connectorId}.toSet()
         return if(finished.isEmpty())next else settle(next,finished,now)
     }
     fun stop(state:AppState,connectorId:String,now:Long):AppState {
@@ -101,6 +110,7 @@ object ChargingEngine {
         return refreshPowers(state.copy(balanceMinor=state.balanceMinor-finished.sumOf{it.progress.costMinor},charges=state.charges.filter{it.session.connectorId !in ids},
             history=(entries+state.history).take(100),completedConnectorIds=state.completedConnectorIds+ids,lastProgress=finished.lastOrNull()?.progress ?: state.lastProgress))
     }
+
 }
 
 @Immutable data class ChargePercentSample(val seconds:Long,val percent:Double)

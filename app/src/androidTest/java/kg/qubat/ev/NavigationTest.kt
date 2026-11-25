@@ -194,10 +194,14 @@ class NavigationTest {
             compose.onNodeWithText("Север · DEMO 01").assertIsDisplayed().performClick()
             compose.waitUntil(10000) {compose.onAllNodesWithTag("map-station-card").fetchSemanticsNodes().isNotEmpty()}
             compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-1").performClick()
+            compose.onNodeWithTag("connector-dialog-state").assertTextEquals("Свободен")
+            compose.onNodeWithTag("start-charge").assertDoesNotExist()
+            compose.onNodeWithText("Закрыть").performClick()
+            compose.onNodeWithTag("connector-demo-bishkek-unit-2-port-1").performClick()
             compose.onNodeWithTag("start-charge").assertExists()
             compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
-            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-1-port-1").assertIsDisplayed()
-            compose.onNodeWithTag("choice-status-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("Свободен").assertIsDisplayed()
+            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-2-port-1").assertIsDisplayed()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-2-port-1",useUnmergedTree=true).assertTextEquals("Подключён").assertIsDisplayed()
         }
         step("Поиск только по названию станции и пустое состояние") {
             compose.onNodeWithText("Список",useUnmergedTree=true).performClick()
@@ -259,19 +263,19 @@ class NavigationTest {
             android.os.SystemClock.sleep(1300)
             compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed()
             compose.onNodeWithText("Остановить зарядку",substring=true).assertIsDisplayed().performClick()
-            compose.onNodeWithTag("choice-status-demo-bishkek-unit-1-port-1",useUnmergedTree=true).performScrollTo().assertTextEquals("Завершён").assertIsDisplayed()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-2-port-1",useUnmergedTree=true).performScrollTo().assertTextEquals("Завершён").assertIsDisplayed()
             compose.onNodeWithText("Освободить разъём после сеанса").assertIsDisplayed()
                 .performSemanticsAction(SemanticsActions.OnClick) { it() }
             compose.waitForIdle()
             try {
                 compose.waitUntil(5000) {
-                    compose.onAllNodes(hasTestTag("choice-status-demo-bishkek-unit-1-port-1") and hasText("Свободен"),useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()
+                    compose.onAllNodes(hasTestTag("choice-status-demo-bishkek-unit-2-port-1") and hasText("Подключён"),useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()
                 }
             } catch(failure:Throwable) {
                 throw AssertionError(compose.onRoot().printToString(),failure)
             }
-            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-1-port-1").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithTag("choice-status-demo-bishkek-unit-1-port-1",useUnmergedTree=true).assertTextEquals("Свободен").assertIsDisplayed()
+            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-2-port-1").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-2-port-1",useUnmergedTree=true).assertTextEquals("Подключён").assertIsDisplayed()
         }
         step("История и профиль") {
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()

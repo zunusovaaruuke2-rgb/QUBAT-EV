@@ -16,13 +16,16 @@ class ChargePercentTimelineTest {
         val samples=chargePercentTimeline(ChargeResult(600,10.0,0,false),emptyList())
         assertEquals(20+10.0/60*100,samples.last().percent,0.00001)
     }
-    @Test fun `second connector can start and updates its map station status`() {
-        val station=DemoData.stations.first()
-        val port=station.chargers.last{it.connectors.size==2}.connectors[1]
-        val result=ChargingEngine.start(AppState(),station.id,port.id,1000)
+    @Test fun `connected second connector starts and map overlay shows charging`() {
+        val original=DemoData.stations.first()
+        val port=original.chargers.last{it.connectors.size==2}.connectors[1].copy(state=ConnectorState.CONNECTED)
+        val station=original.copy(chargers=original.chargers.map { unit ->
+            unit.copy(connectors=unit.connectors.map { if(it.id==port.id)port else it })
+        })
+        val result=ChargingCalculator(listOf(station)).start(AppState(),station.id,port.id,1000)
         assertTrue(result.started)
         val marker=station.withConnectorSessions(mapOf(port.id to 25),emptySet())
         assertEquals(ConnectorState.CHARGING,marker.connectors.first{it.id==port.id}.state)
-        assertEquals(station.availableConnectors-1,marker.availableConnectors)
+        assertEquals(station.availableConnectors,marker.availableConnectors)
     }
 }

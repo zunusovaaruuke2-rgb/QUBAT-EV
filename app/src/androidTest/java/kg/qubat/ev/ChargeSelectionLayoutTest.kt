@@ -79,6 +79,7 @@ class ChargeSelectionLayoutTest {
             }
         }
         compose.runOnIdle { language = AppLanguage.RU }
+        compose.onNodeWithTag("start-charge").assertIsNotEnabled()
         saveChargePreview(compose, "charging-selection-equal-cards")
         // The busy port must never enable the start action, even when deliberately selected.
         val busy = station.chargers.first().connectors[1]
@@ -91,8 +92,11 @@ class ChargeSelectionLayoutTest {
         compose.waitUntil(5000) { port.id == station.chargers[2].connectors.first().id }
         compose.onAllNodes(hasTestTag("charge-choice-${station.chargers[2].connectors[0].id}")).assertCountEquals(1)
         compose.onNodeWithTag("start-charge").assertIsNotEnabled()
-        compose.onNodeWithTag("charge-unit-${station.chargers.first().id}").performScrollTo().performClick()
-        compose.waitUntil(5000) { port.id == station.freeConnector()!!.id }
+        val connected=station.connectors.first{it.state==ConnectorState.CONNECTED}
+        val connectedUnit=station.chargers.first{unit->unit.connectors.any{it.id==connected.id}}
+        compose.onNodeWithTag("charge-unit-${connectedUnit.id}").performScrollTo().performClick()
+        compose.waitUntil(5000) { port.id == connected.id }
+        compose.onNodeWithTag("choice-status-${connected.id}",useUnmergedTree=true).performScrollTo().assertTextEquals("Подключён")
         compose.onNodeWithTag("start-charge").assertIsEnabled().performClick()
         compose.waitUntil(5000) { starts == 1 }
         compose.runOnIdle { assertEquals(1, starts); width = 292; fontScale = 1.6f }
