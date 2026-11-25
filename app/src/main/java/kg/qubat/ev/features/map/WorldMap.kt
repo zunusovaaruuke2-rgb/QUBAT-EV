@@ -175,8 +175,26 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
 
                 }
             }
-            .pointerInput(map,stations) {
+            .pointerInput(map,stations,selectedId) {
                 detectTapGestures(
+                    onPress={ point ->
+                        val native=map ?: return@detectTapGestures
+                        val station=stations.minByOrNull { s ->
+                            val pos=native.projection.toScreenLocation(LatLng(s.point.lat,s.point.lon))
+                            (Offset(pos.x,pos.y-26*density)-point).getDistance()
+                        }
+                        val marker=station?.let {markers[it.id]}
+                        if(station!=null && marker!=null) {
+                            val pos=native.projection.toScreenLocation(LatLng(station.point.lat,station.point.lon))
+                            if((Offset(pos.x,pos.y-26*density)-point).getDistance()<48*density) {
+                                val original=marker.icon
+                                val bitmap=stationMarker(station,station.id==selectedId)
+                                val pressed=Bitmap.createScaledBitmap(bitmap,(bitmap.width*.9f).toInt(),(bitmap.height*.9f).toInt(),true)
+                                marker.icon=IconFactory.getInstance(context).fromBitmap(pressed)
+                                try {tryAwaitRelease()} finally {marker.icon=original}
+                            }
+                        }
+                    },
                     onDoubleTap={ point ->map?.let {native ->native.setZoom((native.zoom+1).coerceIn(0.0,19.0),PointF(point.x,point.y),200L)}},
                     onTap={ point ->
                         val native=map ?: return@detectTapGestures
