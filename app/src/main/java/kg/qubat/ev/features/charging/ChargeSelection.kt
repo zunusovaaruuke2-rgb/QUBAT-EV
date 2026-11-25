@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.sp
             }
             DepthButton(
                 onClick = onStart,
-                enabled = port?.state == ConnectorState.FREE && state.availableBalanceMinor > 0 && state.charges.size < ChargingEngine.MAX_CARS,
+                enabled = port?.state == ConnectorState.CONNECTED && state.availableBalanceMinor > 0 && state.charges.size < ChargingEngine.MAX_CARS,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("start-charge"),
             ) {
                 AppIcon(Icons.Default.PlayArrow, null, Modifier.size(26.dp))
@@ -93,7 +93,7 @@ import androidx.compose.ui.unit.sp
                 val status = if (available) "Свободен" else if (offline) "Офлайн" else "Занят"
                 val statusColor = if (available) Lime else Muted
                 DepthSurface(
-                    onClick = { onChoose(charger.connectors.firstOrNull { it.state == ConnectorState.FREE } ?: charger.connectors.first()) },
+                    onClick = { onChoose(charger.connectors.firstOrNull { it.state == ConnectorState.CONNECTED } ?: charger.connectors.first()) },
                     modifier = Modifier.width(cardWidth).height(cardHeight).testTag("charge-unit-${charger.id}"),
                     shape = RoundedCornerShape(16.dp), color = if (isSelected) Lime.copy(alpha = .08f) else SurfaceGreen,
                     border = BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) Lime else MaterialTheme.colorScheme.outline),
@@ -144,7 +144,7 @@ import androidx.compose.ui.unit.sp
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 ChargeText("Выбрано:", fontSize = 11.sp, color = Muted)
                 ChargeText("Аппарат №${unit.number} · GB/T ${port.number}", Modifier.testTag("selection-apparatus"), fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = if (LocalDensity.current.fontScale > 1.25f) 2 else 1)
-                ChargeText(if (port.state == ConnectorState.FREE) "Готово к зарядке" else port.state.title, fontSize = 12.sp, color = if (port.state == ConnectorState.FREE) Lime else Color(port.state.argb), maxLines = 1)
+                ChargeText(if (port.state == ConnectorState.FREE) "Подключите кабель" else port.state.title, fontSize = 12.sp, color = if (port.state == ConnectorState.FREE) Lime else Color(port.state.argb), maxLines = 1)
             }
         }
     }
