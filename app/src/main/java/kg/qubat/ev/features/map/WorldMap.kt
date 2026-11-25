@@ -182,9 +182,9 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
                         val native=map ?: return@detectTapGestures
                         fun distance(station:Station):Float {
                             val projected=native.projection.toScreenLocation(LatLng(station.point.lat,station.point.lon))
-                            return (Offset(projected.x,projected.y-20*density)-point).getDistance()
+                            return (Offset(projected.x,projected.y-26*density)-point).getDistance()
                         }
-                        stations.minByOrNull(::distance)?.takeIf {distance(it)<44*density}?.let(select)
+                        stations.minByOrNull(::distance)?.takeIf {distance(it)<48*density}?.let(select)
                     }
                 )
             })
@@ -201,23 +201,7 @@ private const val WORLD_STYLE="https://tiles.openfreemap.org/styles/liberty"
 internal fun stationMarkerKey(station:Station,selected:Boolean):String =
     "${station.chargerCount}:${station.connectors.joinToString {it.state.name}}:$selected"
 
-internal fun stationMarker(station:Station,selected:Boolean):Bitmap {
-    val bitmap=Bitmap.createBitmap(112,112,Bitmap.Config.ARGB_8888)
-    val canvas=Canvas(bitmap)
-    val paint=Paint(Paint.ANTI_ALIAS_FLAG)
-    paint.color=if(selected) android.graphics.Color.rgb(181,244,129) else android.graphics.Color.WHITE
-    canvas.drawCircle(56f,56f,52f,paint)
-    paint.style=Paint.Style.STROKE;paint.strokeWidth=12f
-    val arc=360f/station.connectorCount
-    station.connectors.forEachIndexed {index,port->
-        paint.color=port.state.argb
-        canvas.drawArc(RectF(15f,15f,97f,97f),-90+index*arc,(arc-3).coerceAtLeast(1f),false,paint)
-    }
-    paint.style=Paint.Style.FILL;paint.color=android.graphics.Color.rgb(12,48,37)
-    paint.textSize=40f;paint.textAlign=Paint.Align.CENTER;paint.typeface=android.graphics.Typeface.DEFAULT_BOLD
-    canvas.drawText(station.chargerCount.toString(),56f,70f,paint)
-    return bitmap
-}
+internal fun stationMarker(station:Station,selected:Boolean):Bitmap = connectorMarker(station,selected)
 
 internal fun userLocationMarker():Bitmap {
     val image=Bitmap.createBitmap(80,80,Bitmap.Config.ARGB_8888)
