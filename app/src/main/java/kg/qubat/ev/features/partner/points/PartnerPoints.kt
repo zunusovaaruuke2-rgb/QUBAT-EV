@@ -12,6 +12,13 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,56 +41,71 @@ private fun networkPortStatus(status: NativePortStatus): String = when (status) 
 }
 
 @Composable fun NativePartnerPoints(repo: NativePartnerRepository, revision: Int, onChanged: () -> Unit, initialStationId: String? = null) {
-    var selected by rememberSaveable(initialStationId) { mutableStateOf(initialStationId) }
-    var query by rememberSaveable { mutableStateOf("") }
-    var status by rememberSaveable { mutableStateOf("Все статусы") }
-    var group by rememberSaveable { mutableStateOf("Все группы") }
-    var owner by rememberSaveable { mutableStateOf("Все владельцы") }
-    var brand by rememberSaveable { mutableStateOf("Все бренды") }
-    var archived by rememberSaveable { mutableStateOf(false) }
+    var selected by rememberSaveable(repo.account.id, initialStationId) { mutableStateOf(initialStationId) }
+    var query by rememberSaveable(repo.account.id) { mutableStateOf("") }
+    var status by rememberSaveable(repo.account.id) { mutableStateOf("Все статусы") }
+    var group by rememberSaveable(repo.account.id) { mutableStateOf("Все группы") }
+    var owner by rememberSaveable(repo.account.id) { mutableStateOf("Все владельцы") }
+    var brand by rememberSaveable(repo.account.id) { mutableStateOf("Все бренды") }
+    var archived by rememberSaveable(repo.account.id) { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
-    val stations = remember(repo, revision, archived) { repo.stations(includeArchived = archived) }
-    val brands = remember(repo, revision) { repo.brands() }
-    val station = selected?.let { id -> stations.firstOrNull { it.id == id } }
-    BackHandler(selected != null) { selected = null }
-    if (station != null) {
-        NetworkPointDetails(repo, station, revision, { selected = null }, onChanged)
+    var filtersOpen by remember { mutableStateOf(false) }
+    val keyboard=LocalSoftwareKeyboardController.current
+    val allStations=remember(repo,revision){repo.stations(includeArchived=true)}
+    val stations=if(archived)allStations else allStations.filter{!it.archived}
+    val brands=remember(repo,revision){repo.brands()}
+    val station=selected?.let{id->allStations.firstOrNull{it.id==id}}
+    val states=remember(repo,revision,allStations){allStations.associate{it.id to networkStatus(repo,it)}}
+    BackHandler(selected!=null){selected=null}
+    if(station!=null) {
+        NetworkPointDetails(repo,station,revision,{selected=null},onChanged)
     } else {
-        val filtered = stations.filter { item ->
-            (query.isBlank() || listOf(item.title, item.id, item.serialNumber, item.city, item.address).any { it.contains(query, true) }) &&
-                (status == "Все статусы" || networkStatus(repo, item) == status) &&
-                (group == "Все группы" || item.groupId == group) && (owner == "Все владельцы" || item.ownerId == owner) &&
-                (brand == "Все бренды" || item.brandId == brand)
+        val filtered=stations.filter{item->
+            (query.isBlank() || listOf(item.title,item.id,item.serialNumber,item.city,item.address).any{it.contains(query,true)}) &&
+                (status=="Все статусы" || states[item.id]==status) &&
+                (group=="Все группы" || item.groupId==group) &&
+                (owner=="Все владельцы" || item.ownerId==owner) &&
+                (brand=="Все бренды" || item.brandId==brand)
         }
-        LazyColumn(Modifier.fillMaxSize().testTag("network-points"), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
+        val applied=listOf(status!="Все статусы",group!="Все группы",owner!="Все владельцы",brand!="Все бренды",archived).count{it}
+        val clear:()->Unit={query="";status="Все статусы";group="Все группы";owner="Все владельцы";brand="Все бренды";archived=false}
+        LazyColumn(Modifier.fillMaxSize().testTag("network-points"),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
             item("point-search") {
-                Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    NetworkField("Название, ID, серийный номер, город", query, "network-point-search") { query = it }
-                    NetworkChoice("Статус", status, listOf("Все статусы", "В сети", "Нет связи", "Занят", "Ошибка", "Данные не обновлялись", "Архив"), { it }, "network-point-status") { status = it }
-                    NetworkChoice("Группа", group, listOf("Все группы") + stations.map { it.groupId }.distinct(), { it }, "network-point-group") { group = it }
-                    NetworkChoice("Владелец", owner, listOf("Все владельцы") + stations.map { it.ownerId }.distinct(), { it }, "network-point-owner") { owner = it }
-                    NetworkChoice("Бренд", brand, listOf("Все бренды") + brands.map { it.id }, { id -> brands.firstOrNull { it.id == id }?.name ?: id }, "network-point-brand") { brand = it }
-                    DepthChip(archived, { archived = !archived }, Modifier.testTag("network-point-show-archive")) { AppText("Показывать архив") }
-                    if (repo.can(NativePermission.EDIT_STATION)) DepthButton({ creating = true }, Modifier.fillMaxWidth().testTag("network-point-create")) { AppText("Добавить точку") }
-                    NetworkNote("Найдено: ${filtered.size} · аппаратов: ${filtered.sumOf { it.apparatusCount }} · разъёмов: ${filtered.sumOf { it.ports.size }}")
+                Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    PressOutlinedTextField(query,{query=it.take(300)},modifier=Modifier.fillMaxWidth().testTag("network-point-search"),
+                        singleLine=true,placeholder={AppText("Название или адрес точки",fontSize=14.sp)},
+                        leadingIcon={AppIcon(Icons.Default.Search,null)},
+                        trailingIcon={if(query.isNotEmpty())PressIconButton(onClick={query=""}){AppIcon(Icons.Default.Close,"Очистить поиск")}},
+                        keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={keyboard?.hide()}))
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically) {
+                        DepthOutlinedButton(onClick={keyboard?.hide();filtersOpen=true},modifier=Modifier.weight(1f).testTag("network-point-filters")) {
+                            AppIcon(Icons.Default.Tune,null,Modifier.size(20.dp));Spacer(Modifier.width(6.dp))
+                            AppText(if(applied==0)"Фильтры" else "Фильтры · $applied",fontSize=14.sp)
+                        }
+                        if(repo.can(NativePermission.EDIT_STATION))DepthButton(onClick={creating=true},modifier=Modifier.weight(1f).testTag("network-point-create")) {
+                            AppIcon(Icons.Default.Add,null,Modifier.size(20.dp));AppText("Добавить",fontSize=14.sp)
+                        }
+                    }
+                    if(applied>0 || query.isNotBlank())PressTextButton(onClick=clear,modifier=Modifier.testTag("network-point-clear-filters")){AppText("Сбросить поиск и фильтры",fontSize=12.sp)}
                 }
             }
-            if (filtered.isEmpty()) item("point-empty") { NetworkCard("Точки не найдены") { NetworkNote("Измените поиск или фильтры.") } }
-            items(filtered, key = { "point-${it.id}" }) { item ->
-                DepthSurface({ selected = item.id }, Modifier.fillMaxWidth().testTag("network-point-${item.id}")) {
-                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                        AppText(item.title, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                        NetworkNote(item.address)
-                        AppText(networkStatus(repo, item), color = if (networkStatus(repo, item) in listOf("В сети", "Занят")) Lime else MaterialTheme.colorScheme.error, fontSize = 13.sp)
-                        AppText("${networkNumber(item.powerKw)} кВт · ${item.apparatusCount} аппарат · ${item.ports.size} разъёма", fontSize = 13.sp)
-                        NetworkNote("${item.city} · ${item.groupId} · ${brands.firstOrNull { it.id == item.brandId }?.name ?: item.brandId}")
-                        NetworkNote("Сигнал: ${networkTime.format(item.lastSeen)} · ${item.source}")
-                    }
-                }
+            item("point-counts"){PointListEquipmentCounts(filtered)}
+            if(filtered.isEmpty())item("point-empty"){NetworkCard("Точки не найдены"){
+                NetworkNote("Измените поиск или фильтры.")
+                PressTextButton(onClick=clear){AppText("Показать все точки")}
+            }}
+            items(filtered,key={"point-${it.id}"},contentType={"point"}){item->
+                PointListCard(item,states.getValue(item.id)){selected=item.id}
             }
         }
+        if(filtersOpen)PointListFilters(
+            allStations,brands,status,group,owner,brand,archived,
+            ownerTitle={id->NativePartnerRepository.accounts.firstOrNull{it.id==id}?.name?:id},
+            onDismiss={filtersOpen=false},
+            onApply={s,g,o,b,archive->status=s;group=g;owner=o;brand=b;archived=archive;filtersOpen=false}
+        )
     }
-    if (creating) NetworkStationEditor(repo, null, { creating = false }) { creating = false; onChanged() }
+    if(creating)NetworkStationEditor(repo,null,{creating=false}){creating=false;onChanged()}
 }
 
 @Composable private fun NetworkPointDetails(repo: NativePartnerRepository, station: NativeStation, revision: Int, onBack: () -> Unit, onChanged: () -> Unit) {
@@ -117,7 +139,7 @@ private fun networkPortStatus(status: NativePortStatus): String = when (status) 
                     station.errorReason?.let { NetworkNote("Причина: $it", true) }
                 } }
                 item("detail-equipment") { NetworkCard("${station.apparatusCount} аппарат · ${station.ports.size} независимых разъёма") {
-                    AppText("Номинальная мощность: ${networkNumber(station.powerKw)} кВт", fontSize = 13.sp)
+                    AppText("Общая установленная мощность: ${networkNumber(station.powerKw)} кВт", fontSize = 13.sp)
                     NetworkNote("Мощность аппарата и число разъёмов учитываются отдельно.")
                 } }
                 items(station.ports, key = { "port-${it.id}" }) { port -> NetworkCard("Порт ${port.number} · ${port.type}") {
@@ -192,7 +214,7 @@ private data class NetworkPortDraft(val number: String, val type: String, val po
             val lat = requireNotNull(networkDecimal(latitude)) { "Некорректная широта." }
             val lon = requireNotNull(networkDecimal(longitude)) { "Некорректная долгота." }
             require(lat >= BigDecimal("-90") && lat <= BigDecimal("90") && lon >= BigDecimal("-180") && lon <= BigDecimal("180")) { "Координаты вне допустимого диапазона." }
-            val kw = requireNotNull(networkDecimal(power)?.takeIf { it > BigDecimal.ZERO }) { "Мощность должна быть больше нуля." }
+            val kw = requireNotNull(pointTotalPower(power)) { "Введите положительную общую мощность или сумму мощностей." }
             val count = requireNotNull(apparatus.toIntOrNull()?.takeIf { it in 1..100 }) { "Число аппаратов: от 1 до 100." }
             require(ports.isNotEmpty() && ports.map { it.number }.distinct().size == ports.size) { "Добавьте разъём. Номера портов должны быть уникальны." }
             val validatedPorts = ports.map { p ->
@@ -224,7 +246,9 @@ private data class NetworkPortDraft(val number: String, val type: String, val po
         NetworkField("Широта *", latitude, "network-edit-latitude", true) { latitude = it }
         NetworkField("Долгота *", longitude, "network-edit-longitude", true) { longitude = it }
         NetworkField("Режим работы *", hours, "network-edit-hours") { hours = it }
-        NetworkField("Номинальная мощность, кВт *", power, "network-edit-power", true) { power = it }
+        NetworkField("Общая мощность, кВт *", power, "network-edit-power") { power = it }
+        NetworkNote("Укажите итог или сумму мощностей аппаратов: 80 + 120. Сохраняется общая мощность.")
+        pointTotalPower(power)?.let{total->AppText("Общая мощность: ${networkNumber(total)} кВт",fontWeight=FontWeight.SemiBold,color=Lime,modifier=Modifier.testTag("network-edit-total-power"))}
         NetworkField("Физических аппаратов *", apparatus, "network-edit-apparatus", true) { apparatus = it }
         ports.forEachIndexed { index, p ->
             HorizontalDivider()
@@ -236,7 +260,7 @@ private data class NetworkPortDraft(val number: String, val type: String, val po
             NetworkNote("Статус поступает от источника данных: ${networkPortStatus(p.status)}")
             if (ports.size > 1) PressTextButton({ ports.removeAt(index) }, Modifier.testTag("network-edit-port-$index-remove")) { AppText("Убрать разъём") }
         }
-        DepthOutlinedButton({ ports.add(NetworkPortDraft((ports.size + 1).toString(), "GB/T DC", power, "200", NativePortStatus.UNAVAILABLE, networkId())) }, Modifier.fillMaxWidth().testTag("network-edit-port-add")) { AppText("Добавить разъём") }
+        DepthOutlinedButton({ ports.add(NetworkPortDraft((ports.size + 1).toString(), "GB/T DC", ports.firstOrNull()?.power?.takeIf{networkDecimal(it)?.signum()==1} ?: "80", "200", NativePortStatus.UNAVAILABLE, networkId())) }, Modifier.fillMaxWidth().testTag("network-edit-port-add")) { AppText("Добавить разъём") }
         NetworkField("Причина изменения *", reason, "network-edit-reason") { reason = it }
     }
 }

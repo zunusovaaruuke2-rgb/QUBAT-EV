@@ -10,6 +10,21 @@ internal fun partnerTranslation(text:String,language:AppLanguage):String? {
     return text.replace(key,translated)
 }
 private val partnerPhrases=mapOf(
+    "Название или адрес точки" to ("Location name or address" to "Түйүндүн аталышы же дареги"),
+    "Очистить поиск" to ("Clear search" to "Издөөнү тазалоо"),
+    "Добавить" to ("Add" to "Кошуу"),
+    "Фильтры точек" to ("Location filters" to "Түйүндөрдүн чыпкалары"),
+    "Сбросить" to ("Reset" to "Тазалоо"),
+    "Сбросить поиск и фильтры" to ("Clear search and filters" to "Издөө менен чыпкаларды тазалоо"),
+    "Показать все точки" to ("Show all locations" to "Бардык түйүндөрдү көрсөтүү"),
+    "Показать точки" to ("Show locations" to "Түйүндөрдү көрсөтүү"),
+    "Общая мощность" to ("Total installed power" to "Жалпы орнотулган кубаттуулук"),
+    "Общая мощность, кВт *" to ("Total installed power, kW *" to "Жалпы орнотулган кубаттуулук, кВт *"),
+    "Укажите итог или сумму мощностей аппаратов: 80 + 120. Сохраняется общая мощность." to ("Enter the total or add charger powers: 80 + 120. The total is saved." to "Жалпы кубаттуулукту же аппараттардын суммасын киргизиңиз: 80 + 120. Жалпы сумма сакталат."),
+    "Введите положительную общую мощность или сумму мощностей." to ("Enter a positive total or sum of charger powers." to "Оң жалпы кубаттуулукту же кубаттуулуктардын суммасын киргизиңиз."),
+    "Северная группа" to ("Northern group" to "Түндүк топ"),
+    "Южная группа" to ("Southern group" to "Түштүк топ"),
+    "Фильтры" to ("Filters" to "Чыпкалар"),
     "Выберите точку" to ("Select location" to "Түйүндү тандаңыз"),
     "Все точки" to ("All locations" to "Бардык түйүндөр"),
     "Общие показатели сети" to ("Network totals" to "Тармактын жалпы көрсөткүчтөрү"),
@@ -153,6 +168,10 @@ private val partnerPhrases=mapOf(
 )
 private data class PartnerTextPattern(val pattern:Regex,val render:(List<String>,AppLanguage)->String)
 private val partnerPatterns=listOf(
+    PartnerTextPattern(Regex("^Фильтры · (\\d+)$")) {g,l->if(l==AppLanguage.EN) "Filters · ${g[0]}" else "Чыпкалар · ${g[0]}"},
+    PartnerTextPattern(Regex("^Общая мощность: (.+) кВт$")) {g,l->if(l==AppLanguage.EN) "Total installed power: ${g[0]} kW" else "Жалпы орнотулган кубаттуулук: ${g[0]} кВт"},
+    PartnerTextPattern(Regex("^Общая установленная мощность: (.+) кВт$")) {g,l->if(l==AppLanguage.EN) "Total installed power: ${g[0]} kW" else "Жалпы орнотулган кубаттуулук: ${g[0]} кВт"},
+    PartnerTextPattern(Regex("^Последний сигнал: (.+)$")) {g,l->if(l==AppLanguage.EN) "Last signal: ${g[0]}" else "Акыркы сигнал: ${g[0]}"},
     PartnerTextPattern(Regex("^Аппаратов: (\\d+) · Разъёмов: (\\d+)$")) {g,l->if(l==AppLanguage.EN) "Chargers: ${g[0]} · Ports: ${g[1]}" else "Аппараттар: ${g[0]} · Туташтыргычтар: ${g[1]}"},
     PartnerTextPattern(Regex("^Разъёмов: (\\d+)$")) {g,l->if(l==AppLanguage.EN) "Ports: ${g[0]}" else "Туташтыргычтар: ${g[0]}"},
     PartnerTextPattern(Regex("^Аппарат №(\\d+)$")) {g,l->if(l==AppLanguage.EN) "Charger №${g[0]}" else "Аппарат №${g[0]}"},
