@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.sp
                         PressIconButton(onClick={selectedId=null}) {AppIcon(Icons.Default.Close,"Закрыть карточку")}
                     }
                     AppText("${selected.chargerCount} ${if(selected.chargerCount==4) "аппарата" else "аппаратов"} · свободно ${selected.availableConnectors} из ${selected.connectorCount} разъёмов",color=Muted,fontSize=11.sp)
+                    DriverDiscountPrice(selected.id)
                     StationEquipment(selected) {onConnector(selected,it)}
                 }
             }

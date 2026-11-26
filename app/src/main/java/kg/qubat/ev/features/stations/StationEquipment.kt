@@ -93,7 +93,8 @@ import androidx.compose.ui.unit.sp
     }
 }
 @Composable fun LocationEquipmentCard(station:Station,location:GeoPoint?,onDetail:()->Unit,onConnector:(Connector)->Unit) {
-    val summary=remember(station.availableConnectors,station.connectorCount) {"Свободно ${station.availableConnectors} из ${station.connectorCount} разъёмов · 13,5 сом/кВт·ч"}
+    val rate=LocalDriverDiscounts.current[station.id]?.rateMinor?:station.tariffMinor
+    val summary=remember(station.availableConnectors,station.connectorCount,rate) {"Свободно ${station.availableConnectors} из ${station.connectorCount} разъёмов · "+driverRateLabel(rate)}
     val distance=remember(station.point,location) {location?.let {"${String.format(Ru,"%.1f",distanceKm(it,station.point))} км по прямой"}}
     DepthSurface(onClick=onDetail,shape=RoundedCornerShape(22.dp),color=SurfaceGreen) {
         Column(Modifier.fillMaxWidth().padding(12.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
@@ -105,6 +106,7 @@ import androidx.compose.ui.unit.sp
                 PressIconButton(onClick=onDetail) {AppIcon(Icons.Default.Place,"Маршрут и детали ${station.city}",tint=Lime)}
             }
             AppText(summary,color=Muted,fontSize=11.sp)
+            DriverDiscountBadge(station.id)
             distance?.let {AppText(it,color=Muted,fontSize=11.sp)}
             StationEquipment(station,onConnector)
         }

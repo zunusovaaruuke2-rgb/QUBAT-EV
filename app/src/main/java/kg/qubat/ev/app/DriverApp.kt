@@ -29,6 +29,10 @@ private enum class Tab(val label: String,val icon: ImageVector) {
     HOME("Карта",Icons.Default.Map), STATIONS("Список",Icons.Default.List), CHARGE("Зарядка",Icons.Default.PlayArrow), WALLET("Кошелёк",Icons.Default.AccountBox), PROFILE("Профиль",Icons.Default.Person)
 }
 @Composable internal fun QubatDriverApp(vm:ChargingViewModel,partnerLabel:String?,onPartner:()->Unit,onPartnerDemo:()->Unit) {
+    DriverDiscountProvider { QubatDriverContent(vm,partnerLabel,onPartner,onPartnerDemo) }
+}
+@Composable private fun QubatDriverContent(vm:ChargingViewModel,partnerLabel:String?,onPartner:()->Unit,onPartnerDemo:()->Unit) {
+    val discounts=LocalDriverDiscounts.current
     val state by vm.state.collectAsStateWithLifecycle()
     var tabName by rememberSaveable { mutableStateOf(Tab.HOME.name) }
     val tab=Tab.valueOf(tabName)
@@ -128,7 +132,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                                 ?: station.connectors.firstOrNull {it.state==ConnectorState.CONNECTED}
                             ChargeContent(station,chosenPort,state,addingVehicle,
                                 onChoose={selectedId=station.id;selectedConnectorId=it.id},
-                                onStart={if(vm.start(station,chosenPort?.id)) {selectedConnectorId=chosenPort?.id;addingVehicle=false} else message("Разъём недоступен или недостаточно учебного баланса")},
+                                onStart={if(vm.start(station,chosenPort?.id,discounts[station.id]?.rateMinor?:station.tariffMinor)) {selectedConnectorId=chosenPort?.id;addingVehicle=false} else message("Не удалось начать: проверьте тариф, подключение и учебный баланс")},
                                 onStop={id->vm.stop(id)},
                                 onRelease={chosenPort?.let {vm.releaseConnector(it.id)}},
                                 onStations={tabName=Tab.STATIONS.name},
@@ -149,7 +153,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                     text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         AppText(port.state.title,color=Color(port.state.argb),fontWeight=FontWeight.Bold,modifier=Modifier.testTag("connector-dialog-state"))
                         AppText("${site.city} · ${site.title}")
-                        AppText("GB/T DC · 80 кВт · 13,5 сом/кВт·ч",color=Muted,fontSize=13.sp)
+                        AppText("GB/T DC · 80 кВт · "+driverRateLabel(discounts[site.id]?.rateMinor?:site.tariffMinor),color=Muted,fontSize=13.sp)
+                        DriverDiscountBadge(site.id)
                         port.percent?.let {AppText("Демо-уровень заряда: $it%",color=Color(port.state.argb))}
                         AppText(when(port.state) {
                             ConnectorState.FREE -> "Разъём свободен. Подключите кабель перед запуском."
@@ -166,7 +171,8 @@ private enum class Tab(val label: String,val icon: ImageVector) {
             detailId?.let { id ->
                 val s=stations.first {it.id==id}
                 AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={detailId=null},title={AppText("${s.city} · ДЕМО")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-                    AppText(s.title,fontWeight=FontWeight.Bold);AppText("${s.status.title} · ${s.availableConnectors} из ${s.connectorCount} мест свободно\n80 кВт на место · GB/T DC · 13,5 сом/кВт·ч")
+                    AppText(s.title,fontWeight=FontWeight.Bold);AppText("${s.status.title} · ${s.availableConnectors} из ${s.connectorCount} мест свободно\n80 кВт на место · GB/T DC")
+                    DriverDiscountPrice(s.id)
                     AppText("Вымышленная станция у центра города. По этим координатам зарядной станции может не быть. Маршрут — только для проверки интерфейса.",color=Amber)
                     AppText("${s.point.lat}, ${s.point.lon}",color=Muted)
                     DepthOutlinedButton(onClick={openRoute(context,s,::message)},modifier=Modifier.fillMaxWidth()) {AppText("Учебный маршрут · 2ГИС")}

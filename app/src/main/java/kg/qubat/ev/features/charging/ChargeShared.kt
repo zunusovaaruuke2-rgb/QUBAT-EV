@@ -21,7 +21,9 @@ import androidx.compose.ui.unit.sp
 @Composable internal fun ChargePill(text:String) {
     Surface(shape=CircleShape,color=Lime.copy(alpha=.13f)){ChargeText(text,Modifier.padding(horizontal=10.dp,vertical=6.dp),fontSize=11.sp,fontWeight=FontWeight.SemiBold,color=Lime)}
 }
-@Composable internal fun ChargeStationCard(station:Station,port:Connector?,compact:Boolean=false,selection:Boolean=false) {
+@Composable internal fun ChargeStationCard(station:Station,port:Connector?,compact:Boolean=false,selection:Boolean=false,agreedTariffMinor:Long?=null) {
+    val rate=agreedTariffMinor?:if(selection)LocalDriverDiscounts.current[station.id]?.rateMinor?:station.tariffMinor else station.tariffMinor
+    val rateText=if(rate==1350L)"13,5 сом/кВт·ч" else driverRateLabel(rate)
     DepthSurface(Modifier.fillMaxWidth(),shape=RoundedCornerShape(22.dp),color=SurfaceGreen) {
         Column(Modifier.padding(if(compact)6.dp else 10.dp)) {
             Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(11.dp)) {
@@ -29,7 +31,7 @@ import androidx.compose.ui.unit.sp
                 Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(3.dp)) {
                     ChargeText(station.title,fontSize=16.sp,fontWeight=FontWeight.Bold,maxLines=if(selection)2 else 1)
                     ChargeText("${station.city} · Аппарат ${port?.let{station.chargerNumber(it.id)} ?: 1}",fontSize=12.sp,color=Muted,maxLines=if(selection)2 else 1)
-                    ChargeText("${station.powerKw} кВт · 13,5 сом/кВт·ч" + if(selection) "" else " · GB/T DC",fontSize=11.sp,color=Lime,maxLines=if(selection)2 else 1)
+                    ChargeText("${station.powerKw} кВт · $rateText" + if(selection) "" else " · GB/T DC",fontSize=11.sp,color=Lime,maxLines=if(selection)2 else 1)
                 }
                 ChargePill("Демо")
             }

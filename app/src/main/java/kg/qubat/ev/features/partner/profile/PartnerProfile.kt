@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
     val night = LocalNight.current
     val language = LocalAppLanguage.current
     val links = buildList {
+        if(runCatching{DriverDiscountService(repo,DriverDiscountStore(context)).canOpen()}.getOrDefault(false))add(ProfileShortcut("discounts","Скидки водителям","Для выбранных точек",Icons.Default.Person))
         add(ProfileShortcut("points", "Мои точки", "Адреса и аппараты", Icons.Default.LocationOn))
         if (repo.can(NativePermission.REPORT)) add(ProfileShortcut("reports", "Отчёты", "Результаты за период", Icons.Default.List))
         if (repo.can(NativePermission.FINANCE)) add(ProfileShortcut("finance", "Финансы", "Доходы и расходы", Icons.Default.AccountBox))

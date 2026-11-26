@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.LocalDate
 
-@Composable fun NativePartnerAccess(repo: NativePartnerRepository, revision: Int, onChanged: () -> Unit) {
+@Composable fun NativePartnerAccess(repo: NativePartnerRepository, revision: Int, onChanged: () -> Unit, onDiscounts: () -> Unit = {}) {
     if (!repo.can(NativePermission.MANAGE_MEMBERS)) { NativeDenied(); return }
     var inviting by remember { mutableStateOf(false) }
     var editingMember by remember { mutableStateOf<NativeMember?>(null) }
@@ -60,7 +60,7 @@ import java.time.LocalDate
         }
         item("grant-header") { NetworkCard("Скидки и бесплатные зарядки") {
             NetworkNote("Отдельные разрешения с датами, лимитами, одобрением и обязательным аудитом.")
-            if (repo.can(NativePermission.DISCOUNT)) DepthOutlinedButton({ grantKind = NativeGrantKind.PERCENT }, Modifier.fillMaxWidth().testTag("network-discount-create")) { AppText("Добавить скидку") }
+            if (repo.can(NativePermission.DISCOUNT)) DepthOutlinedButton(onDiscounts, Modifier.fillMaxWidth().testTag("network-discount-create")) { AppText("Скидки водителям") }
             if (repo.can(NativePermission.FREE_CHARGE)) DepthOutlinedButton({ grantKind = NativeGrantKind.FREE }, Modifier.fillMaxWidth().testTag("network-free-grant-create")) { AppText("Разрешить бесплатную зарядку") }
         } }
         if (grants.isEmpty()) item("grants-empty") { NetworkNote("Скидок и разрешений пока нет.") }

@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.sp
     val roomy=maxHeight>=520.dp
     val metricsHeight=with(LocalDensity.current){(12.sp.toDp()+15.sp.toDp())*5f+20.dp}
     Column(Modifier.fillMaxSize().testTag("charge-details-${port.id}"),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-        ChargeStationCard(station,port,!roomy)
+        ChargeStationCard(station,port,!roomy,agreedTariffMinor=charge.session.agreedTariffMinor)
         Row(Modifier.fillMaxWidth().height(maxOf(if(roomy)214.dp else 156.dp,metricsHeight)),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)) {
             BoxWithConstraints(Modifier.weight(.42f).fillMaxHeight(),contentAlignment=Alignment.Center) {
                 val diameter=minOf(maxWidth,maxHeight,164.dp)

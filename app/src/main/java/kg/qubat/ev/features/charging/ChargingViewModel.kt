@@ -61,7 +61,11 @@ class ChargingViewModel(app:Application):AndroidViewModel(app) {
             val vehicle=item.optInt("vehicle",i+1).takeIf{it in 1..2 && charges.none{c->c.session.vehicleNumber==it}} ?: (1..2).first{n->charges.none{c->c.session.vehicleNumber==n}}
             val samples=item.optJSONArray("power") ?: JSONArray()
             val power=(0 until minOf(samples.length(),120)).mapNotNull{index->val p=samples.optJSONObject(index) ?: return@mapNotNull null;val kw=p.optDouble("kw",0.0);val sec=p.optLong("sec",0);if(kw.isFinite() && kw in 0.0..80.0 && sec>=0)PowerSample(sec,kw) else null}
-            charges+=RunningCharge(ChargeSession(station.id,start,item.optLong("budget",balance).coerceAtLeast(0),port.id,vehicle),ChargeResult(item.optLong("seconds",0).coerceAtLeast(0),energy,cost,false),item.optLong("updated",start).coerceAtLeast(start),power)
+            val rate=if(item.has("tariff"))item.optLong("tariff",-1).takeIf{it in 1..station.tariffMinor}?:return@runCatching else null
+            val discount=item.optInt("discount",0).takeIf{it in 0..99}?:return@runCatching
+            if(discount>0 && (rate==null || rate!=discountedRate(station.tariffMinor,discount)))return@runCatching
+            if(discount==0 && rate!=null && rate!=station.tariffMinor)return@runCatching
+            charges+=RunningCharge(ChargeSession(station.id,start,item.optLong("budget",balance).coerceAtLeast(0),port.id,vehicle,rate,discount),ChargeResult(item.optLong("seconds",0).coerceAtLeast(0),energy,cost,false),item.optLong("updated",start).coerceAtLeast(start),power)
         }
         AppState(balance,charges,(retiredHistory+history).take(100),completed-charges.map{it.session.connectorId}.toSet())
     }.getOrDefault(AppState())
@@ -76,16 +80,20 @@ class ChargingViewModel(app:Application):AndroidViewModel(app) {
         return null
     }
     private fun persist() {
-        val s=_state.value;val json=JSONObject().put("schema",2).put("balance",s.balanceMinor)
+        val s=_state.value;val json=JSONObject().put("schema",3).put("balance",s.balanceMinor)
         json.put("charges",JSONArray().also{array->s.charges.forEach{c->array.put(JSONObject().put("id",c.session.stationId).put("connector",c.session.connectorId).put("start",c.session.startedAt).put("budget",c.session.budgetMinor).put("vehicle",c.session.vehicleNumber)
+            .put("tariff",c.session.agreedTariffMinor).put("discount",c.session.discountPercent)
             .put("seconds",c.progress.seconds).put("energy",c.progress.energyKwh).put("cost",c.progress.costMinor).put("updated",c.updatedAt)
             .put("power",JSONArray().also{samples->c.powerHistory.forEach{samples.put(JSONObject().put("sec",it.seconds).put("kw",it.powerKw))}}))}})
         json.put("history",JSONArray().also{array->s.history.take(100).forEach{array.put(JSONObject().put("title",it.title).put("amount",it.amountMinor).put("date",it.timestamp).put("detail",it.detail))}})
         json.put("completed",JSONArray(s.completedConnectorIds.toList()))
         prefs.edit().putString("state",json.toString()).apply()
     }
-    fun start(station:Station,connectorId:String?=null):Boolean {
-        val result=ChargingEngine.start(_state.value,station.id,connectorId,System.currentTimeMillis())
+    fun start(station:Station,connectorId:String?=null,expectedTariffMinor:Long?=null):Boolean {
+        val quote=runCatching{currentDriverDiscounts(getApplication<Application>())[station.id]}.getOrElse{return false}
+        val rate=quote?.rateMinor?:station.tariffMinor
+        if(expectedTariffMinor!=null && expectedTariffMinor!=rate)return false
+        val result=ChargingEngine.start(_state.value,station.id,connectorId,System.currentTimeMillis(),rate,quote?.percent?:0)
         _state.value=result.state;persist();return result.started
     }
     fun stop(connectorId:String) {_state.value=ChargingEngine.stop(_state.value,connectorId,System.currentTimeMillis());persist()}

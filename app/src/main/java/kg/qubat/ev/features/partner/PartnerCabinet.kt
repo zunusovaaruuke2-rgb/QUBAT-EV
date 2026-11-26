@@ -27,7 +27,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
-private enum class NativePage(val label:String) { MONITOR("Мониторинг"),POINTS("Точки"),REPORTS("Отчёты"),FINANCE("Финансы"),ACCESS("Сотрудники и доступ"),BRANDS("Название и цвет"),JOURNAL("События"),PROFILE("Мой кабинет") }
+private enum class NativePage(val label:String) { MONITOR("Мониторинг"),POINTS("Точки"),REPORTS("Отчёты"),FINANCE("Финансы"),ACCESS("Сотрудники и доступ"),DISCOUNTS("Скидки водителям"),BRANDS("Название и цвет"),JOURNAL("События"),PROFILE("Мой кабинет") }
 @Composable fun PartnerCabinetScreen(account:PartnerAccount,onBack:()->Unit,onSignOut:()->Unit,onSwitchDemo:()->Unit) {
     val context=LocalContext.current
     val disk=remember {NativePartnerDisk(context.applicationContext)}
@@ -75,7 +75,9 @@ private enum class NativePage(val label:String) { MONITOR("Мониторинг"
         }
         return
     }
-    val pages=NativePage.entries.filter{when(it){NativePage.REPORTS->repo.can(NativePermission.REPORT);NativePage.FINANCE->repo.can(NativePermission.FINANCE);else->true}}
+    val discountContext=LocalContext.current
+    val discountService=remember(repo,discountContext){DriverDiscountService(repo,DriverDiscountStore(discountContext))}
+    val pages=NativePage.entries.filter{when(it){NativePage.REPORTS->repo.can(NativePermission.REPORT);NativePage.FINANCE->repo.can(NativePermission.FINANCE);NativePage.DISCOUNTS->runCatching{discountService.canOpen()}.getOrDefault(false);else->true}}
     ModalNavigationDrawer(drawerState=drawer,drawerContent={ModalDrawerSheet {
         Column(Modifier.widthIn(max=330.dp).verticalScroll(rememberScrollState()).padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
             AppText("QUBAT EV",fontSize=24.sp,fontWeight=FontWeight.Black)
@@ -105,7 +107,8 @@ private enum class NativePage(val label:String) { MONITOR("Мониторинг"
                     NativePage.POINTS->NativePartnerPoints(repo,revision,changed,initialPoint)
                     NativePage.REPORTS->NativeReports(repo,revision,changed)
                     NativePage.FINANCE->NativeFinance(repo,revision,changed)
-                    NativePage.ACCESS->NativePartnerAccess(repo,revision,changed)
+                    NativePage.ACCESS->NativePartnerAccess(repo,revision,changed){pageName=NativePage.DISCOUNTS.name}
+                    NativePage.DISCOUNTS->NativePartnerDriverDiscounts(repo,revision,changed)
                     NativePage.BRANDS->NativePartnerBrands(repo,revision,changed)
                     NativePage.JOURNAL->NativePartnerJournal(repo,revision,changed){id->initialPoint=id;pageName=NativePage.POINTS.name}
                     NativePage.PROFILE->NativeProfile(repo,revision,onSwitchDemo,onSignOut){route->

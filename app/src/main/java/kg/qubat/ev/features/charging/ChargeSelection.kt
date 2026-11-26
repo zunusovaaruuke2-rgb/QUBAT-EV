@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.sp
                     }
                 }
                 if (port != null) ChargeSelectionSummary(unit, port)
+                DriverDiscountPrice(station.id)
             }
             DepthButton(
                 onClick = onStart,

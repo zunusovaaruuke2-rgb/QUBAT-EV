@@ -6,7 +6,7 @@ import kotlin.math.ceil
 import kotlin.math.roundToLong
 
 @Immutable data class HistoryEntry(val title:String,val amountMinor:Long,val timestamp:Long,val detail:String)
-@Immutable data class ChargeSession(val stationId:String,val startedAt:Long,val budgetMinor:Long,val connectorId:String="",val vehicleNumber:Int=1)
+@Immutable data class ChargeSession(val stationId:String,val startedAt:Long,val budgetMinor:Long,val connectorId:String="",val vehicleNumber:Int=1,val agreedTariffMinor:Long?=null,val discountPercent:Int=0)
 @Immutable data class PowerSample(val seconds:Long,val powerKw:Double)
 @Immutable data class RunningCharge(val session:ChargeSession,val progress:ChargeResult=ChargeResult(0,0.0,0,false),val updatedAt:Long=session.startedAt,val powerHistory:List<PowerSample> = emptyList())
 @Immutable data class AppState(
@@ -30,7 +30,7 @@ object ChargingEngine {
     const val BATTERY_ENERGY_KWH=48.0 // 60 kWh battery, initial charge 20%.
     private val calculator by lazy { ChargingCalculator(DemoData.stations) }
     fun powerKw(state:AppState,charge:RunningCharge)=calculator.powerKw(state,charge)
-    fun start(state:AppState,stationId:String,connectorId:String?,now:Long)=calculator.start(state,stationId,connectorId,now)
+    fun start(state:AppState,stationId:String,connectorId:String?,now:Long,agreedTariffMinor:Long?=null,discountPercent:Int=0)=calculator.start(state,stationId,connectorId,now,agreedTariffMinor,discountPercent)
     fun advance(state:AppState,now:Long)=calculator.advance(state,now)
     fun stop(state:AppState,connectorId:String,now:Long)=calculator.stop(state,connectorId,now)
 }
@@ -38,6 +38,7 @@ object ChargingEngine {
 /** Same calculations with an explicit station snapshot, allowing realistic connected-port fixtures. */
 internal class ChargingCalculator(private val stations:List<Station>) {
     private fun site(charge:RunningCharge)=stations.first{it.id==charge.session.stationId}
+    private fun tariff(charge:RunningCharge)=charge.session.agreedTariffMinor?:site(charge).tariffMinor
     private fun apparatus(charge:RunningCharge)=site(charge).chargers.first{unit->unit.connectors.any{it.id==charge.session.connectorId}}
     fun powerKw(state:AppState,charge:RunningCharge):Double {
         val unit=apparatus(charge)
@@ -48,14 +49,18 @@ internal class ChargingCalculator(private val stations:List<Station>) {
         val power=powerKw(state,charge)
         if(charge.powerHistory.lastOrNull()?.powerKw==power)charge else charge.copy(powerHistory=(charge.powerHistory+PowerSample(charge.progress.seconds,power)).let{if(it.size>120)listOf(it.first())+it.takeLast(119) else it})
     })
-    fun start(state:AppState,stationId:String,connectorId:String?,now:Long):ChargeStartResult {
+    fun start(state:AppState,stationId:String,connectorId:String?,now:Long,agreedTariffMinor:Long?=null,discountPercent:Int=0):ChargeStartResult {
         val current=advance(state,now)
         val station=stations.firstOrNull{it.id==stationId} ?: return ChargeStartResult(current,false)
+        if(agreedTariffMinor!=null && agreedTariffMinor !in 1..station.tariffMinor)return ChargeStartResult(current,false)
+        if(discountPercent !in 0..99 || (discountPercent>0 && agreedTariffMinor==null))return ChargeStartResult(current,false)
+        val expected=if(discountPercent==0)station.tariffMinor else discountedRate(station.tariffMinor,discountPercent)
+        if(agreedTariffMinor!=null && agreedTariffMinor!=expected)return ChargeStartResult(current,false)
         if(connectorId==null || current.charges.size>=ChargingEngine.MAX_CARS || current.availableBalanceMinor<=0)return ChargeStartResult(current,false)
         val occupied=current.charges.map{it.session.connectorId}.toSet()+current.completedConnectorIds
         val port=station.connectors.firstOrNull{(connectorId==null || it.id==connectorId) && it.state==ConnectorState.CONNECTED && it.id !in occupied} ?: return ChargeStartResult(current,false)
         val number=(1..ChargingEngine.MAX_CARS).first{n->current.charges.none{it.session.vehicleNumber==n}}
-        val charge=RunningCharge(ChargeSession(station.id,now,current.balanceMinor,port.id,number))
+        val charge=RunningCharge(ChargeSession(station.id,now,current.balanceMinor,port.id,number,agreedTariffMinor,discountPercent))
         return ChargeStartResult(refreshPowers(current.copy(charges=current.charges+charge)),true)
     }
     fun advance(state:AppState,now:Long):AppState {
@@ -74,7 +79,7 @@ internal class ChargingCalculator(private val stations:List<Station>) {
             val duration=ceil((ChargingEngine.BATTERY_ENERGY_KWH-charge.progress.energyKwh).coerceAtLeast(0.0)*3600/power).toLong()
             val seconds=minOf(elapsed,duration)
             val energy=(charge.progress.energyKwh+power*seconds/3600).coerceAtMost(ChargingEngine.BATTERY_ENERGY_KWH).let{if(it>=ChargingEngine.BATTERY_ENERGY_KWH-1e-9)ChargingEngine.BATTERY_ENERGY_KWH else it}
-            val cost=(energy*site(charge).tariffMinor).roundToLong().coerceAtLeast(charge.progress.costMinor)
+            val cost=(energy*tariff(charge)).roundToLong().coerceAtLeast(charge.progress.costMinor)
             charge.copy(progress=ChargeResult(charge.progress.seconds+seconds,energy,cost,false),updatedAt=charge.updatedAt+elapsed*1000)
         }
         val demands=desired.mapIndexed{i,c->c.progress.costMinor-current.charges[i].progress.costMinor}
@@ -89,7 +94,7 @@ internal class ChargingCalculator(private val stations:List<Station>) {
         val updated=desired.mapIndexed{i,charge->
             if(allocations[i]==demands[i])charge else {
                 val previous=current.charges[i];val cost=previous.progress.costMinor+allocations[i]
-                val energy=(cost.toDouble()/site(charge).tariffMinor).coerceIn(previous.progress.energyKwh,ChargingEngine.BATTERY_ENERGY_KWH)
+                val energy=(cost.toDouble()/tariff(charge)).coerceIn(previous.progress.energyKwh,ChargingEngine.BATTERY_ENERGY_KWH)
                 val seconds=minOf(charge.progress.seconds,previous.progress.seconds+ceil((energy-previous.progress.energyKwh)*3600/powerKw(current,previous)).toLong())
                 charge.copy(progress=ChargeResult(seconds,energy,cost,true))
             }
@@ -106,7 +111,7 @@ internal class ChargingCalculator(private val stations:List<Station>) {
     private fun settle(state:AppState,ids:Set<String>,now:Long):AppState {
         val finished=state.charges.filter{it.session.connectorId in ids}
         val entries=finished.map{c->HistoryEntry("Демо-зарядка · ${site(c).city}",-c.progress.costMinor,now,
-            "Автомобиль ${c.session.vehicleNumber} · аппарат ${apparatus(c).number} · GB/T ${site(c).connectors.first{it.id==c.session.connectorId}.number} · "+String.format(java.util.Locale("ru"),"%.3f кВт·ч · %d сек",c.progress.energyKwh,c.progress.seconds))}
+            "Тариф ${((c.session.agreedTariffMinor?:site(c).tariffMinor)/100.0)} сом/кВт·ч · Автомобиль ${c.session.vehicleNumber} · аппарат ${apparatus(c).number} · GB/T ${site(c).connectors.first{it.id==c.session.connectorId}.number} · "+String.format(java.util.Locale("ru"),"%.3f кВт·ч · %d сек",c.progress.energyKwh,c.progress.seconds))}
         return refreshPowers(state.copy(balanceMinor=state.balanceMinor-finished.sumOf{it.progress.costMinor},charges=state.charges.filter{it.session.connectorId !in ids},
             history=(entries+state.history).take(100),completedConnectorIds=state.completedConnectorIds+ids,lastProgress=finished.lastOrNull()?.progress ?: state.lastProgress))
     }
