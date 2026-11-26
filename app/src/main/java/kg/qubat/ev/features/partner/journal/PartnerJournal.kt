@@ -16,60 +16,94 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.math.BigDecimal
 import java.time.Instant
+import androidx.activity.compose.BackHandler
 
-@Composable fun NativePartnerJournal(repo: NativePartnerRepository, revision: Int, onChanged: () -> Unit) {
+@Composable fun NativePartnerJournal(repo: NativePartnerRepository, revision: Int, onChanged: () -> Unit, onOpenPoint: (String) -> Unit = {}) {
     var editingSettings by remember { mutableStateOf<NativeNotificationSettings?>(null) }
-    var query by rememberSaveable { mutableStateOf("") }
-    var section by rememberSaveable { mutableStateOf(if (repo.can(NativePermission.NOTIFICATIONS)) "Уведомления" else "Журнал действий") }
-    val events = remember(repo, revision) { if (repo.can(NativePermission.MANAGE_MEMBERS)) repo.audit().sortedByDescending { it.at } else emptyList() }
+    var query by rememberSaveable(repo.account.id) { mutableStateOf("") }
+    var section by rememberSaveable(repo.account.id) { mutableStateOf(if (repo.can(NativePermission.NOTIFICATIONS)) "Уведомления" else "Журнал действий") }
+    var selectedAlert by rememberSaveable(repo.account.id) { mutableStateOf("") }
+    var selectedAudit by rememberSaveable(repo.account.id) { mutableStateOf("") }
+    var settingsOpen by rememberSaveable(repo.account.id) { mutableStateOf(false) }
+    val events = remember(repo, revision) { if (repo.can(NativePermission.MANAGE_MEMBERS)) repo.audit() else emptyList() }
     val settings = remember(repo, revision) { if (repo.can(NativePermission.NOTIFICATIONS)) repo.notificationSettings() else emptyList() }
-    val stations = remember(repo, revision) { repo.stations() }
-    val activeSessions = remember(repo, revision) { repo.monitoring().sessions.filter { it.status == NativeSessionStatus.ACTIVE } }
-    LazyColumn(Modifier.fillMaxSize().testTag("network-journal"), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        item("journal-tabs") {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                listOf("Уведомления", "Журнал действий").forEachIndexed { index, title -> DepthChip(section == title, { section = title }, Modifier.testTag("network-journal-tab-$index")) { AppText(title) } }
-            }
-        }
-        if (section == "Уведомления") {
-            item("notification-header") { NetworkCard("Правила уведомлений") {
-                NetworkNote("ДЕМО · уведомления формируются в кабинете, внешние сообщения не отправляются.")
-                if (!repo.can(NativePermission.NOTIFICATIONS)) NetworkNote("Настройки и тревоги ограничены вашей ролью.")
-                if (repo.can(NativePermission.NOTIFICATIONS) && settings.isEmpty()) DepthOutlinedButton({
+    val allStations = remember(repo, revision) { repo.stations(includeArchived = true) }
+    val stations = allStations.filter { !it.archived }
+    val active = remember(repo, revision) { if (repo.can(NativePermission.NOTIFICATIONS)) repo.monitoring().sessions.filter { it.status == NativeSessionStatus.ACTIVE } else emptyList() }
+    val checkedAt = remember(repo, revision) { Instant.now() }
+    val alerts = remember(repo, revision, checkedAt) { journalAlerts(stations, settings, active, checkedAt) { !repo.isStale(it, checkedAt) } }
+    val members = remember(repo, revision) { if (repo.can(NativePermission.MANAGE_MEMBERS)) repo.members() else emptyList() }
+    fun author(event: NativeAudit): String = members.firstOrNull { it.id == event.authorId }?.name
+        ?: NativePartnerRepository.accounts.firstOrNull { it.id == event.authorId }?.name ?: "Автор не указан"
+    val translate = LocalTranslate.current
+    fun back() { selectedAlert = ""; selectedAudit = ""; settingsOpen = false }
+    BackHandler(selectedAlert.isNotBlank() || selectedAudit.isNotBlank() || settingsOpen) { back() }
+    LazyColumn(Modifier.fillMaxSize().testTag("network-journal"), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (selectedAlert.isNotBlank() || selectedAudit.isNotBlank()) {
+            item("detail-back") { PressTextButton({ back() }, Modifier.testTag("network-journal-back")) { AppText("К списку событий") } }
+            val alert = alerts.firstOrNull { it.id == selectedAlert }
+            val event = events.firstOrNull { it.id == selectedAudit }
+            if (alert != null) item("alert-detail") { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                JournalAlertDetails(alert, checkedAt, settings.firstOrNull { it.id == alert.ruleId }) { onOpenPoint(alert.station.id) }
+            } }
+            else if (event != null) item("audit-detail") { Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { JournalAuditDetails(event, author(event), allStations) } }
+            else item("unavailable") { NativePanel("Событие больше не активно") { AppText("Вернитесь к списку, чтобы увидеть актуальные данные.", fontSize = 14.sp) } }
+        } else if (settingsOpen) {
+            item("settings-back") { PressTextButton({ back() }, Modifier.testTag("network-journal-back")) { AppText("К списку событий") } }
+            item("settings-title") { AppText("Когда показывать уведомления", fontSize = 18.sp) }
+            item("settings-note") { NetworkNote("Уведомления появляются внутри кабинета. Письма и SMS не отправляются.") }
+            if (settings.isEmpty() && repo.can(NativePermission.NOTIFICATIONS)) item("settings-create") {
+                DepthOutlinedButton({
                     repo.organizations().firstOrNull()?.let { organization ->
                         editingSettings = NativeNotificationSettings(networkId(), organization.id, stations.filter { it.organizationId == organization.id }.map { it.id }.toSet())
                     }
-                }, Modifier.fillMaxWidth().testTag("network-notifications-edit")) { AppText("Создать правило") }
-            } }
-            items(settings, key = { "notification-settings-${it.id}" }) { rule -> NetworkCard("Пороги · ${repo.organizations().firstOrNull { it.id == rule.organizationId }?.name ?: rule.organizationId}") {
-                NetworkNote("Канал: ${rule.channel} · ${if (rule.enabled) "Включены" else "Выключены"}")
-                NetworkNote("Нет связи: ${rule.offlineMinutes} мин · длительная зарядка: ${rule.longSessionMinutes} мин · низкая мощность: ${networkNumber(rule.lowPowerKw)} кВт")
-                DepthOutlinedButton({ editingSettings = rule }, Modifier.fillMaxWidth().testTag(if (settings.first().id == rule.id) "network-notifications-edit" else "network-notifications-edit-${rule.id}")) { AppText("Настроить пороги") }
-            } }
-            val now = Instant.now()
-            val alerts = stations.mapNotNull { station ->
-                val rules = settings.filter { it.enabled && station.id in it.stationIds }
-                val messages = mutableSetOf<String>()
-                rules.forEach { rule ->
-                    if (station.errorReason != null || station.ports.any { it.status == NativePortStatus.FAULT }) messages.add("Неисправность")
-                    if (station.lastSeen.isBefore(now.minusSeconds(rule.offlineMinutes.toLong() * 60))) messages.add("Потеря связи")
-                    val active = activeSessions.filter { it.stationId == station.id }
-                    if (active.any { it.startedAt.isBefore(now.minusSeconds(rule.longSessionMinutes.toLong() * 60)) }) messages.add("Длительная зарядка: более ${rule.longSessionMinutes} мин")
-                    if (active.isNotEmpty() && !repo.isStale(station) && station.instantaneousPowerKw < rule.lowPowerKw) messages.add("Низкая мощность: ${networkNumber(station.instantaneousPowerKw)} кВт")
-                }
-                if (messages.isEmpty()) null else station to messages.toList()
+                }, Modifier.fillMaxWidth().testTag("network-notifications-edit")) { AppText("Добавить правило") }
             }
-            if (alerts.isEmpty()) item("alerts-empty") { NetworkCard("Новых тревог нет") { NetworkNote("Учитываются назначенные точки и настроенный порог потери связи.") } }
-            items(alerts, key = { "alert-${it.first.id}" }) { (station, messages) -> NetworkCard(station.title, Modifier.testTag("network-alert-${station.id}")) {
-                messages.forEach { AppText(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp) }
-                station.errorReason?.let { NetworkNote(it, true) }
-                NetworkNote("Сигнал: ${networkTime.format(station.lastSeen)} · источник ${station.source}")
-            } }
+            items(settings, key = { "notification-settings-${it.id}" }) { rule ->
+                val organization = repo.organizations().firstOrNull { it.id == rule.organizationId }?.name ?: "Настройки уведомлений"
+                DepthOutlinedButton({ editingSettings = rule }, Modifier.fillMaxWidth().testTag(if (settings.first().id == rule.id) "network-notifications-edit" else "network-notifications-edit-${rule.id}")) {
+                    AppText(organization, Modifier.weight(1f), fontSize = 14.sp)
+                    AppText(if (rule.enabled) "Включены" else "Выключены", fontSize = 12.sp)
+                    AppText(" ›")
+                }
+            }
         } else {
-            item("audit-search") { NetworkField("Поиск по действию, автору и причине", query, "network-audit-search") { query = it } }
-            val filtered = events.filter { event -> query.isBlank() || listOf(event.action, event.authorId, event.reason, event.before, event.after).any { it.contains(query, true) } }
-            if (filtered.isEmpty()) item("audit-empty") { NetworkCard("Журнал действий") { NetworkNote(if (repo.can(NativePermission.MANAGE_MEMBERS)) "Изменения точек, тарифов, финансов и доступов появятся здесь." else "Внутренний аудит доступен владельцу и администратору. Ваша роль сохраняет доступ к назначенным точкам.") } }
-            items(filtered, key = { "audit-${it.id}" }) { NetworkAuditCard(it) }
+            item("journal-tabs") {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    listOf("Уведомления", "Журнал действий").forEachIndexed { index, title ->
+                        DepthChip(section == title, { section = title }, Modifier.testTag("network-journal-tab-$index")) {
+                            AppText(if (index == 0) "Уведомления" else "Действия", fontSize = 14.sp)
+                        }
+                    }
+                }
+            }
+            if (section == "Уведомления") {
+                if (repo.can(NativePermission.NOTIFICATIONS)) {
+                    item("notification-settings") { DepthOutlinedButton({ settingsOpen = true }, Modifier.fillMaxWidth().testTag("network-notifications-open")) { AppText("Настроить уведомления", Modifier.weight(1f)); AppText("›") } }
+                    item("notification-note") { NetworkNote("Время в строке — время данных или начала зарядки. Это текущие состояния точек.") }
+                    if (alerts.isEmpty()) item("alerts-empty") { NetworkNote("Активных уведомлений нет.") }
+                    alerts.groupBy{it.referenceAt.atZone(PARTNER_ZONE).toLocalDate()}.forEach{(date,rows)->
+                        item("alert-date-$date"){AppText(nativeDate.format(date),fontSize=12.sp,color=Muted)}
+                        items(rows, key = { "alert-${it.id}" }) { alert ->
+                            JournalEventRow(alert.referenceAt, alert.station.title + " · " + translate(alert.kind.title), true,
+                                "network-alert-${alert.id}") { selectedAlert = alert.id }
+                        }
+                    }
+                } else item("notification-denied") { NetworkNote("Уведомления недоступны вашей роли.") }
+            } else {
+                item("audit-search") { NetworkField("Найти действие или сотрудника", query, "network-audit-search") { query = it } }
+                val filtered = events.filter { event -> query.isBlank() || listOf(event.action, journalActionTitle(event.action), author(event), event.authorId, event.reason, event.before, event.after).any { it.contains(query.trim(), true) } }
+                if (filtered.isEmpty()) item("audit-empty") { NetworkNote(if (repo.can(NativePermission.MANAGE_MEMBERS)) "Действий пока нет." else "Журнал действий доступен владельцу и администратору.") }
+                filtered.groupBy{it.at.atZone(PARTNER_ZONE).toLocalDate()}.forEach{(date,rows)->
+                    item("audit-date-$date"){AppText(nativeDate.format(date),fontSize=12.sp,color=Muted)}
+                    items(rows, key = { "audit-${it.id}" }) { event ->
+                        JournalEventRow(event.at, author(event) + " · " + translate(journalActionTitle(event.action)), false,
+                            "network-audit-${event.id}") { selectedAudit = event.id }
+                    }
+                }
+            }
+            item("journal-help") { NetworkNote("Нажмите на строку, чтобы узнать подробности.") }
+            item("journal-demo") { NetworkNote("ДЕМО · события внутри кабинета") }
         }
     }
     editingSettings?.let { rule -> NetworkNotificationEditor(repo, rule, { editingSettings = null }) { editingSettings = null; onChanged() } }
@@ -83,7 +117,7 @@ import java.time.Instant
     var stationIds by remember { mutableStateOf(original.stationIds) }
     var reason by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
-    NetworkEditor("Пороги уведомлений", "network-notifications-editor", error, onDismiss, {
+    NetworkEditor("Настроить уведомления", "network-notifications-editor", error, onDismiss, {
         runCatching {
             val offlineMinutes = requireNotNull(offline.toIntOrNull()?.takeIf { it in 1..1440 }) { "Порог потери связи: от 1 до 1440 минут." }
             val longMinutes = requireNotNull(longSession.toIntOrNull()?.takeIf { it in 1..10080 }) { "Порог зарядки: от 1 до 10080 минут." }
@@ -94,10 +128,10 @@ import java.time.Instant
         }.onSuccess { onSaved() }.onFailure { error = it.message ?: "Не удалось сохранить пороги" }
     }) {
         DepthChip(enabled, { enabled = !enabled }, Modifier.testTag("network-notifications-enabled")) { AppText("Уведомления включены") }
-        NetworkNote("Канал: в кабинете. Внешние каналы появятся после согласованной интеграции.")
-        NetworkField("Потеря связи, минут", offline, "network-notifications-offline", true) { offline = it }
-        NetworkField("Длительная зарядка, минут", longSession, "network-notifications-long", true) { longSession = it }
-        NetworkField("Низкая мощность, кВт", lowPower, "network-notifications-power", true) { lowPower = it }
+        NetworkNote("Уведомления показываются только внутри кабинета.")
+        NetworkField("Нет новых данных дольше, минут", offline, "network-notifications-offline", true) { offline = it }
+        NetworkField("Зарядка дольше, минут", longSession, "network-notifications-long", true) { longSession = it }
+        NetworkField("Мощность ниже, кВт", lowPower, "network-notifications-power", true) { lowPower = it }
         NetworkNote("Правило применяется к выбранным точкам организации.")
         NetworkStationSelection(repo.stations().filter { it.organizationId == original.organizationId }, stationIds, "network-notifications-station") { stationIds = it }
         NetworkField("Причина изменения *", reason, "network-notifications-reason") { reason = it }

@@ -27,7 +27,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
-private enum class NativePage(val label:String) { MONITOR("Мониторинг"),POINTS("Точки"),REPORTS("Отчёты"),FINANCE("Финансы"),ACCESS("Сотрудники и доступ"),BRANDS("Название и цвет"),JOURNAL("Журнал и уведомления"),PROFILE("Профиль партнёра") }
+private enum class NativePage(val label:String) { MONITOR("Мониторинг"),POINTS("Точки"),REPORTS("Отчёты"),FINANCE("Финансы"),ACCESS("Сотрудники и доступ"),BRANDS("Название и цвет"),JOURNAL("События"),PROFILE("Профиль партнёра") }
 @Composable fun PartnerCabinetScreen(account:PartnerAccount,onBack:()->Unit,onSignOut:()->Unit,onSwitchDemo:()->Unit) {
     val context=LocalContext.current
     val disk=remember {NativePartnerDisk(context.applicationContext)}
@@ -107,7 +107,7 @@ private enum class NativePage(val label:String) { MONITOR("Мониторинг"
                     NativePage.FINANCE->NativeFinance(repo,revision,changed)
                     NativePage.ACCESS->NativePartnerAccess(repo,revision,changed)
                     NativePage.BRANDS->NativePartnerBrands(repo,revision,changed)
-                    NativePage.JOURNAL->NativePartnerJournal(repo,revision,changed)
+                    NativePage.JOURNAL->NativePartnerJournal(repo,revision,changed){id->initialPoint=id;pageName=NativePage.POINTS.name}
                     NativePage.PROFILE->NativeProfile(account,onSwitchDemo,onSignOut)
                 }}
             }
