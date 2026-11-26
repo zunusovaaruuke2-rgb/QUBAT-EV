@@ -268,6 +268,32 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
     }
     fun brands():List<NativeBrand> {requirePermission(NativePermission.VIEW);return state.brands.filter{brand->organizations().any{it.id==brand.organizationId}}.toList()}
     fun saveBrand(value:NativeBrand,reason:String) {requirePermission(NativePermission.MANAGE_BRANDS);orgCheck(value.organizationId);reasonCheck(reason);require(value.name.isNotBlank() && Regex("#[0-9A-Fa-f]{6}").matches(value.color)){"Укажите название и цвет #RRGGBB"};val old=state.brands.firstOrNull{it.id==value.id};old?.let{orgCheck(it.organizationId);require(it.organizationId==value.organizationId)};if(old==null)state.brands.add(value) else state.brands[state.brands.indexOf(old)]=value;log(value.organizationId,emptySet(),"Изменение бренда",old,value,reason)}
+    /** Validate the entire reassignment before changing any point. Existing models/IDs stay intact. */
+    fun assignBrandPoints(brandId:String,stationIds:Set<String>,reason:String,replacementBrandId:String?=null) {
+        requirePermission(NativePermission.MANAGE_BRANDS)
+        requirePermission(NativePermission.EDIT_STATION)
+        reasonCheck(reason)
+        val brand=brands().firstOrNull{it.id==brandId}?:throw SecurityException("Название сети недоступно")
+        require(!brand.archived){"Название находится в архиве"}
+        orgCheck(brand.organizationId)
+        val selected=stationIds.map{id->
+            requirePermission(NativePermission.EDIT_STATION,id)
+            station(id).also{require(it.organizationId==brand.organizationId){"Точка другой организации"}}
+        }
+        val removed=scopedStations().filter{it.organizationId==brand.organizationId && it.brandId==brand.id && it.id !in stationIds}
+        val replacement=if(removed.isEmpty())null else {
+            val other=brands().firstOrNull{it.id==replacementBrandId && it.organizationId==brand.organizationId && !it.archived && it.id!=brand.id}
+            requireNotNull(other){"Для снятых точек выберите другое название сети"}
+        }
+        val before=selected.filter{it.brandId!=brand.id}+removed
+        val after=selected.filter{it.brandId!=brand.id}.map{it.copy(brandId=brand.id)}+
+            removed.map{it.copy(brandId=replacement!!.id)}
+        before.forEach{requirePermission(NativePermission.EDIT_STATION,it.id)}
+        after.forEach(::validateStation)
+        if(after.isEmpty())return
+        after.forEach{updated->state.stations[state.stations.indexOfFirst{it.id==updated.id}]=updated}
+        log(brand.organizationId,after.map{it.id}.toSet(),"Назначение названия сети",before,after,reason)
+    }
     fun notificationSettings():List<NativeNotificationSettings> {requirePermission(NativePermission.NOTIFICATIONS);val ids=scopedStations().map{it.id}.toSet();return state.notifications.filter{(account.role==PartnerRole.ADMIN || it.organizationId==organizationId) && it.stationIds.all{key->key in ids}}.toList()}
     fun saveNotificationSettings(value:NativeNotificationSettings,reason:String) {requirePermission(NativePermission.NOTIFICATIONS);validateAssignments(value.organizationId,value.stationIds);reasonCheck(reason);require(value.offlineMinutes>0 && value.longSessionMinutes>0 && value.lowPowerKw.signum()>=0 && value.channel=="В кабинете"){"Проверьте пороги; в ДЕМО доступен канал «В кабинете»"};val old=state.notifications.firstOrNull{it.id==value.id};old?.let{validateAssignments(it.organizationId,it.stationIds)};if(old==null)state.notifications.add(value) else state.notifications[state.notifications.indexOf(old)]=value;log(value.organizationId,value.stationIds,"Настройка уведомлений",old,value,reason)}
     fun audit():List<NativeAudit> {requirePermission(NativePermission.MANAGE_MEMBERS);val ids=scopedStations().map{it.id}.toSet();return state.audit.filter{(account.role==PartnerRole.ADMIN || it.organizationId==organizationId) && it.stationIds.all{key->key in ids}}.sortedByDescending{it.at}}
