@@ -165,7 +165,7 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
         if(account.role==PartnerRole.DRIVER || (builtIn==null && activeMember()==null))throw SecurityException("Нет доступа к кабинету партнёра")
         if(account.role !in setOf(PartnerRole.ADMIN,PartnerRole.OWNER) && activeMember()==null)throw SecurityException("Доступ отозван или срок закончился")
     }
-    private fun roleRights():Set<NativePermission> = when(account.role){
+    private fun roleRights(role:PartnerRole=account.role):Set<NativePermission> = when(role){
         PartnerRole.ADMIN,PartnerRole.OWNER->NativePermission.entries.toSet()
         PartnerRole.ACCOUNTANT->setOf(NativePermission.VIEW,NativePermission.REPORT,NativePermission.EXPORT,NativePermission.FINANCE,NativePermission.EDIT_FINANCE)
         PartnerRole.EMPLOYEE->setOf(NativePermission.VIEW)
@@ -239,6 +239,12 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
     }
     fun members():List<NativeMember> {requirePermission(NativePermission.MANAGE_MEMBERS);val ids=scopedStations().map{it.id}.toSet();return state.members.filter{(account.role==PartnerRole.ADMIN || it.organizationId==organizationId) && it.stationIds.all{key->key in ids}}.toList()}
     private fun validateAssignments(org:String,ids:Set<String>) {orgCheck(org);require(ids.isNotEmpty()){"Выберите точки"};ids.forEach{val s=station(it);if(s.organizationId!=org)throw SecurityException("Точка другой организации")}}
+    /** Configured permissions for an authorized member; dates/revocation are shown separately. */
+    fun memberPermissions(id:String):Set<NativePermission> {
+        val member=members().firstOrNull{it.id==id}?:throw SecurityException("Пользователь недоступен")
+        val role=roleRights(member.role)
+        return if(member.rights.isEmpty())role else role.intersect(member.rights)
+    }
     fun inviteMember(value:NativeMember,reason:String) {
         requirePermission(NativePermission.MANAGE_MEMBERS);reasonCheck(reason);validateAssignments(value.organizationId,value.stationIds)
         require(value.id.isNotBlank() && value.name.isNotBlank() && (value.contact.contains("@") || value.contact.count{it.isDigit()}>=9)){"Укажите имя и телефон или email"}

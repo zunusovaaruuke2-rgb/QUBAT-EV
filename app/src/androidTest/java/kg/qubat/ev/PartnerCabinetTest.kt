@@ -142,6 +142,13 @@ class PartnerCabinetTest {
             stage="brands and access"
             section("brands");scroll("network-brand-create").assertIsEnabled()
             section("access");scroll("network-access-invite").assertIsEnabled()
+            scroll("network-member-open-demo-employee")
+            compose.onNodeWithTag("network-member-revoke-demo-employee").assertDoesNotExist()
+            compose.onNodeWithTag("network-member-open-demo-employee").performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithTag("network-member-edit-demo-employee").fetchSemanticsNodes().isNotEmpty()}
+            compose.onNodeWithTag("network-member-revoke-demo-employee").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithText("Закрыть").performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithTag("network-member-edit-demo-employee").fetchSemanticsNodes().isEmpty()}
             stage="observer cannot change prices"
             section("profile");scroll("partner-switch-demo").performClick()
             compose.onNodeWithTag("partner-demo-demo-observer").performScrollTo().performClick();ready()
