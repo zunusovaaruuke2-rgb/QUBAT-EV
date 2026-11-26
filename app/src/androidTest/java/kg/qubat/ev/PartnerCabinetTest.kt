@@ -30,10 +30,10 @@ class PartnerCabinetTest {
     @get:Rule val chain:RuleChain=RuleChain.outerRule(cleanup).around(compose)
     private fun scroll(tag:String):SemanticsNodeInteraction {
         compose.waitForIdle()
-        // This report fixture renders five header items and twenty session rows per page.
+        // The simple report has eight header items; expanded details show twenty session rows per page.
         // Jump to its pagination instead of recursively traversing lazily prefetched semantics.
         if(tag.startsWith("network-page-")) {
-            compose.onNodeWithTag("network-reports-scroll").performScrollToIndex(5+20)
+            compose.onNodeWithTag("network-reports-scroll").performScrollToIndex(8+20)
             compose.waitForIdle()
             return compose.onNodeWithTag(tag).assertIsDisplayed()
         }
@@ -109,6 +109,10 @@ class PartnerCabinetTest {
             compose.onNodeWithTag("network-select-station-").performClick()
             compose.waitUntil(5000){compose.onAllNodesWithTag("network-select-station-").fetchSemanticsNodes().isEmpty()}
             compose.waitForIdle()
+            scroll("network-report-summary")
+            compose.onNodeWithTag("network-search").assertDoesNotExist()
+            scroll("network-report-details").performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithText("Скрыть зарядки").fetchSemanticsNodes().isNotEmpty()}
             scroll("network-page-next").assertIsEnabled().performClick()
             compose.waitUntil(5000){compose.onAllNodes(hasTestTag("network-page-label") and hasText("2 / 4")).fetchSemanticsNodes().isNotEmpty()}
             scroll("network-page-label")

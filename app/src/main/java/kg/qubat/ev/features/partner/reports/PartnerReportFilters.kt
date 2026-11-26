@@ -77,7 +77,7 @@ internal data class NativeFilterUi(val filter:NativeReportFilter,val content:@Co
     return NativeFilterUi(filter,content)
 }
 
-@Composable private fun NativeDateRange(from:String,to:String,onDismiss:()->Unit,onApply:(String,String)->Unit){
+@Composable internal fun NativeDateRange(from:String,to:String,onDismiss:()->Unit,onApply:(String,String)->Unit){
     var first by remember{mutableStateOf(from)};var last by remember{mutableStateOf(to)}
     val valid=runCatching{PartnerPeriod(LocalDate.parse(first),LocalDate.parse(last))}.isSuccess
     AlertDialog(onDismissRequest=onDismiss,title={AppText("Период отчёта")},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)){

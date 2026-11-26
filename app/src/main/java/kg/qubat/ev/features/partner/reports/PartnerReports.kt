@@ -30,26 +30,56 @@ import kotlinx.coroutines.*
         if(uri==null||frozen==null||frozen.account.id!=repo.account.id){busy=false;return@rememberLauncherForActivityResult}
         scope.launch{try{withContext(Dispatchers.IO){context.contentResolver.openOutputStream(uri,"w")?.use{NativePartnerExcel.write(frozen,it)}?:error("Нет доступа к файлу")};message="Excel сохранён: 5 листов · ${frozen.filter.period.from} — ${frozen.filter.period.to}"}catch(cancel:CancellationException){throw cancel}catch(_:Exception){message="Не удалось сохранить Excel. Повторите попытку."}finally{busy=false}}
     }
-    if(repo.can(NativePermission.EXPORT))DepthButton(onClick={pending=report;busy=true;message=null;launcher.launch(NativePartnerExcel.fileName(report));repo.recordExport(report);onChanged()},enabled=!busy,modifier=Modifier.fillMaxWidth().testTag("network-export")){AppText(if(busy)"Подготовка Excel…" else "Скачать Excel (.xlsx)")}
+    if(repo.can(NativePermission.EXPORT))DepthButton(onClick={pending=report;busy=true;message=null;launcher.launch(NativePartnerExcel.fileName(report));repo.recordExport(report);onChanged()},enabled=!busy,modifier=Modifier.fillMaxWidth().testTag("network-export")){AppText(if(busy)"Подготовка Excel…" else "Скачать отчёт в Excel")}
     message?.let{AppText(it,fontSize=11.sp,color=Muted)}
 }
 
 @Composable internal fun NativeReports(repo:NativePartnerRepository,revision:Int,onChanged:()->Unit){
     if(!repo.can(NativePermission.REPORT)){NativeDenied();return}
-    val selected=nativeFilters(repo);val filter=selected.filter
+    val selected=simpleReportFilters(repo);val filter=selected.filter
+    if(filter.stationId!=null && repo.stations(includeArchived=true).none{it.id==filter.stationId}){
+        LazyColumn(Modifier.fillMaxSize().testTag("network-reports-scroll"),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
+            item{selected.content()}
+            item{NativePanel("Точка недоступна"){AppText("Выберите другую точку",color=Muted)}}
+        }
+        return
+    }
     val report=remember(repo,filter,revision){repo.report(filter)}
-    var page by rememberSaveable{mutableIntStateOf(0)}
+    var page by rememberSaveable(repo.account.id){mutableIntStateOf(0)}
+    var details by rememberSaveable(repo.account.id){mutableStateOf(false)}
+    var issues by rememberSaveable(repo.account.id){mutableStateOf(false)}
     LaunchedEffect(filter){page=0}
     val pages=((report.sessions.size+19)/20).coerceAtLeast(1)
     if(page>=pages)page=pages-1
     LazyColumn(Modifier.fillMaxSize().testTag("network-reports-scroll"),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
         item(key="filters"){selected.content()}
+        item(key="heading"){AppText("Результат за период",fontSize=17.sp,fontWeight=androidx.compose.ui.text.font.FontWeight.SemiBold)}
+        item(key="energy"){ReportEnergySummary(report.summary)}
+        item(key="revenue"){if(repo.can(NativePermission.FINANCE))ReportMoneySummary(report.summary)}
+        item(key="counts"){
+            NativePanel("Отмены и ошибки"){
+                PressTextButton(onClick={issues=!issues},modifier=Modifier.fillMaxWidth().testTag("network-report-issues")){
+                    AppText(if(issues)"Скрыть подробности" else "Показать подробности",Modifier.weight(1f),fontSize=14.sp);AppText(if(issues)"▴" else "▾")
+                }
+                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                    Column(Modifier.weight(1f)){AppText("Отменено",fontSize=13.sp,color=Muted);AppText(report.summary.cancelledCount.toString(),Modifier.testTag("network-report-cancelled"))}
+                    Column(Modifier.weight(1f)){AppText("С ошибкой",fontSize=13.sp,color=Muted);AppText(report.summary.errorCount.toString(),Modifier.testTag("network-report-errors"))}
+                }
+                if(issues){
+                    AppText("Активные зарядки",fontSize=13.sp,color=Muted)
+                    AppText(report.summary.activeCount.toString())
+                    AppText("Клиентов с завершёнными зарядками",fontSize=13.sp,color=Muted)
+                    AppText(report.summary.uniqueCustomers.toString())
+                }
+            }
+        }
         item(key="export"){NativeExport(repo,report,onChanged)}
-        item(key="energy"){NativeMetric("Завершённые сессии / энергия","${report.summary.completedCount} · ${nativeEnergy(report.summary.energyKwh)}","network-report-summary")}
-        item(key="counts"){AppText("Отменено: ${report.summary.cancelledCount} · ошибок: ${report.summary.errorCount} · клиентов: ${report.summary.uniqueCustomers}",fontSize=12.sp,color=Muted)}
-        if(repo.can(NativePermission.FINANCE))item(key="revenue"){NativePanel("Начислено / оплачено / возвраты"){AppText(nativeMoney(report.summary.chargedKgs));AppText(nativeMoney(report.summary.paidKgs));AppText("Возвраты: ${nativeMoney(report.summary.refundKgs)}");AppText("Не оплачено: ${nativeMoney(report.summary.unpaidKgs)}");AppText("Средний тариф: ${nativeMoney(report.summary.averageTariffKgs)} / кВт·ч",fontSize=12.sp)}}
+        item(key="details"){DepthOutlinedButton(onClick={details=!details},modifier=Modifier.fillMaxWidth().testTag("network-report-details")){
+            AppText(if(details)"Скрыть зарядки" else "Подробности по зарядкам",Modifier.weight(1f));AppText(if(details)"▴" else "▾")
+        }}
+        item(key="notice"){AppText("Пример данных",fontSize=12.sp,color=Muted)}
         if(report.sessions.isEmpty())item(key="empty"){NativePanel("За выбранный период зарядок не найдено"){AppText("Измените период или фильтр",color=Muted)}}
-        items(report.sessions.drop(page*20).take(20),key={it.id},contentType={"session"}){s->NativePanel(report.stations.firstOrNull{it.station.id==s.stationId}?.station?.title?:s.stationId,"network-session-${s.id}"){
+        if(details)items(report.sessions.drop(page*20).take(20),key={it.id},contentType={"session"}){s->NativePanel(report.stations.firstOrNull{it.station.id==s.stationId}?.station?.title?:s.stationId,"network-session-${s.id}"){
             AppText(s.id,fontSize=10.sp,color=Muted);AppText(s.status.label,color=if(s.status==NativeSessionStatus.COMPLETED)Lime else Muted)
             AppText("Порт: ${s.portId} · клиент: ${s.customerId}",fontSize=11.sp)
             AppText("Начало: ${nativeTime.format(s.startedAt)}\nКонец: ${s.endedAt?.let(nativeTime::format)?:"Не завершена"}",fontSize=11.sp,color=Muted)
@@ -58,6 +88,6 @@ import kotlinx.coroutines.*
             s.errorReason?.let{AppText(it,color=MaterialTheme.colorScheme.error)}
             AppText("${s.source} · обновлено ${nativeTime.format(s.updatedAt)}",fontSize=10.sp,color=Muted)
         }}
-        item(key="pages"){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){PressTextButton(onClick={page--},enabled=page>0,modifier=Modifier.testTag("network-page-prev")){AppText("Назад")};AppText("${page+1} / $pages",Modifier.testTag("network-page-label"));PressTextButton(onClick={page++},enabled=page+1<pages,modifier=Modifier.testTag("network-page-next")){AppText("Далее")}}}
+        if(details && report.sessions.isNotEmpty())item(key="pages"){Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically){PressTextButton(onClick={page--},enabled=page>0,modifier=Modifier.testTag("network-page-prev")){AppText("Назад")};AppText("${page+1} / $pages",Modifier.testTag("network-page-label"));PressTextButton(onClick={page++},enabled=page+1<pages,modifier=Modifier.testTag("network-page-next")){AppText("Далее")}}}
     }
 }
