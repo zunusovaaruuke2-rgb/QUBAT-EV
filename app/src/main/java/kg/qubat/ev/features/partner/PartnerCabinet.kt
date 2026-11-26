@@ -27,7 +27,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 
-private enum class NativePage(val label:String) { MONITOR("Мониторинг"),POINTS("Точки"),REPORTS("Отчёты"),FINANCE("Финансы"),ACCESS("Сотрудники и доступ"),BRANDS("Название и цвет"),JOURNAL("События"),PROFILE("Профиль партнёра") }
+private enum class NativePage(val label:String) { MONITOR("Мониторинг"),POINTS("Точки"),REPORTS("Отчёты"),FINANCE("Финансы"),ACCESS("Сотрудники и доступ"),BRANDS("Название и цвет"),JOURNAL("События"),PROFILE("Мой кабинет") }
 @Composable fun PartnerCabinetScreen(account:PartnerAccount,onBack:()->Unit,onSignOut:()->Unit,onSwitchDemo:()->Unit) {
     val context=LocalContext.current
     val disk=remember {NativePartnerDisk(context.applicationContext)}
@@ -108,7 +108,12 @@ private enum class NativePage(val label:String) { MONITOR("Мониторинг"
                     NativePage.ACCESS->NativePartnerAccess(repo,revision,changed)
                     NativePage.BRANDS->NativePartnerBrands(repo,revision,changed)
                     NativePage.JOURNAL->NativePartnerJournal(repo,revision,changed){id->initialPoint=id;pageName=NativePage.POINTS.name}
-                    NativePage.PROFILE->NativeProfile(account,onSwitchDemo,onSignOut)
+                    NativePage.PROFILE->NativeProfile(repo,revision,onSwitchDemo,onSignOut){route->
+                        NativePage.entries.firstOrNull{it.name.lowercase()==route}?.takeIf{it in pages}?.let{destination->
+                            if(destination==NativePage.POINTS)initialPoint=null
+                            pageName=destination.name
+                        }
+                    }
                 }}
             }
         }

@@ -150,7 +150,13 @@ class PartnerCabinetTest {
             compose.onNodeWithText("Закрыть").performClick()
             compose.waitUntil(5000){compose.onAllNodesWithTag("network-member-edit-demo-employee").fetchSemanticsNodes().isEmpty()}
             stage="observer cannot change prices"
-            section("profile");scroll("partner-switch-demo").performClick()
+            section("profile")
+            scroll("network-profile-count-points")
+            compose.onNodeWithTag("network-profile-count-points",useUnmergedTree=true).assertTextEquals("3")
+            compose.onNodeWithTag("network-profile-count-apparatus",useUnmergedTree=true).assertTextEquals("3")
+            compose.onNodeWithTag("network-profile-count-ports",useUnmergedTree=true).assertTextEquals("6")
+            scroll("network-profile-go-finance").assertIsDisplayed()
+            scroll("partner-switch-demo").performClick()
             compose.onNodeWithTag("partner-demo-demo-observer").performScrollTo().performClick();ready()
             section("points");scroll("network-point-partner-demo-a-1").performClick()
             scroll("network-point-tab-parameters").performClick()
