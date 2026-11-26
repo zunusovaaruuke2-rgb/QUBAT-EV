@@ -10,6 +10,28 @@ internal fun partnerTranslation(text:String,language:AppLanguage):String? {
     return text.replace(key,translated)
 }
 private val partnerPhrases=mapOf(
+    "Выберите точку" to ("Select location" to "Түйүндү тандаңыз"),
+    "Все точки" to ("All locations" to "Бардык түйүндөр"),
+    "Общие показатели сети" to ("Network totals" to "Тармактын жалпы көрсөткүчтөрү"),
+    "Показатели выбранной точки" to ("Selected location totals" to "Тандалган түйүндүн көрсөткүчтөрү"),
+    "Точки" to ("Locations" to "Түйүндөр"),
+    "Аппараты" to ("Chargers" to "Аппараттар"),
+    "Разъёмы" to ("Ports" to "Туташтыргычтар"),
+    "Точки и оборудование" to ("Locations and equipment" to "Түйүндөр жана жабдуулар"),
+    "Аппараты на точке" to ("Chargers at this location" to "Түйүндөгү аппараттар"),
+    "Поиск точки" to ("Find location" to "Түйүндү издөө"),
+    "Точки не найдены" to ("No locations found" to "Түйүндөр табылган жок"),
+    "Точка недоступна" to ("Location unavailable" to "Түйүн жеткиликсиз"),
+    "Выбранная точка больше недоступна. Обновите выбор." to ("The selected location is no longer available. Choose again." to "Тандалган түйүн жеткиликсиз. Кайра тандаңыз."),
+    "Доступных точек пока нет" to ("No locations available" to "Жеткиликтүү түйүндөр азырынча жок"),
+    "Состояние точки" to ("Location status" to "Түйүндүн абалы"),
+    "Состояние сети" to ("Network status" to "Тармактын абалы"),
+    "Точки на карте" to ("Locations on the map" to "Картадагы түйүндөр"),
+    "Выбранная точка на карте" to ("Selected location on the map" to "Картадагы тандалган түйүн"),
+    "Разъёмы не добавлены" to ("No ports added" to "Туташтыргычтар кошула элек"),
+    "Нет свежих данных о зарядках" to ("No recent charging data" to "Кубаттоо тууралуу жаңы маалымат жок"),
+    "Текущая мощность: Нет данных" to ("Current power: No data" to "Учурдагы кубаттуулук: Маалымат жок"),
+    "Паспорт точки" to ("Location details" to "Түйүндүн маалыматы"),
     "Без даты" to ("No date" to "Күнү жок"),
     "С даты" to ("From date" to "Башталган күн"),
     "По дату" to ("To date" to "Аяктаган күн"),
@@ -131,6 +153,12 @@ private val partnerPhrases=mapOf(
 )
 private data class PartnerTextPattern(val pattern:Regex,val render:(List<String>,AppLanguage)->String)
 private val partnerPatterns=listOf(
+    PartnerTextPattern(Regex("^Аппаратов: (\\d+) · Разъёмов: (\\d+)$")) {g,l->if(l==AppLanguage.EN) "Chargers: ${g[0]} · Ports: ${g[1]}" else "Аппараттар: ${g[0]} · Туташтыргычтар: ${g[1]}"},
+    PartnerTextPattern(Regex("^Разъёмов: (\\d+)$")) {g,l->if(l==AppLanguage.EN) "Ports: ${g[0]}" else "Туташтыргычтар: ${g[0]}"},
+    PartnerTextPattern(Regex("^Аппарат №(\\d+)$")) {g,l->if(l==AppLanguage.EN) "Charger №${g[0]}" else "Аппарат №${g[0]}"},
+    PartnerTextPattern(Regex("^Макс\\. мощность: (.+) кВт$")) {g,l->if(l==AppLanguage.EN) "Max. power: ${g[0]} kW" else "Эң чоң кубаттуулук: ${g[0]} кВт"},
+    PartnerTextPattern(Regex("^Точек без свежих данных: (\\d+)$")) {g,l->if(l==AppLanguage.EN) "Locations without recent data: ${g[0]}" else "Жаңы маалыматы жок түйүндөр: ${g[0]}"},
+    PartnerTextPattern(Regex("^Мощность по свежим данным: (.+) кВт$")) {g,l->if(l==AppLanguage.EN) "Power from recent data: ${g[0]} kW" else "Жаңы маалымат боюнча кубаттуулук: ${g[0]} кВт"},
     PartnerTextPattern(Regex("^Отменённые: (\\d+) · Незавершённые: (\\d+)$")) {g,l->if(l==AppLanguage.EN) "Cancelled: ${g[0]} · Unfinished: ${g[1]}" else "Жокко чыгарылгандар: ${g[0]} · Аяктабагандар: ${g[1]}"},
     PartnerTextPattern(Regex("^Обновлено: (.+) · Asia/Bishkek$")) {g,l->if(l==AppLanguage.EN) "Updated: ${g[0]} · Asia/Bishkek" else "Жаңыртылды: ${g[0]} · Asia/Bishkek"},
     PartnerTextPattern(Regex("^Excel сохранён · (.+)$")) {g,l->if(l==AppLanguage.EN) "Excel saved · ${g[0]}" else "Excel сакталды · ${g[0]}"},

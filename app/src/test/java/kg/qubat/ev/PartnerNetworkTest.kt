@@ -309,4 +309,57 @@ class PartnerNetworkTest {
         assertNull(owner.monthlyFinance(filter().copy(customerId=state.sessions.single().customerId)).single().payoutKgs)
     }
 
+
+    @Test fun monitoringFiltersOnePointWithoutChangingReportPermissions() {
+        val state=clean()
+        val index=state.stations.indexOfFirst{it.id==a}
+        val original=state.stations[index]
+        state.stations[index]=original.copy(apparatusCount=2,ports=original.ports+listOf(
+            original.ports[0].copy(id="$a-port-3",number=3),
+            original.ports[1].copy(id="$a-port-4",number=4)))
+        val other=state.stations.first{it.organizationId==original.organizationId && it.id!=a}.id
+        state.sessions.addAll(listOf(session("selected",a),session("other",other),session("foreign",b)))
+        val owner=repo(state=state)
+        val all=owner.monitoring()
+        assertEquals(3,all.summary.stationCount);assertEquals(4,all.summary.apparatusCount);assertEquals(8,all.summary.connectorCount)
+        val selected=owner.monitoring(a)
+        assertEquals(listOf(a),selected.stations.map{it.station.id})
+        assertEquals(1,selected.summary.stationCount);assertEquals(2,selected.summary.apparatusCount);assertEquals(4,selected.summary.connectorCount)
+        assertEquals(listOf("selected"),selected.sessions.map{it.id})
+        money("126.69",selected.summary.revenueKgs)
+        money("253.38",all.summary.revenueKgs)
+        assertThrows(SecurityException::class.java){owner.monitoring(b)}
+        assertThrows(SecurityException::class.java){owner.monitoring("missing")}
+        val employee=repo("demo-employee",state)
+        assertFalse(employee.can(NativePermission.REPORT))
+        val assigned=employee.stations().first()
+        val view=employee.monitoring(assigned.id)
+        assertEquals(1,view.summary.stationCount)
+        assertNull(view.summary.revenueKgs)
+    }
+
+    @Test fun monitoringExcludesArchivedPointsButHistoricalReportsKeepThem() {
+        val state=clean()
+        val index=state.stations.indexOfFirst{it.id==a}
+        state.stations[index]=state.stations[index].copy(archived=true)
+        state.sessions.add(session("archived-session",a))
+        val owner=repo(state=state)
+        assertEquals(2,owner.monitoring().summary.stationCount)
+        assertFalse(owner.monitoring().stations.any{it.station.id==a})
+        assertThrows(SecurityException::class.java){owner.monitoring(a)}
+        assertEquals(listOf("archived-session"),owner.report(filter()).sessions.map{it.id})
+    }
+
+    @Test fun apparatusGroupingPreservesEveryExistingPortAndItsNumber() {
+        val point=repo().station(a)
+        val four=point.copy(apparatusCount=2,ports=point.ports+listOf(
+            point.ports[0].copy(id="$a-port-3",number=3),
+            point.ports[1].copy(id="$a-port-4",number=4)))
+        val units=monitorApparatuses(four)
+        assertEquals(listOf(1,2),units.map{it.number})
+        assertEquals(listOf(1,3),units[0].ports.map{it.number})
+        assertEquals(listOf(2,4),units[1].ports.map{it.number})
+        assertEquals(four.ports.map{it.id}.sorted(),units.flatMap{it.ports}.map{it.id}.sorted())
+        assertSame(four.ports[0],units[0].ports[0])
+    }
 }

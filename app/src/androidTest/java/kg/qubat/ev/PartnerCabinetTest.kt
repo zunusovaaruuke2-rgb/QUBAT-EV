@@ -58,7 +58,21 @@ class PartnerCabinetTest {
             compose.onNodeWithTag("partner-demo-demo-owner-a").performScrollTo().performClick();ready()
             stage="monitoring counts"
             scroll("network-station-count")
-            compose.onNode(hasText("3 / 3 / 6") and hasAnyAncestor(hasTestTag("network-station-count"))).assertIsDisplayed()
+            compose.onNodeWithTag("network-monitor-count-points",useUnmergedTree=true).assertTextEquals("3")
+            compose.onNodeWithTag("network-monitor-count-apparatus",useUnmergedTree=true).assertTextEquals("3")
+            compose.onNodeWithTag("network-monitor-count-ports",useUnmergedTree=true).assertTextEquals("6")
+            scroll("network-monitor-point-partner-demo-a-1").performClick()
+            compose.waitUntil(5000){compose.onAllNodes(hasTestTag("network-monitor-count-points") and hasText("1"),useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()}
+            scroll("network-station-count")
+            compose.onNodeWithTag("network-monitor-count-points",useUnmergedTree=true).assertTextEquals("1")
+            compose.onNodeWithTag("network-monitor-count-apparatus",useUnmergedTree=true).assertTextEquals("1")
+            compose.onNodeWithTag("network-monitor-count-ports",useUnmergedTree=true).assertTextEquals("2")
+            scroll("network-monitor-apparatus-partner-demo-a-1-1").assertIsDisplayed()
+            scroll("network-monitor-selector").performClick()
+            compose.onNodeWithTag("network-monitor-select-all").performClick()
+            compose.waitUntil(5000){compose.onAllNodesWithTag("network-monitor-select-all").fetchSemanticsNodes().isEmpty() && compose.onAllNodes(hasTestTag("network-monitor-count-points") and hasText("3"),useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()}
+            scroll("network-station-count")
+            compose.onNodeWithTag("network-monitor-count-points",useUnmergedTree=true).assertTextEquals("3")
             stage="native point tariff"
             section("points")
             scroll("network-point-partner-demo-a-1").performClick()

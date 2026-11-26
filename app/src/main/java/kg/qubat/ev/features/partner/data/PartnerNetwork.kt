@@ -323,10 +323,14 @@ class NativePartnerRepository(val account:PartnerAccount,val state:NativePartner
     fun report(filter:NativeReportFilter,selectedDeductions:Set<NativeDeduction> = defaultDeductions):NativeNetworkReport {requirePermission(NativePermission.REPORT);return buildReport(filter,true,selectedDeductions)}
     fun exportReport(filter:NativeReportFilter,selectedDeductions:Set<NativeDeduction> = defaultDeductions):NativeNetworkReport {requirePermission(NativePermission.EXPORT);requirePermission(NativePermission.REPORT);return buildReport(filter,true,selectedDeductions)}
     fun activeSessions():List<NativeSession> {requirePermission(NativePermission.VIEW);val ids=scopedStations().map{it.id}.toSet();return state.sessions.filter{it.stationId in ids && it.status==NativeSessionStatus.ACTIVE}.sortedBy{it.startedAt}.map{redact(it)}}
-    fun monitoring():NativeNetworkReport {requirePermission(NativePermission.VIEW);return buildReport(NativeReportFilter(PartnerPeriod.today(today)),false)}
+    fun monitoring(stationId:String?=null):NativeNetworkReport {
+        requirePermission(NativePermission.VIEW,stationId)
+        if(stationId!=null && station(stationId).archived)throw SecurityException("Точка недоступна")
+        return buildReport(NativeReportFilter(PartnerPeriod.today(today),stationId=stationId),false,excludeArchived=true)
+    }
     private fun sessionFiltered(filter:NativeReportFilter)=filter.portId!=null || filter.customerId!=null || filter.operation!=null || filter.paymentStatus!=null || filter.status!=null || filter.query.isNotBlank()
-    private fun buildReport(filter:NativeReportFilter,includeFinance:Boolean,selectedDeductions:Set<NativeDeduction> = defaultDeductions):NativeNetworkReport {
-        val base=selectedStations(filter)
+    private fun buildReport(filter:NativeReportFilter,includeFinance:Boolean,selectedDeductions:Set<NativeDeduction> = defaultDeductions,excludeArchived:Boolean=false):NativeNetworkReport {
+        val base=selectedStations(filter).filter{!excludeArchived || !it.archived}
         val raw=selectedSessions(base,filter)
         val query=filter.query.trim()
         val stations=if(query.isBlank())base else base.filter{stationMatches(it,query) || raw.any{s->s.stationId==it.id}}
