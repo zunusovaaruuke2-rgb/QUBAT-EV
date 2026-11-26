@@ -128,6 +128,8 @@ class PartnerCabinetTest {
             val previous=YearMonth.now(PARTNER_ZONE).minusMonths(1)
             val previousCaption=previous.format(java.time.format.DateTimeFormatter.ofPattern("MM.yyyy"))
             compose.waitUntil(5000){compose.onAllNodes(hasTestTag("network-period-label") and hasText(previousCaption,substring=true)).fetchSemanticsNodes().isNotEmpty()}
+            scroll("network-finance-bills").performClick()
+            compose.waitUntil(5000){compose.onNodeWithTag("network-finance-bills").stateDescriptionOnMain()=="Развёрнуто"}
             scroll("network-bill-edit-$previous").performClick()
             compose.onNodeWithTag("network-bill-amount").performScrollTo().performTextReplacement("6543.21")
             compose.onNodeWithTag("network-bill-number").performScrollTo().performTextReplacement("DEMO-NATIVE-001")

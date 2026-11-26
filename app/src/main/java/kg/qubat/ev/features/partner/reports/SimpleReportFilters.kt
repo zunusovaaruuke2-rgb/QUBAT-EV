@@ -15,7 +15,7 @@ import androidx.compose.ui.unit.sp
 import java.time.LocalDate
 
 /** Simple report controls are separate from the finance screen's advanced filters. */
-@Composable internal fun simpleReportFilters(repo: NativePartnerRepository): NativeFilterUi {
+@Composable internal fun simpleReportFilters(repo: NativePartnerRepository, includePreviousMonth: Boolean = false): NativeFilterUi {
     var from by rememberSaveable(repo.account.id) { mutableStateOf(repo.today.minusDays(6).toString()) }
     var to by rememberSaveable(repo.account.id) { mutableStateOf(repo.today.toString()) }
     var stationId by rememberSaveable(repo.account.id) { mutableStateOf("") }
@@ -71,6 +71,10 @@ import java.time.LocalDate
                 AppText("▾")
             }
             AppText("Даты по времени Бишкека", fontSize = 12.sp, color = Muted)
+            if (includePreviousMonth) PressTextButton(onClick = {
+                val end = repo.today.withDayOfMonth(1).minusDays(1)
+                from = end.withDayOfMonth(1).toString(); to = end.toString()
+            }, modifier = Modifier.testTag("network-period-previous")) { AppText("Прошлый месяц", fontSize = 13.sp) }
             DepthOutlinedButton(onClick = { query = ""; picker = true },
                 modifier = Modifier.fillMaxWidth().testTag("network-station-filter")) {
                 // A deleted/revoked selection is never silently presented as all locations.

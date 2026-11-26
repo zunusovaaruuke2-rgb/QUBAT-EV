@@ -14,15 +14,15 @@ import androidx.compose.ui.unit.dp
 import java.time.*
 import kotlinx.coroutines.*
 
-@Composable internal fun NativeExpenseEditor(repo:NativePartnerRepository,initialDate:LocalDate,onDismiss:()->Unit,onSaved:()->Unit){
+@Composable internal fun NativeExpenseEditor(repo:NativePartnerRepository,initialDate:LocalDate,onDismiss:()->Unit,kindOnly:NativeExpenseKind?=null,onSaved:()->Unit){
     val stations=repo.stations(includeArchived=true)
     var stationId by remember{mutableStateOf(stations.first().id)}
-    var kind by remember{mutableStateOf(NativeExpenseKind.OTHER)}
+    var kind by remember{mutableStateOf(kindOnly?:NativeExpenseKind.OTHER)}
     var amount by remember{mutableStateOf("")};var date by remember{mutableStateOf(initialDate.toString())};var reason by remember{mutableStateOf("")};var paid by remember{mutableStateOf(false)};var error by remember{mutableStateOf<String?>(null)}
     val valid=nativeDecimal(amount)?.signum()?.let{it>=0}==true&&reason.isNotBlank()&&runCatching{LocalDate.parse(date)}.isSuccess
-    AlertDialog(onDismissRequest=onDismiss,title={AppText("Расход / выплата · ДЕМО")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
+    AlertDialog(onDismissRequest=onDismiss,title={AppText(if(kindOnly==NativeExpenseKind.PAYOUT)"Выплата партнёру · ДЕМО" else "Расход · ДЕМО")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)){
         stations.forEach{s->DepthChip(stationId==s.id,{stationId=s.id},label={AppText(s.title)})}
-        NativeExpenseKind.entries.forEach{k->DepthChip(kind==k,{kind=k},label={AppText(k.label)})}
+        (kindOnly?.let{listOf(it)}?:NativeExpenseKind.entries.filter{it!=NativeExpenseKind.PAYOUT}).forEach{k->DepthChip(kind==k,{kind=k},label={AppText(k.label)})}
         NativeField("Сумма, сом",amount,"network-expense-amount"){amount=it.take(18)}
         CalendarDateField("Дата",date,"network-expense-date"){date=it}
         NativeField("Причина / документ",reason,"network-expense-reason"){reason=it.take(300)}

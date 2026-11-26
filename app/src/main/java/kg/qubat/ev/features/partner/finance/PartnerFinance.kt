@@ -25,13 +25,24 @@ import kotlinx.coroutines.*
 
 @Composable internal fun NativeFinance(repo:NativePartnerRepository,revision:Int,onChanged:()->Unit){
     if(!repo.can(NativePermission.FINANCE)){NativeDenied();return}
-    val selected=nativeFilters(repo)
-    var deductions by remember{mutableStateOf(NativePartnerRepository.defaultDeductions)}
+    val selected=simpleReportFilters(repo,includePreviousMonth=true)
+    var deductions by remember(repo.account.id){mutableStateOf(NativePartnerRepository.defaultDeductions)}
     var formula by remember{mutableStateOf(false)}
-    var actual by rememberSaveable{mutableStateOf(false)}
+    var actual by rememberSaveable(repo.account.id){mutableStateOf(false)}
+    var billsOpen by rememberSaveable(repo.account.id){mutableStateOf(false)}
+    var payoutsOpen by rememberSaveable(repo.account.id){mutableStateOf(false)}
+    var detailsOpen by rememberSaveable(repo.account.id){mutableStateOf(false)}
     var billMonth by remember{mutableStateOf<YearMonth?>(null)}
     var expense by remember{mutableStateOf(false)}
+    var payoutEditor by remember{mutableStateOf(false)}
     var terms by remember{mutableStateOf(false)}
+    if(selected.filter.stationId!=null && repo.stations(includeArchived=true).none{it.id==selected.filter.stationId}){
+        LazyColumn(Modifier.fillMaxSize().testTag("network-finance-scroll"),contentPadding=PaddingValues(18.dp)){
+            item{selected.content()}
+            item{NativePanel("Точка недоступна"){AppText("Выберите другую точку",color=Muted)}}
+        }
+        return
+    }
     val report=remember(repo,selected.filter,revision,deductions){repo.report(selected.filter,deductions)}
     val rows=report.monthlyFinance
     val context=LocalContext.current
@@ -42,13 +53,36 @@ import kotlinx.coroutines.*
     }},confirmButton={PressTextButton(onClick={formula=false}){AppText("Применить")}})
     billMonth?.let{month->NativeBillEditor(repo,month,{billMonth=null}){onChanged();billMonth=null}}
     if(expense)NativeExpenseEditor(repo,selected.filter.period.to,{expense=false}){onChanged();expense=false}
+    if(payoutEditor)NativeExpenseEditor(repo,selected.filter.period.to,{payoutEditor=false},kindOnly=NativeExpenseKind.PAYOUT){onChanged();payoutEditor=false}
     if(terms)NativeFinancialTerms(repo,{terms=false}){onChanged();terms=false}
     LazyColumn(Modifier.fillMaxSize().testTag("network-finance-scroll"),contentPadding=PaddingValues(18.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
         item(key="filters"){selected.content()}
-        item(key="mode"){Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){DepthChip(!actual,{actual=false},label={AppText("Расчётный")});DepthChip(actual,{actual=true},Modifier.testTag("network-finance-actual"),label={AppText("Фактический")})}}
-        item(key="rule"){AppText(if(actual)"Факт берётся из квитанции за полный месяц. При отсутствии счёта показывается «Нет данных»." else "Расчётное электричество и фактическая квитанция сохраняются отдельно. Все значения демонстрационные.",fontSize=11.sp,color=Muted)}
-        item(key="profit"){NativeMetric(if(actual)"Фактическая прибыль" else "Расчётная прибыль",nativeMoney(knownSum(rows.map{if(actual)it.actualProfitKgs else it.estimatedProfitKgs})),"network-finance-profit")}
-        item(key="reconcile"){NativePanel("Акт сверки"){
+        item(key="profit"){FinanceProfitSummary(rows,actual,deductions)}
+        item(key="breakdown"){FinanceBreakdown(rows,actual,deductions)}
+        item(key="bills-link"){FinanceSectionButton("Квитанции и расходы","Добавить квитанцию за электричество",billsOpen,"network-finance-bills"){billsOpen=!billsOpen}}
+        item(key="payouts-link"){FinanceSectionButton("Выплаты партнёру","Что уже перечислено владельцу",payoutsOpen,"network-finance-payouts"){payoutsOpen=!payoutsOpen}}
+        if(payoutsOpen){
+            item(key="payout-summary"){NativePanel("Выплаты партнёру"){
+                FinanceAmount("Подтверждённые выплаты за период",knownSum(rows.map{it.payoutKgs}),"network-finance-payout-total")
+                AppText("Прибыль и выплата — разные суммы",fontSize=12.sp,color=Muted)
+            }}
+            if(repo.can(NativePermission.EDIT_FINANCE) && report.stations.isNotEmpty())item(key="payout-create"){DepthOutlinedButton(onClick={payoutEditor=true},modifier=Modifier.fillMaxWidth().testTag("network-payout-create")){AppText("Записать выплату")}}
+            val payouts=report.expenses.filter{it.kind==NativeExpenseKind.PAYOUT}
+            if(payouts.isEmpty())item(key="payout-empty"){AppText("Записей о выплатах за период нет",fontSize=13.sp,color=Muted)}
+            items(payouts,key={"payout-${it.id}"},contentType={"payout"}){payment->NativePanel(report.stations.firstOrNull{it.station.id==payment.stationId}?.station?.title?:payment.stationId){
+                AppText(nativeMoney(payment.amountKgs),fontWeight=FontWeight.SemiBold,color=Lime)
+                AppText(nativeDate.format(payment.date),fontSize=13.sp)
+                AppText(if(payment.paid)"Подтверждена · демо" else "Не подтверждена · демо",fontSize=13.sp,color=Muted)
+                if(payment.note.isNotBlank())AppText(payment.note,fontSize=13.sp)
+            }}
+        }
+        item(key="export"){NativeExport(repo,report,onChanged)}
+        item(key="details-link"){FinanceSectionButton("Подробный расчёт","Сверка, статьи расходов и условия договора",detailsOpen,"network-finance-details"){detailsOpen=!detailsOpen}}
+        if(billsOpen){
+            item(key="mode"){Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){DepthChip(!actual,{actual=false},label={AppText("По тарифам")});DepthChip(actual,{actual=true},Modifier.testTag("network-finance-actual"),label={AppText("По квитанциям")})}}
+            item(key="rule"){AppText("Квитанция учитывается только за полный месяц. Неизвестные суммы показываются как «Нет данных».",fontSize=12.sp,color=Muted)}
+        }
+        if(detailsOpen)item(key="reconcile"){NativePanel("Акт сверки"){
             AppText("Начислено: ${nativeMoney(report.summary.chargedKgs)}")
             AppText("Оплачено по сессиям: ${nativeMoney(report.summary.paidKgs)}")
             AppText("Поступления реестра: ${nativeMoney(report.summary.paymentLedgerKgs)}")
@@ -57,11 +91,10 @@ import kotlinx.coroutines.*
             AppText("Не оплачено: ${nativeMoney(report.summary.unpaidKgs)}",fontSize=12.sp,color=Muted)
             PressTextButton(onClick={formula=true},modifier=Modifier.testTag("network-finance-formula")){AppText("Статьи расчёта")}
         }}
-        if(repo.can(NativePermission.EDIT_FINANCE))item(key="expense"){DepthOutlinedButton(onClick={expense=true},modifier=Modifier.fillMaxWidth().testTag("network-expense-create")){AppText("Внести расход / выплату")}}
-        if(repo.can(NativePermission.EDIT_TARIFF))item(key="terms"){DepthOutlinedButton(onClick={terms=true},modifier=Modifier.fillMaxWidth().testTag("network-financial-terms")){AppText("Договорные ставки и история")}}
-        item(key="export"){NativeExport(repo,report,onChanged)}
+        if(billsOpen && repo.can(NativePermission.EDIT_FINANCE) && report.stations.isNotEmpty())item(key="expense"){DepthOutlinedButton(onClick={expense=true},modifier=Modifier.fillMaxWidth().testTag("network-expense-create")){AppText("Добавить расход")}}
+        if(detailsOpen && repo.can(NativePermission.EDIT_TARIFF))item(key="terms"){DepthOutlinedButton(onClick={terms=true},modifier=Modifier.fillMaxWidth().testTag("network-financial-terms")){AppText("Договорные ставки и история")}}
         attachmentError?.let{message->item(key="attachment-error"){AppText(message,color=MaterialTheme.colorScheme.error)}}
-        items(report.monthBills,key={"invoice-${it.id}"},contentType={"invoice"}){invoice->NativePanel("Квитанция №${invoice.billNumber}","network-invoice-${invoice.id}"){
+        if(billsOpen)items(report.monthBills,key={"invoice-${it.id}"},contentType={"invoice"}){invoice->NativePanel("Квитанция №${invoice.billNumber}","network-invoice-${invoice.id}"){
             AppText(report.stations.firstOrNull{it.station.id==invoice.stationId}?.station?.title?:invoice.stationId)
             AppText("${invoice.month} · ${nativeMoney(invoice.electricityKgs)}",color=Lime,fontWeight=FontWeight.Bold)
             AppText("Дата документа: ${invoice.billDate} · ${if(invoice.paid)"Оплачено · ДЕМО" else "Не оплачено"}",fontSize=12.sp)
@@ -73,7 +106,7 @@ import kotlinx.coroutines.*
             }
         }}
         if(rows.isEmpty())item(key="empty"){NativePanel("За период финансовых записей не найдено"){AppText("Измените даты или выбранную станцию",color=Muted)}}
-        items(rows,key={it.month.toString()},contentType={"month"}){m->NativePanel("${m.month} · ${m.stationIds.size} точек","network-month-${m.month}"){
+        if(billsOpen || detailsOpen)items(rows,key={it.month.toString()},contentType={"month"}){m->NativePanel("${m.month} · ${m.stationIds.size} точек","network-month-${m.month}"){
             AppText(nativeEnergy(m.energyKwh),color=Lime)
             AppText("Оплаченная выручка: ${nativeMoney(m.revenueKgs)}")
             AppText("Электричество: расчёт ${nativeMoney(m.electricityEstimateKgs)}\nФакт ${nativeMoney(m.electricityFactKgs)}",Modifier.testTag("network-month-electricity"),fontSize=12.sp)
