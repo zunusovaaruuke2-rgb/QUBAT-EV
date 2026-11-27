@@ -6,6 +6,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -150,7 +152,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
                 val port=site?.connectors?.firstOrNull {it.id==id}
                 if(site!=null && port!=null) AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={focusedConnectorId=null},
                     title={AppText("Аппарат ${site.chargerNumber(id)} · разъём ${port.number}")},
-                    text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                    text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                         AppText(port.state.title,color=Color(port.state.argb),fontWeight=FontWeight.Bold,modifier=Modifier.testTag("connector-dialog-state"))
                         AppText("${site.city} · ${site.title}")
                         AppText("GB/T DC · 80 кВт · "+driverRateLabel(discounts[site.id]?.rateMinor?:site.tariffMinor),color=Muted,fontSize=13.sp)
@@ -170,7 +172,7 @@ private enum class Tab(val label: String,val icon: ImageVector) {
             }
             detailId?.let { id ->
                 val s=stations.first {it.id==id}
-                AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={detailId=null},title={AppText("${s.city} · ДЕМО")},text={Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                AlertDialog(modifier=Modifier.depthFrame(RoundedCornerShape(28.dp),MaterialTheme.colorScheme.surfaceContainerHigh,3.dp,fill=false),onDismissRequest={detailId=null},title={AppText("${s.city} · ДЕМО")},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(10.dp)) {
                     AppText(s.title,fontWeight=FontWeight.Bold);AppText("${s.status.title} · ${s.availableConnectors} из ${s.connectorCount} мест свободно\n80 кВт на место · GB/T DC")
                     DriverDiscountPrice(s.id)
                     AppText("Вымышленная станция у центра города. По этим координатам зарядной станции может не быть. Маршрут — только для проверки интерфейса.",color=Amber)
