@@ -7,8 +7,8 @@ android {
         applicationId = "kg.qubat.ev"
         minSdk = 26
         targetSdk = 35
-        versionCode = 24
-        versionName = "1.9.2-demo"
+        versionCode = 32
+        versionName = "1.16.0-demo"
         manifestPlaceholders["mapsApiKey"] = mapsKey.get()
         buildConfigField("boolean", "MAPS_CONFIGURED", mapsKey.get().isNotBlank().toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -31,6 +31,7 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.9.3")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
+    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("org.maplibre.gl:android-sdk:11.11.0")

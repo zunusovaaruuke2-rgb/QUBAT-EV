@@ -60,7 +60,7 @@ class NavigationTest {
             compose.onNodeWithText("Источники карты").assertIsDisplayed()
             compose.onNodeWithText("Закрыть").performClick()
             val map=compose.onNodeWithTag("world-map")
-            compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+            compose.waitUntil(45000) {map.stateDescriptionOnMain().contains("карта загружена")}
             var nativeMap:MapLibreMap?=null
             lateinit var nativeView:MapView
             compose.runOnIdle {nativeView=findMapView(compose.activity.window.decorView)!!;nativeView.getMapAsync {nativeMap=it}}
@@ -84,11 +84,11 @@ class NavigationTest {
                 val switch=if(compose.onAllNodesWithContentDescription("Ночная тема").fetchSemanticsNodes().isNotEmpty()) "Ночная тема" else "Дневная тема"
                 compose.onNodeWithContentDescription(switch).performClick()
                 compose.waitForIdle()
-                compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+                compose.waitUntil(45000) {map.stateDescriptionOnMain().contains("карта загружена")}
                 verifyMapContrast()
                 compose.onNodeWithContentDescription(if(switch=="Ночная тема") "Дневная тема" else "Ночная тема").assertIsDisplayed().performClick()
                 compose.waitForIdle()
-                compose.waitUntil(45000) {map.fetchSemanticsNode().config[SemanticsProperties.StateDescription].contains("карта загружена")}
+                compose.waitUntil(45000) {map.stateDescriptionOnMain().contains("карта загружена")}
                 verifyMapContrast()
             }
             verifyMapContrast()
@@ -133,7 +133,7 @@ class NavigationTest {
             step("Увеличение масштаба карты") {
                 compose.onNodeWithContentDescription("Увеличить карту").performClick()
                 try {compose.waitUntil(10000) {zoom()>initial+0.5}}
-                catch(failure:Throwable) {throw AssertionError("Масштаб до: $initial; после: ${zoom()}; ${map.fetchSemanticsNode().config[SemanticsProperties.StateDescription]}",failure)}
+                catch(failure:Throwable) {throw AssertionError("Масштаб до: $initial; после: ${zoom()}; ${map.stateDescriptionOnMain()}",failure)}
             }
             val initialLongitude=centre().longitude
             step("Перемещение нативной карты") {
@@ -194,9 +194,14 @@ class NavigationTest {
             compose.onNodeWithText("Север · DEMO 01").assertIsDisplayed().performClick()
             compose.waitUntil(10000) {compose.onAllNodesWithTag("map-station-card").fetchSemanticsNodes().isNotEmpty()}
             compose.onNodeWithTag("connector-demo-bishkek-unit-1-port-1").performClick()
+            compose.onNodeWithTag("connector-dialog-state").assertTextEquals("Свободен")
+            compose.onNodeWithTag("start-charge").assertDoesNotExist()
+            compose.onNodeWithText("Закрыть").performClick()
+            compose.onNodeWithTag("connector-demo-bishkek-unit-2-port-1").performClick()
             compose.onNodeWithTag("start-charge").assertExists()
             compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
-            visible("Аппарат 1 · разъём 1 · Свободен")
+            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-2-port-1").assertIsDisplayed()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-2-port-1",useUnmergedTree=true).assertTextEquals("Подключён").assertIsDisplayed()
         }
         step("Поиск только по названию станции и пустое состояние") {
             compose.onNodeWithText("Список",useUnmergedTree=true).performClick()
@@ -215,11 +220,32 @@ class NavigationTest {
             compose.onNodeWithTag("station-search-field").performImeAction()
             visible("Тянь-Шань · DEMO 05")
             step("Список показывает состояния отдельных разъёмов") {
-                listOf("1-port-2" to "Заряжается","2-port-1" to "Подключён","3-port-1" to "Завершён","3-port-2" to "Ошибка").forEach {(suffix,title)->
-                    compose.onNodeWithTag("connector-demo-naryn-unit-$suffix").performScrollTo().performClick()
-                    compose.onNodeWithTag("connector-dialog-state").assertTextEquals(title)
-                    compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
-                    compose.onNodeWithText("Закрыть").performClick()
+                // Charging is checked on Bishkek map above. Naryn now has a one-port first apparatus.
+                val site=DemoData.stations.first{it.id=="demo-naryn"}
+                listOf(ConnectorState.CONNECTED,ConnectorState.COMPLETED,ConnectorState.ERROR).forEach {state->
+                    val source=when {
+                        state==ConnectorState.CONNECTED -> DemoData.stations.first()
+                        site.connectors.any{it.state==state} -> site
+                        else -> DemoData.stations.first{it.connectors.any{port->port.state==state}}
+                    }
+                    compose.onNodeWithTag("station-search-field").performTextClearance()
+                    compose.onNodeWithTag("station-search-field").performTextInput(source.title.substringBefore(" ·"))
+                    compose.onNodeWithTag("station-search-field").performImeAction()
+                    visible(source.title)
+                    val port=source.connectors.first{it.state==state}
+                    val title=state.title
+                    compose.onNodeWithTag("connector-${port.id}").performScrollTo().performClick()
+                    if(state==ConnectorState.CONNECTED) {
+                        compose.onNodeWithTag("charge-choice-${port.id}").performScrollTo().assertIsDisplayed()
+                        compose.onNodeWithTag("choice-status-${port.id}",useUnmergedTree=true).assertTextEquals(title)
+                        compose.onNodeWithTag("start-charge").assertIsEnabled()
+                        compose.onNodeWithText("Список",useUnmergedTree=true).performClick()
+                        compose.onNodeWithContentDescription("Поиск станции").performClick()
+                    } else {
+                        compose.onNodeWithTag("connector-dialog-state").assertTextEquals(title)
+                        compose.onNodeWithText("Выбрать разъём").assertDoesNotExist()
+                        compose.onNodeWithText("Закрыть").performClick()
+                    }
                 }
             }
             compose.onNodeWithTag("station-search-field").performTextClearance()
@@ -242,23 +268,24 @@ class NavigationTest {
         }
         step("Старт и остановка симуляции") {
             compose.onNodeWithText("Зарядка",useUnmergedTree=true).performClick()
-            compose.onNodeWithTag("start-charge").performScrollTo().performClick()
+            compose.onNodeWithTag("start-charge").assertIsDisplayed().performClick()
             visible("Зарядка идёт")
             android.os.SystemClock.sleep(1300)
-            compose.onNodeWithTag("charge-power-chart").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithText("Остановить симуляцию",substring=true).performScrollTo().performClick()
-            visible("Аппарат 1 · разъём 1 · Завершён")
-            compose.onNodeWithText("Освободить разъём после сеанса").performScrollTo()
+            compose.onNodeWithTag("charge-percent-chart").assertIsDisplayed()
+            compose.onNodeWithText("Остановить зарядку",substring=true).assertIsDisplayed().performClick()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-2-port-1",useUnmergedTree=true).performScrollTo().assertTextEquals("Завершён").assertIsDisplayed()
+            compose.onNodeWithText("Освободить разъём после сеанса").assertIsDisplayed()
                 .performSemanticsAction(SemanticsActions.OnClick) { it() }
-            compose.onNode(hasScrollAction() and SemanticsMatcher.keyIsDefined(SemanticsProperties.VerticalScrollAxisRange)).performSemanticsAction(SemanticsActions.ScrollBy) { it(0f,-10000f) }
+            compose.waitForIdle()
             try {
                 compose.waitUntil(5000) {
-                    compose.onAllNodesWithText("Аппарат 1 · разъём 1 · Свободен").fetchSemanticsNodes().isNotEmpty()
+                    compose.onAllNodes(hasTestTag("choice-status-demo-bishkek-unit-2-port-1") and hasText("Подключён"),useUnmergedTree=true).fetchSemanticsNodes().isNotEmpty()
                 }
             } catch(failure:Throwable) {
                 throw AssertionError(compose.onRoot().printToString(),failure)
             }
-            visible("Аппарат 1 · разъём 1 · Свободен")
+            compose.onNodeWithTag("charge-choice-demo-bishkek-unit-2-port-1").performScrollTo().assertIsDisplayed()
+            compose.onNodeWithTag("choice-status-demo-bishkek-unit-2-port-1",useUnmergedTree=true).assertTextEquals("Подключён").assertIsDisplayed()
         }
         step("История и профиль") {
             compose.onNodeWithText("Кошелёк",useUnmergedTree=true).performClick()
@@ -339,7 +366,7 @@ class NavigationTest {
                 compose.waitUntil(10000) {nearMe()}
                 android.os.SystemClock.sleep(2100)
                 fix(42.876,74.571)
-                compose.waitUntil(10000) {compose.onNodeWithTag("user-location").fetchSemanticsNode().config[SemanticsProperties.StateDescription]=="42.876,74.571"}
+                compose.waitUntil(10000) {compose.onNodeWithTag("user-location").stateDescriptionOnMain()=="42.876,74.571"}
             } finally {manager.removeTestProvider(android.location.LocationManager.GPS_PROVIDER)}
         }
     }
