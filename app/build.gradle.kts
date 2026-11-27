@@ -7,8 +7,8 @@ android {
         applicationId = "kg.qubat.ev"
         minSdk = 26
         targetSdk = 35
-        versionCode = 31
-        versionName = "1.15.1-demo"
+        versionCode = 32
+        versionName = "1.16.0-demo"
         manifestPlaceholders["mapsApiKey"] = mapsKey.get()
         buildConfigField("boolean", "MAPS_CONFIGURED", mapsKey.get().isNotBlank().toString())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
